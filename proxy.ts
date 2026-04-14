@@ -1,11 +1,32 @@
-import { authkitProxy } from "@workos-inc/authkit-nextjs";
+import { authkit, handleAuthkitHeaders } from "@workos-inc/authkit-nextjs";
+import type { NextRequest } from "next/server";
 
-export const proxy = authkitProxy({
-  middlewareAuth: {
-    enabled: true,
-    unauthenticatedPaths: ["/", "/api/auth/signin", "/api/auth/callback"],
-  },
-});
+const AUTH_CALLBACK_PATH = "/api/auth/callback";
+
+function getRedirectUri(request: NextRequest): string {
+  return new URL(AUTH_CALLBACK_PATH, request.url).toString();
+}
+
+async function authProxy(request: NextRequest) {
+  const { session, headers, authorizationUrl } = await authkit(request, {
+    redirectUri: getRedirectUri(request),
+  });
+
+  if (
+    request.nextUrl.pathname.startsWith("/dashboard") &&
+    !session.user &&
+    authorizationUrl
+  ) {
+    return handleAuthkitHeaders(request, headers, {
+      redirect: authorizationUrl,
+    });
+  }
+
+  return handleAuthkitHeaders(request, headers);
+}
+
+export default authProxy;
+export { authProxy as proxy };
 
 export const config = {
   matcher: [

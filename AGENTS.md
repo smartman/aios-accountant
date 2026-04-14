@@ -23,7 +23,9 @@ Do not add or rely on ad-hoc import scripts for local testing in this repo.
 
 Invoice import testing should be done through the app UI using Playwright MCP, with credentials read from `.env.local`.
 
-Keep the Playwright MCP browser session open while testing so progress stays visible to the user. Do not close the browser session between steps unless the user explicitly asks or the work is fully complete.
+`npm run dev` is started externally for this repo. Assume the existing dev server will automatically pick up file changes, and do not ask for or suggest restarting it unless the user explicitly requests that restart.
+
+Keep the Playwright MCP browser session and browser window open while testing so progress stays visible to the user. Do not close the browser session or browser window between steps unless the user explicitly asks or the work is fully complete.
 
 Do not print secret values in logs, test output, or commit them into tracked files.
 
