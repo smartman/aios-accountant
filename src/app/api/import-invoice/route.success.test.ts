@@ -24,6 +24,8 @@ const hoisted = vi.hoisted(() => ({
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
   },
+  meritFindVendor: vi.fn(),
+  smartAccountsFindVendor: vi.fn(),
 }));
 
 vi.mock("@/lib/openrouter", () => ({
@@ -38,8 +40,14 @@ vi.mock("@/lib/user-accounting-connections", () => ({
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
+vi.mock("@/lib/merit-data", () => ({
+  findVendor: hoisted.meritFindVendor,
+}));
 vi.mock("@/lib/smartaccounts-adapter", () => ({
   smartAccountsProviderAdapter: hoisted.smartAccountsProviderAdapter,
+}));
+vi.mock("@/lib/smartaccounts-data", () => ({
+  findVendor: hoisted.smartAccountsFindVendor,
 }));
 
 function buildExtraction(
@@ -189,6 +197,8 @@ beforeEach(async () => {
   vi.resetAllMocks();
   Object.assign(hoisted.smartAccountsProviderAdapter, buildAdapter());
   Object.assign(hoisted.meritProviderAdapter, buildAdapter());
+  hoisted.smartAccountsFindVendor.mockResolvedValue(null);
+  hoisted.meritFindVendor.mockResolvedValue(null);
 
   const { extractInvoiceWithOpenRouter } = await import("@/lib/openrouter");
   vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(buildExtraction());

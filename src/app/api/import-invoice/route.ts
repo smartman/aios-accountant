@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { MeritCredentials, SmartAccountsCredentials } from "@/lib/accounting-provider-types";
-import { getStoredAccountingConnection, type StoredAccountingConnection } from "@/lib/user-accounting-connections";
+import {
+  MeritCredentials,
+  SmartAccountsCredentials,
+} from "@/lib/accounting-provider-types";
+import {
+  getStoredAccountingConnection,
+  type StoredAccountingConnection,
+} from "@/lib/user-accounting-connections";
 import { getUser } from "@/lib/workos";
 import { meritProviderAdapter } from "@/lib/merit";
 import { smartAccountsProviderAdapter } from "@/lib/smartaccounts-adapter";
@@ -48,7 +54,8 @@ async function importForSavedConnection(
     return importWithAdapter({
       savedConnection,
       adapter: smartAccountsProviderAdapter,
-      credentials: savedConnection.credentials.credentials as SmartAccountsCredentials,
+      credentials: savedConnection.credentials
+        .credentials as SmartAccountsCredentials,
       mimeType,
       filename,
       buffer,

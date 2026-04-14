@@ -6,10 +6,7 @@ import {
 } from "./invoice-import-types";
 
 const SMARTACCOUNTS_TIMEZONE = "Europe/Tallinn";
-
-function smartAccountsBaseUrl(): string {
-  return process.env.SMARTACCOUNTS_BASE_URL ?? "https://sa.smartaccounts.eu/en/api";
-}
+const SMARTACCOUNTS_API_ROOT = "https://sa.smartaccounts.eu/en/api";
 
 export const CACHE_TTLS = {
   accounts: 10 * 60 * 1000,
@@ -178,7 +175,7 @@ export async function smartAccountsRequest<T>(
     apikey: publicKey,
   });
   const signature = signSmartAccountsRequest(query, bodyText, credentials);
-  const url = `${smartAccountsBaseUrl()}${path}:${methodName}?${query}&signature=${signature}`;
+  const url = `${SMARTACCOUNTS_API_ROOT}${path}:${methodName}?${query}&signature=${signature}`;
 
   const response = await fetch(url, {
     method: options?.httpMethod ?? (options?.body ? "POST" : "GET"),

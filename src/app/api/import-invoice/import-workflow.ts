@@ -8,7 +8,11 @@ import { extractInvoiceWithOpenRouter } from "@/lib/openrouter";
 import { ImportedInvoiceResult } from "@/lib/invoice-import-types";
 import { findVendor as findMeritVendor } from "@/lib/merit-data";
 import { findVendor as findSmartAccountsVendor } from "@/lib/smartaccounts-data";
-import { generateFallbackInvoiceNumber, resolvePurchaseRows, uniqueAccounts } from "@/lib/provider-import-helpers";
+import {
+  generateFallbackInvoiceNumber,
+  resolvePurchaseRows,
+  uniqueAccounts,
+} from "@/lib/provider-import-helpers";
 import { type StoredAccountingConnection } from "@/lib/user-accounting-connections";
 
 function bufferToDataUrl(buffer: Buffer, mimeType: string): string {
@@ -28,13 +32,21 @@ function assertReferenceAccounts(
   );
 }
 
-async function extractInvoiceData<TCredentials>(params: {
-  savedConnection: StoredAccountingConnection;
-  fingerprint: string;
-  filename: string;
-  mimeType: string;
-  buffer: Buffer;
-}, accounts: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>["referenceData"]["accounts"], taxCodes: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>["referenceData"]["taxCodes"]) {
+async function extractInvoiceData<TCredentials>(
+  params: {
+    savedConnection: StoredAccountingConnection;
+    fingerprint: string;
+    filename: string;
+    mimeType: string;
+    buffer: Buffer;
+  },
+  accounts: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >["referenceData"]["accounts"],
+  taxCodes: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >["referenceData"]["taxCodes"],
+) {
   const extraction = await extractInvoiceWithOpenRouter({
     provider: params.savedConnection.provider,
     filename: params.filename,
@@ -107,10 +119,12 @@ async function findExistingVendorBeforeCreate(params: {
   };
 }
 
-async function findExistingImportedInvoice<TCredentials>(params: {
+export async function findExistingImportedInvoice<TCredentials>(params: {
   adapter: AccountingProviderAdapter<TCredentials>;
   credentials: TCredentials;
-  context: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>;
+  context: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >;
   extraction: ImportedInvoiceResult["extraction"];
   savedConnection: StoredAccountingConnection;
   vendor: ProviderVendorResult;
@@ -145,7 +159,10 @@ async function findExistingImportedInvoice<TCredentials>(params: {
     attachedFile: false,
     createdPayment: false,
     paymentId: null,
-    purchaseAccounts: uniqueAccounts(params.rows, params.context.referenceData.accounts),
+    purchaseAccounts: uniqueAccounts(
+      params.rows,
+      params.context.referenceData.accounts,
+    ),
     paymentAccount: null,
     extraction: params.extraction,
     alreadyExisted: true,
@@ -155,12 +172,16 @@ async function findExistingImportedInvoice<TCredentials>(params: {
 async function recordPaymentIfNeeded<TCredentials>(params: {
   adapter: AccountingProviderAdapter<TCredentials>;
   credentials: TCredentials;
-  context: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>;
+  context: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >;
   createdInvoiceId: string;
   extraction: ImportedInvoiceResult["extraction"];
   vendorId: string;
   vendorName: string;
-}): Promise<Pick<ImportedInvoiceResult, "createdPayment" | "paymentId" | "paymentAccount">> {
+}): Promise<
+  Pick<ImportedInvoiceResult, "createdPayment" | "paymentId" | "paymentAccount">
+> {
   if (!params.extraction.payment.isPaid) {
     return {
       createdPayment: false,
@@ -206,7 +227,9 @@ async function recordPaymentIfNeeded<TCredentials>(params: {
 async function attachFileIfNeeded<TCredentials>(params: {
   adapter: AccountingProviderAdapter<TCredentials>;
   credentials: TCredentials;
-  context: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>;
+  context: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >;
   createdInvoiceId: string;
   createdInvoiceAttachedFile: boolean | undefined;
   extraction: ImportedInvoiceResult["extraction"];
@@ -242,14 +265,21 @@ async function attachFileIfNeeded<TCredentials>(params: {
 async function resolveVendorAndExistingInvoice<TCredentials>(params: {
   adapter: AccountingProviderAdapter<TCredentials>;
   credentials: TCredentials;
-  context: Awaited<ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>>;
+  context: Awaited<
+    ReturnType<AccountingProviderAdapter<TCredentials>["loadContext"]>
+  >;
   extraction: ImportedInvoiceResult["extraction"];
   savedConnection: StoredAccountingConnection;
   rows: ReturnType<typeof resolvePurchaseRows>;
-}): Promise<{ vendor: ProviderVendorResult; existingResult: ImportedInvoiceResult | null }> {
+}): Promise<{
+  vendor: ProviderVendorResult;
+  existingResult: ImportedInvoiceResult | null;
+}> {
   const existingVendor = await findExistingVendorBeforeCreate({
     savedConnection: params.savedConnection,
-    credentials: params.credentials as SmartAccountsCredentials | MeritCredentials,
+    credentials: params.credentials as
+      | SmartAccountsCredentials
+      | MeritCredentials,
     extraction: params.extraction,
   });
 
@@ -300,7 +330,10 @@ export async function importWithAdapter<TCredentials>(params: {
   fingerprint: string;
 }): Promise<ImportedInvoiceResult> {
   const context = await params.adapter.loadContext(params.credentials);
-  assertReferenceAccounts(params.savedConnection, context.referenceData.accounts.length);
+  assertReferenceAccounts(
+    params.savedConnection,
+    context.referenceData.accounts.length,
+  );
   const extraction = await extractInvoiceData<TCredentials>(
     params,
     context.referenceData.accounts,
