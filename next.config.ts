@@ -12,6 +12,7 @@ const appUrl = productionUrl ?? branchUrl ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
   env: {
+    NEXT_PUBLIC_WORKOS_REDIRECT_URI: `${appUrl}/api/auth/callback`,
     WORKOS_REDIRECT_URI: `${appUrl}/api/auth/callback`,
   },
 };
