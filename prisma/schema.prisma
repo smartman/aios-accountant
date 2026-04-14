@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model UserAccountingConnection {
+  workosUserId         String   @id
+  provider             String
+  encryptedCredentials String
+  credentialSummary    Json
+  verifiedAt           DateTime
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
