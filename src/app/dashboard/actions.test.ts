@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { saveAccountingConnection } from "./actions";
+import { getUser } from "@/lib/workos";
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -34,11 +36,6 @@ afterEach(() => {
 
 describe("saveAccountingConnection", () => {
   it("returns an auth error when no user is signed in", async () => {
-    const [{ saveAccountingConnection }, { getUser }] = await Promise.all([
-      import("./actions"),
-      import("@/lib/workos"),
-    ]);
-
     vi.mocked(getUser).mockResolvedValue({ user: null });
 
     const result = await saveAccountingConnection(

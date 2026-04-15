@@ -130,7 +130,24 @@ function jsonSchemaForInvoiceExtraction() {
   };
 }
 
-function buildPrompt(
+function buildSystemPrompt(): string {
+  return [
+    "You extract structured data from purchase invoices for accounting imports.",
+    "The vendor is the supplier, seller, service provider, or invoice issuer that billed the customer.",
+    "Never use the invoice recipient, buyer, customer, subscriber, or bill-to entity as the vendor.",
+    "Determine vendor and customer from explicit role labels before using header branding or company logos.",
+    "Labels such as Arve saaja, Saaja, Ostja, Tellija, Klient, Buyer, Bill to, Invoice recipient, Recipient, and Customer refer to the buyer or invoice recipient, not the vendor.",
+    "Labels such as Tarnija, Supplier, Seller, Issuer, From, Payee, and Makse saaja refer to the vendor or payment recipient.",
+    "Use the PDF's visual layout when resolving party roles. Bind each label to the nearest company block in the same visual group, column, or side of the page.",
+    "Do not rely on flattened reading order when it conflicts with the visible PDF layout.",
+    "Do not treat top-of-page branding as the vendor by default. Use branding only as fallback evidence when explicit role labels are missing.",
+    "Cross-check the payment direction: the payment recipient or payee is usually the vendor, while the invoice recipient or bill-to party is the customer.",
+    "If role evidence conflicts, prefer the clearest labeled role assignment, leave uncertain fields null, and explain the ambiguity in warnings.",
+    "Return only data grounded in the document.",
+  ].join("\n");
+}
+
+function buildUserPrompt(
   provider: AccountingProvider,
   accounts: ProviderReferenceAccount[],
   taxCodes: ProviderReferenceTaxCode[],
@@ -150,8 +167,11 @@ function buildPrompt(
     provider === "smartaccounts" ? "SmartAccounts" : "Merit";
 
   return [
-    "Extract supplier invoice data from the uploaded document.",
     `Return only structured accounting data for importing a purchase invoice into ${providerLabel}.`,
+    "Vendor extraction is the top priority: vendor.* must describe the supplier or issuer, never the buyer.",
+    "For Estonian invoices, Arve saaja is the invoice recipient and Makse saaja is the payee or payment recipient. Do not copy Arve saaja details into vendor fields.",
+    "For multi-column or visually grouped PDFs, keep labels matched with the nearest company details in the same block or column.",
+    "If explicit role labels and header branding disagree, prefer the explicit labeled roles and mention the conflict in warnings.",
     "Use ISO date format YYYY-MM-DD for every date.",
     "Use one of the provided account codes for each row's accountPurchase.",
     "Only choose purchase posting accounts that fit the invoice content. Do not use bank, cash, receivable, payable, or VAT settlement accounts unless the invoice clearly represents such a purchase.",
@@ -189,6 +209,42 @@ function extractMessageText(content: unknown): string {
   }
 
   return "";
+}
+
+function buildOpenRouterContent(params: {
+  provider: AccountingProvider;
+  mimeType: string;
+  filename: string;
+  fileDataUrl: string;
+  accounts: ProviderReferenceAccount[];
+  taxCodes: ProviderReferenceTaxCode[];
+}): OpenRouterMessageContent[] {
+  const content: OpenRouterMessageContent[] = [
+    {
+      type: "text",
+      text: buildUserPrompt(params.provider, params.accounts, params.taxCodes),
+    },
+  ];
+
+  if (params.mimeType.startsWith("image/")) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: params.fileDataUrl,
+      },
+    });
+    return content;
+  }
+
+  content.push({
+    type: "file",
+    file: {
+      filename: params.filename,
+      file_data: params.fileDataUrl,
+    },
+  });
+
+  return content;
 }
 
 function normalizeVendor(data: InvoiceExtraction): InvoiceExtraction["vendor"] {
@@ -271,40 +327,7 @@ export async function extractInvoiceWithOpenRouter(params: {
 }): Promise<InvoiceExtraction> {
   const apiKey = assertEnv("OPENROUTER_API_KEY");
   const model = assertEnv("OPENROUTER_MODEL");
-
-  const content: OpenRouterMessageContent[] = [
-    {
-      type: "text",
-      text: buildPrompt(params.provider, params.accounts, params.taxCodes),
-    },
-  ];
-
-  if (params.mimeType.startsWith("image/")) {
-    content.push({
-      type: "image_url",
-      image_url: {
-        url: params.fileDataUrl,
-      },
-    });
-  } else {
-    content.push({
-      type: "file",
-      file: {
-        filename: params.filename,
-        file_data: params.fileDataUrl,
-      },
-    });
-  }
-
-  const plugins: Array<Record<string, unknown>> = [];
-  if (params.mimeType === "application/pdf") {
-    plugins.push({
-      id: "file-parser",
-      pdf: {
-        engine: "native",
-      },
-    });
-  }
+  const content = buildOpenRouterContent(params);
 
   const response = await fetch(
     "https://openrouter.ai/api/v1/chat/completions",
@@ -320,6 +343,10 @@ export async function extractInvoiceWithOpenRouter(params: {
         model,
         messages: [
           {
+            role: "system",
+            content: buildSystemPrompt(),
+          },
+          {
             role: "user",
             content,
           },
@@ -328,7 +355,6 @@ export async function extractInvoiceWithOpenRouter(params: {
           type: "json_schema",
           json_schema: jsonSchemaForInvoiceExtraction(),
         },
-        plugins: plugins.length ? plugins : undefined,
         temperature: 0.1,
       }),
     },
@@ -366,3 +392,8 @@ export async function extractInvoiceWithOpenRouter(params: {
 
   return normalizeExtraction(parsed);
 }
+
+export const __test__ = {
+  buildSystemPrompt,
+  buildUserPrompt,
+};

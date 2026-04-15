@@ -6,6 +6,13 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 <!-- END:nextjs-agent-rules -->
 
+# Official API Docs
+
+Verified on 2026-04-15:
+
+- Merit Aktiva API docs: https://api.merit.ee/merit-aktiva-api/
+- SmartAccounts API docs: https://www.smartaccounts.eu/uuskodu2015/wp-content/uploads/2025/04/SmartAccounts_API_latest.pdf
+
 # Local Test Credentials
 
 Local test credentials are stored in the repo's `.env.local` file and should be read from there instead of being hardcoded anywhere else.
