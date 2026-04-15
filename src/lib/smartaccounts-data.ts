@@ -316,26 +316,6 @@ export async function createPayment(
   return { paymentId };
 }
 
-export async function uploadDocumentAttachment(params: {
-  credentials: SmartAccountsCredentials;
-  docId: string;
-  filename: string;
-  mimeType: string;
-  fileContentBase64: string;
-}): Promise<void> {
-  await smartAccountsRequest("/general/files", "add", params.credentials, {
-    httpMethod: "POST",
-    body: {
-      docId: params.docId,
-      docType: "VENDOR_INVOICE",
-      fileName: params.filename,
-      mimeType: params.mimeType,
-      fileContent: params.fileContentBase64,
-      description: "Uploaded via invoice import",
-    },
-  });
-}
-
 function paymentAccountSortOrder(order: string | undefined): number {
   if (!order) {
     return Number.MAX_SAFE_INTEGER;
