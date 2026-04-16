@@ -40,13 +40,13 @@ vi.mock("@/lib/user-accounting-connections", () => ({
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
-vi.mock("@/lib/merit-data", () => ({
+vi.mock("@/lib/providers/merit/data", () => ({
   findVendor: hoisted.meritFindVendor,
 }));
-vi.mock("@/lib/smartaccounts-adapter", () => ({
+vi.mock("@/lib/smartaccounts", () => ({
   smartAccountsProviderAdapter: hoisted.smartAccountsProviderAdapter,
 }));
-vi.mock("@/lib/smartaccounts-data", () => ({
+vi.mock("@/lib/providers/smartaccounts/data", () => ({
   findVendor: hoisted.smartAccountsFindVendor,
 }));
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { __test__ } from "./merit-adapter";
+import { __test__ } from "./adapter";
 
 function buildInvoiceParams() {
   return {
@@ -150,8 +150,8 @@ describe("merit adapter pure helper primitives", () => {
   });
 });
 
-describe("merit adapter pure payload builders", () => {
-  it("covers vendor, invoice, and payment payload builder branches", () => {
+describe("merit adapter pure vendor payload builders", () => {
+  it("builds vendor payloads and grouped tax amounts", () => {
     expect(
       __test__.buildMeritVendorPayload({
         ...buildInvoiceParams(),
@@ -173,40 +173,148 @@ describe("merit adapter pure payload builders", () => {
         { id: "tax-22", code: "22", rate: 22 },
       ]),
     ).toEqual([{ TaxId: "tax-22", Amount: 22 }]);
+  });
+});
 
-    const invoiceBody = __test__.buildPurchaseInvoiceBody({
-      ...buildInvoiceParams(),
-      extraction: {
-        ...buildInvoiceParams().extraction,
-        invoice: {
-          ...buildInvoiceParams().extraction.invoice,
-          dueDate: null,
-          issueDate: null,
-          invoiceNumber: null,
-          referenceNumber: null,
-          totalAmount: null,
+describe("merit adapter pure invoice unit matching", () => {
+  it("matches units and uses row totals for purchase invoices", () => {
+    const invoiceBody = __test__.buildPurchaseInvoiceBody(
+      {
+        ...buildInvoiceParams(),
+        extraction: {
+          ...buildInvoiceParams().extraction,
+          invoice: {
+            ...buildInvoiceParams().extraction.invoice,
+            dueDate: null,
+            issueDate: null,
+            invoiceNumber: null,
+            referenceNumber: null,
+            totalAmount: null,
+          },
         },
+        rows: [
+          {
+            ...buildInvoiceParams().rows[0],
+            unit: undefined,
+            price: undefined,
+            sum: 100,
+            taxCode: undefined,
+          },
+        ],
       },
-      rows: [
-        {
-          ...buildInvoiceParams().rows[0],
-          unit: undefined,
-          price: undefined,
-          sum: 100,
-          taxCode: undefined,
-        },
-      ],
-    });
+      [{ code: "tk", name: "tk" }],
+    );
 
     expect(invoiceBody.DueDate).toBe("20260414");
+    expect(invoiceBody.TotalAmount).toBe(100);
     expect(invoiceBody.InvoiceRow).toEqual([
       expect.objectContaining({
         Price: 100,
         TaxId: undefined,
-        Item: expect.objectContaining({ UOMName: "pcs" }),
+        Item: expect.objectContaining({ UOMName: null }),
       }),
     ]);
+    expect(
+      __test__.selectMeritUnitName([{ code: "tk", name: "tk" }], "pcs"),
+    ).toBe("tk");
+    expect(
+      __test__.selectMeritUnitName([{ code: "tundi", name: "tund" }], "hours"),
+    ).toBe("tund");
+    expect(
+      __test__.selectMeritUnitName([{ code: "kuud", name: "kuu" }], "months"),
+    ).toBe("kuu");
+    expect(
+      __test__.selectMeritUnitName([{ code: "ltr", name: "ltr" }], "litres"),
+    ).toBe("ltr");
+    expect(
+      __test__.selectMeritUnitName([{ code: "km", name: "km" }], "km"),
+    ).toBe("km");
+    expect(__test__.selectMeritUnitName([], "pcs")).toBeNull();
+  });
+});
 
+describe("merit adapter pure invoice total helpers", () => {
+  it("calculates net row totals from summed and derived row values", () => {
+    expect(
+      __test__.buildMeritRowNetTotal([
+        {
+          ...buildInvoiceParams().rows[0],
+          sum: 145.08,
+          quantity: 1,
+          price: 145.08,
+        },
+        {
+          ...buildInvoiceParams().rows[1],
+          sum: 36.21,
+          quantity: 1,
+          price: 36.21,
+        },
+      ]),
+    ).toBe(181.29);
+    expect(
+      __test__.buildMeritRowNetTotal([
+        {
+          ...buildInvoiceParams().rows[0],
+          sum: undefined,
+          price: 50,
+          quantity: 2,
+        },
+      ]),
+    ).toBe(100);
+    expect(
+      __test__.buildMeritRowNetTotal([
+        {
+          ...buildInvoiceParams().rows[0],
+          sum: undefined,
+          price: undefined,
+          quantity: undefined,
+        },
+      ]),
+    ).toBeUndefined();
+  });
+});
+
+describe("merit adapter pure invoice total fallbacks", () => {
+  it("falls back from row totals to extracted invoice totals", () => {
+    expect(
+      __test__.buildPurchaseInvoiceBody(
+        {
+          ...buildInvoiceParams(),
+          rows: [],
+          extraction: {
+            ...buildInvoiceParams().extraction,
+            invoice: {
+              ...buildInvoiceParams().extraction.invoice,
+              amountExcludingVat: 181.29,
+              totalAmount: 224.8,
+            },
+          },
+        },
+        [],
+      ).TotalAmount,
+    ).toBe(181.29);
+    expect(
+      __test__.buildPurchaseInvoiceBody(
+        {
+          ...buildInvoiceParams(),
+          rows: [],
+          extraction: {
+            ...buildInvoiceParams().extraction,
+            invoice: {
+              ...buildInvoiceParams().extraction.invoice,
+              amountExcludingVat: null,
+              totalAmount: 224.8,
+            },
+          },
+        },
+        [],
+      ).TotalAmount,
+    ).toBe(224.8);
+  });
+});
+
+describe("merit adapter pure payment payload builders", () => {
+  it("builds payment payloads for EUR and foreign-currency invoices", () => {
     expect(
       __test__.buildPaymentBody(
         {

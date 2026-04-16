@@ -1,11 +1,11 @@
-import { SmartAccountsCredentials } from "./accounting-provider-types";
+import { SmartAccountsCredentials } from "../../accounting-provider-types";
 import {
   SmartAccountsAccount,
   SmartAccountsArticle,
   SmartAccountsBankAccount,
   SmartAccountsCashAccount,
   SmartAccountsVatPc,
-} from "./invoice-import-types";
+} from "../../invoice-import-types";
 import {
   asRecord,
   CACHE_TTLS,
@@ -17,7 +17,7 @@ import {
   toOptionalBoolean,
   toOptionalNumber,
   toOptionalString,
-} from "./smartaccounts-core";
+} from "./core";
 
 function normalizeAccount(
   record: Record<string, unknown>,

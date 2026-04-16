@@ -1,11 +1,11 @@
-import { SmartAccountsCredentials } from "./accounting-provider-types";
+import { SmartAccountsCredentials } from "../../accounting-provider-types";
 import {
   SmartAccountsAccount,
   SmartAccountsArticle,
   SmartAccountsBankAccount,
   SmartAccountsCashAccount,
   SmartAccountsVendor,
-} from "./invoice-import-types";
+} from "../../invoice-import-types";
 import {
   CACHE_TTLS,
   accountLabel,
@@ -17,8 +17,8 @@ import {
   setCachedValue,
   smartAccountsRequest,
   toOptionalString,
-} from "./smartaccounts-core";
-import { getArticles } from "./smartaccounts-loaders";
+} from "./core";
+import { getArticles } from "./loaders";
 
 type SmartAccountsPaymentAccount =
   | ({ type: "BANK" } & SmartAccountsBankAccount)

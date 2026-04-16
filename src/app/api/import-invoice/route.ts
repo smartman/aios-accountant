@@ -10,7 +10,7 @@ import {
 } from "@/lib/user-accounting-connections";
 import { getUser } from "@/lib/workos";
 import { meritProviderAdapter } from "@/lib/merit";
-import { smartAccountsProviderAdapter } from "@/lib/smartaccounts-adapter";
+import { smartAccountsProviderAdapter } from "@/lib/smartaccounts";
 import { importWithAdapter } from "./import-workflow";
 
 export const runtime = "nodejs";

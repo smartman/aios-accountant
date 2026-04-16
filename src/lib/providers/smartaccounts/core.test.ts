@@ -12,14 +12,14 @@ import {
   toOptionalBoolean,
   toOptionalNumber,
   toOptionalString,
-} from "./smartaccounts-core";
+} from "./core";
 import {
   getAccounts,
   getArticles,
   getBankAccounts,
   getCashAccounts,
   getVatPcs,
-} from "./smartaccounts-loaders";
+} from "./loaders";
 
 function buildCredentials(seed: string) {
   return {

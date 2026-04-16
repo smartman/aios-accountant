@@ -6,8 +6,8 @@ import type {
   FindOrCreateVendorParams,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
-} from "./accounting-provider-types";
-import { smartAccountsProviderAdapter } from "./smartaccounts-adapter";
+} from "../../accounting-provider-types";
+import { smartAccountsProviderAdapter } from "./adapter";
 
 function responseJson(payload: unknown): Response {
   return {

@@ -5,8 +5,8 @@ import type {
   FindOrCreateVendorParams,
   MeritCredentials,
   ProviderRuntimeContext,
-} from "./accounting-provider-types";
-import { clearMeritCachesForTests, meritProviderAdapter } from "./merit";
+} from "../../accounting-provider-types";
+import { clearMeritCachesForTests, meritProviderAdapter } from "./index";
 
 type MeritRuntimeContext = Extract<
   ProviderRuntimeContext,
@@ -118,6 +118,7 @@ function buildMeritContext(): MeritRuntimeContext {
       taxes: [{ id: "tax-22", code: "22", rate: 22 }],
       banks: [],
       paymentTypes: [],
+      units: [{ code: "tk", name: "tk" }],
       vendors: [],
     },
   };
@@ -285,6 +286,13 @@ describe("merit context loading", () => {
         } as Response;
       }
 
+      if (url.includes("/getunits?")) {
+        return {
+          ok: true,
+          json: async () => [{ Code: "tk", Name: "tk" }],
+        } as Response;
+      }
+
       return {
         ok: true,
         json: async () => [],
@@ -293,6 +301,10 @@ describe("merit context loading", () => {
 
     const summary = await meritProviderAdapter.validateCredentials(credentials);
     const context = await meritProviderAdapter.loadContext(credentials);
+    expect(context.provider).toBe("merit");
+    if (context.provider !== "merit") {
+      throw new Error("Expected Merit provider context.");
+    }
 
     expect(summary.label).toBe("Merit");
     expect(summary.publicId).toBe("merit-id");
@@ -307,6 +319,7 @@ describe("merit context loading", () => {
       id: "bank-1",
       name: "Main bank",
     });
+    expect(context.raw.units).toEqual([{ code: "tk", name: "tk" }]);
   });
 });
 

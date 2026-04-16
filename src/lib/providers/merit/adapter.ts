@@ -8,31 +8,34 @@ import {
   MeritCredentials,
   MeritPaymentType,
   MeritTax,
+  MeritUnit,
   ProviderPaymentAccount,
   ProviderPaymentResult,
   ProviderVendorResult,
   SavedConnectionSummary,
   assertProviderContext,
   toSafeIsoString,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 import {
   clearCachedValuesByPrefix,
   getAccounts,
   getBanks,
   getPaymentTypes,
   getTaxes,
+  getUnits,
   meritDate,
   meritDateTime,
   meritRequest,
   namespacedCacheKey,
   toOptionalString,
   validateMeritV2Access,
-} from "./merit-core";
+} from "./core";
+import { createVendor, findExistingPurchaseInvoice, findVendor } from "./data";
 import {
-  createVendor,
-  findExistingPurchaseInvoice,
-  findVendor,
-} from "./merit-data";
+  meritUnitAliases,
+  normalizeMeritUnitLabel,
+  selectMeritUnitName,
+} from "./units";
 
 function buildVendorObject(vendorId: string): Record<string, unknown> {
   return {
@@ -88,11 +91,12 @@ function pickMeritBank(
 }
 
 async function loadMeritContext(credentials: MeritCredentials) {
-  const [accounts, taxes, banks, paymentTypes] = await Promise.all([
+  const [accounts, taxes, banks, paymentTypes, units] = await Promise.all([
     getAccounts(credentials),
     getTaxes(credentials),
     getBanks(credentials),
     getPaymentTypes(credentials),
+    getUnits(credentials),
   ]);
 
   return {
@@ -122,6 +126,7 @@ async function loadMeritContext(credentials: MeritCredentials) {
       taxes,
       banks,
       paymentTypes,
+      units,
       vendors: [],
     },
   };
@@ -243,8 +248,27 @@ function buildTaxAmounts(
   }));
 }
 
+function buildMeritRowNetTotal(
+  rows: CreatePurchaseInvoiceParams["rows"],
+): number | undefined {
+  const total = rows.reduce((sum, row) => {
+    const rowTotal =
+      row.sum ??
+      (row.price !== undefined && row.quantity !== undefined
+        ? row.price * row.quantity
+        : undefined);
+
+    return typeof rowTotal === "number" && Number.isFinite(rowTotal)
+      ? sum + rowTotal
+      : sum;
+  }, 0);
+
+  return total > 0 ? Number(total.toFixed(2)) : undefined;
+}
+
 function buildPurchaseInvoiceBody(
   params: CreatePurchaseInvoiceParams,
+  units: MeritUnit[],
 ): Record<string, unknown> {
   return {
     Vendor: buildVendorObject(params.vendorId),
@@ -265,7 +289,7 @@ function buildPurchaseInvoiceBody(
         Code: row.code,
         Description: row.description.slice(0, 100),
         Type: 2,
-        UOMName: row.unit ?? "pcs",
+        UOMName: selectMeritUnitName(units, row.unit),
       },
       Quantity: row.quantity ?? 1,
       Price: row.price ?? row.sum ?? undefined,
@@ -273,7 +297,11 @@ function buildPurchaseInvoiceBody(
       GLAccountCode: row.accountCode,
       Description: row.description,
     })),
-    TotalAmount: params.extraction.invoice.totalAmount ?? undefined,
+    TotalAmount:
+      buildMeritRowNetTotal(params.rows) ??
+      params.extraction.invoice.amountExcludingVat ??
+      params.extraction.invoice.totalAmount ??
+      undefined,
   };
 }
 
@@ -335,7 +363,10 @@ export const meritProviderAdapter: AccountingProviderAdapter<MeritCredentials> =
 
     async createPurchaseInvoice(credentials, params, context) {
       const meritContext = assertProviderContext(context, "merit");
-      const body = buildPurchaseInvoiceBody(params);
+      const body = buildPurchaseInvoiceBody(
+        params,
+        meritContext.raw.units ?? [],
+      );
       body.TaxAmount = buildTaxAmounts(params, meritContext.raw.taxes);
 
       if (params.attachment?.mimeType === "application/pdf") {
@@ -421,8 +452,12 @@ export const __test__ = {
   buildMeritVendorPayload,
   buildPaymentBody,
   buildPurchaseInvoiceBody,
+  buildMeritRowNetTotal,
   buildTaxAmounts,
   computeTaxAmountForRow,
+  meritUnitAliases,
   maskSecret,
+  normalizeMeritUnitLabel,
   pickMeritBank,
+  selectMeritUnitName,
 };

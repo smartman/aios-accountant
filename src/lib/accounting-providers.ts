@@ -7,7 +7,7 @@ import {
   isSmartAccountsCredentials,
 } from "./accounting-provider-types";
 import { meritProviderAdapter } from "./merit";
-import { smartAccountsProviderAdapter } from "./smartaccounts-adapter";
+import { smartAccountsProviderAdapter } from "./smartaccounts";
 
 export const accountingProviders = {
   smartaccounts: smartAccountsProviderAdapter,

@@ -7,7 +7,7 @@ import {
   validateCredentialShape,
 } from "@/lib/accounting-providers";
 import { meritProviderAdapter } from "@/lib/merit";
-import { smartAccountsProviderAdapter } from "@/lib/smartaccounts-adapter";
+import { smartAccountsProviderAdapter } from "@/lib/smartaccounts";
 import { upsertAccountingConnection } from "@/lib/user-accounting-connections";
 import type { SaveConnectionState } from "./action-state";
 

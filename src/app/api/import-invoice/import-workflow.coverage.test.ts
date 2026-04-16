@@ -31,10 +31,10 @@ vi.mock("@/lib/merit", () => ({
     attachDocument: vi.fn(),
   },
 }));
-vi.mock("@/lib/merit-data", () => ({
+vi.mock("@/lib/providers/merit/data", () => ({
   findVendor: hoisted.meritFindVendor,
 }));
-vi.mock("@/lib/smartaccounts-adapter", () => ({
+vi.mock("@/lib/smartaccounts", () => ({
   smartAccountsProviderAdapter: {
     loadContext: vi.fn(),
     findOrCreateVendor: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock("@/lib/smartaccounts-adapter", () => ({
     attachDocument: vi.fn(),
   },
 }));
-vi.mock("@/lib/smartaccounts-data", () => ({
+vi.mock("@/lib/providers/smartaccounts/data", () => ({
   findVendor: hoisted.smartAccountsFindVendor,
 }));
 

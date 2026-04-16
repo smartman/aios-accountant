@@ -198,11 +198,17 @@ export interface MeritPaymentType {
   currencyCode?: string;
 }
 
+export interface MeritUnit {
+  code: string;
+  name: string;
+}
+
 export interface MeritProviderContext {
   accounts: MeritAccount[];
   taxes: MeritTax[];
   banks: MeritBank[];
   paymentTypes: MeritPaymentType[];
+  units?: MeritUnit[];
   vendors: MeritVendor[];
 }
 

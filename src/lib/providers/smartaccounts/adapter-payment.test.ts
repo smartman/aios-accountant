@@ -3,7 +3,7 @@ import type {
   CreatePaymentParams,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 
 const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
   uploadDocumentAttachment: vi.fn(),
 }));
 
-vi.mock("./smartaccounts", () => mocks);
+vi.mock("./index", () => mocks);
 
 function buildCredentials(): SmartAccountsCredentials {
   return {
@@ -124,8 +124,7 @@ beforeEach(() => {
 
 describe("smartaccounts adapter payment validation", () => {
   it("throws when no payment account or amount can be resolved", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
     mocks.choosePaymentAccount.mockReturnValueOnce(null);
 
     await expect(
@@ -169,8 +168,7 @@ describe("smartaccounts adapter payment validation", () => {
 
 describe("smartaccounts adapter payment payloads", () => {
   it("maps payment payloads and document uploads through the SmartAccounts helpers", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     const payment = await smartAccountsProviderAdapter.createPayment(
       buildCredentials(),
@@ -220,8 +218,7 @@ describe("smartaccounts adapter payment payloads", () => {
   });
 
   it("defaults missing payment dates and currency values in payment payloads", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await smartAccountsProviderAdapter.createPayment(
       buildCredentials(),

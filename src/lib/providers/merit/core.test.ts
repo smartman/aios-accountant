@@ -18,7 +18,7 @@ import {
   toOptionalNumber,
   toOptionalString,
   validateMeritV2Access,
-} from "./merit-core";
+} from "./core";
 
 function buildCredentials(seed: string) {
   return {

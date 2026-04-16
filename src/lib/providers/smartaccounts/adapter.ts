@@ -11,11 +11,11 @@ import {
   SmartAccountsCredentials,
   assertProviderContext,
   toSafeIsoString,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 import {
   SmartAccountsAccount,
   SmartAccountsVendor,
-} from "./invoice-import-types";
+} from "../../invoice-import-types";
 import {
   choosePaymentAccount,
   chooseRelevantArticle,
@@ -33,7 +33,7 @@ import {
   getCashAccounts,
   getVatPcs,
   uploadDocumentAttachment,
-} from "./smartaccounts";
+} from "./index";
 
 function maskSecret(value: string): string {
   const trimmed = value.trim();

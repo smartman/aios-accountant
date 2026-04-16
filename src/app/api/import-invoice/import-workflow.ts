@@ -6,8 +6,8 @@ import {
 } from "@/lib/accounting-provider-types";
 import { extractInvoiceWithOpenRouter } from "@/lib/openrouter";
 import { ImportedInvoiceResult } from "@/lib/invoice-import-types";
-import { findVendor as findMeritVendor } from "@/lib/merit-data";
-import { findVendor as findSmartAccountsVendor } from "@/lib/smartaccounts-data";
+import { findVendor as findMeritVendor } from "@/lib/providers/merit/data";
+import { findVendor as findSmartAccountsVendor } from "@/lib/providers/smartaccounts/data";
 import {
   generateFallbackInvoiceNumber,
   resolvePurchaseRows,

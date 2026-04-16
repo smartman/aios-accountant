@@ -33,7 +33,7 @@ vi.mock("@/lib/user-accounting-connections", () => ({
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
-vi.mock("@/lib/smartaccounts-adapter", () => ({
+vi.mock("@/lib/smartaccounts", () => ({
   smartAccountsProviderAdapter: hoisted.smartAccountsProviderAdapter,
 }));
 
