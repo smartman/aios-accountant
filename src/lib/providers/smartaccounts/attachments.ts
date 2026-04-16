@@ -1,5 +1,5 @@
-import { SmartAccountsCredentials } from "./accounting-provider-types";
-import { smartAccountsRequest } from "./smartaccounts-core";
+import { SmartAccountsCredentials } from "../../accounting-provider-types";
+import { smartAccountsRequest } from "./core";
 
 const DEFAULT_ATTACHMENT_FILENAME = "attachment";
 const SMARTACCOUNTS_ATTACHMENT_FILENAME_MAX_LENGTH = 64;

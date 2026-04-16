@@ -2,7 +2,7 @@ import {
   FindExistingInvoiceParams,
   MeritCredentials,
   MeritVendor,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 import {
   CACHE_TTLS,
   cachedValue,
@@ -13,7 +13,7 @@ import {
   setCachedValue,
   toOptionalString,
   isNonNull,
-} from "./merit-core";
+} from "./core";
 
 function normalizeVendor(record: Record<string, unknown>): MeritVendor | null {
   const id = toOptionalString(record.VendorId);

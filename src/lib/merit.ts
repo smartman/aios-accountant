@@ -1,2 +1,1 @@
-export * from "./merit-adapter";
-export * from "./merit-core";
+export * from "./providers/merit";

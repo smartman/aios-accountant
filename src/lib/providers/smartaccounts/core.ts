@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
-import { SmartAccountsCredentials } from "./accounting-provider-types";
+import { SmartAccountsCredentials } from "../../accounting-provider-types";
 import {
   SmartAccountsAccount,
   SmartAccountsVendor,
-} from "./invoice-import-types";
+} from "../../invoice-import-types";
 
 const SMARTACCOUNTS_TIMEZONE = "Europe/Tallinn";
 const SMARTACCOUNTS_API_ROOT = "https://sa.smartaccounts.eu/en/api";

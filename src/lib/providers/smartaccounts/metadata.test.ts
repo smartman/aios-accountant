@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatAccountLabel, getAccounts, getVatPcs } from "./smartaccounts";
+import { formatAccountLabel, getAccounts, getVatPcs } from "./index";
 
 describe("SmartAccounts metadata normalization", () => {
   afterEach(() => {

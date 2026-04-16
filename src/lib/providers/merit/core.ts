@@ -5,13 +5,15 @@ import {
   MeritCredentials,
   MeritPaymentType,
   MeritTax,
-} from "./accounting-provider-types";
+  MeritUnit,
+} from "../../accounting-provider-types";
 
 export const CACHE_TTLS = {
   accounts: 10 * 60 * 1000,
   taxes: 10 * 60 * 1000,
   banks: 10 * 60 * 1000,
   paymentTypes: 10 * 60 * 1000,
+  units: 10 * 60 * 1000,
   vendors: 5 * 60 * 1000,
   purchaseInvoices: 2 * 60 * 1000,
 } as const;
@@ -26,6 +28,7 @@ const MERIT_ENDPOINT_VERSIONS = {
   getbanks: "v1",
   getvendors: "v1",
   getpaymenttypes: "v2",
+  getunits: "v1",
   sendvendor: "v2",
   getpurchorders: "v2",
   sendpurchinvoice: "v2",
@@ -342,6 +345,16 @@ function normalizePaymentType(
   };
 }
 
+function normalizeUnit(record: Record<string, unknown>): MeritUnit | null {
+  const code = toOptionalString(record.Code);
+  const name = toOptionalString(record.Name);
+  if (!code || !name) {
+    return null;
+  }
+
+  return { code, name };
+}
+
 export async function getAccounts(
   credentials: MeritCredentials,
 ): Promise<MeritAccount[]> {
@@ -400,6 +413,19 @@ export async function getPaymentTypes(
         },
       );
       return extractList(response).map(normalizePaymentType).filter(isNonNull);
+    },
+  );
+}
+
+export async function getUnits(
+  credentials: MeritCredentials,
+): Promise<MeritUnit[]> {
+  return cachedValue(
+    namespacedCacheKey(credentials, "units"),
+    CACHE_TTLS.units,
+    async () => {
+      const response = await meritRequest<unknown>("getunits", credentials, {});
+      return extractList(response).map(normalizeUnit).filter(isNonNull);
     },
   );
 }

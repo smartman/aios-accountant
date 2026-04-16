@@ -13,8 +13,8 @@ import {
   findExistingVendorInvoice,
   findVendor,
   formatAccountLabel,
-} from "./smartaccounts-data";
-import { uploadDocumentAttachment } from "./smartaccounts-attachments";
+} from "./data";
+import { uploadDocumentAttachment } from "./attachments";
 
 function buildCredentials(seed: string) {
   return {

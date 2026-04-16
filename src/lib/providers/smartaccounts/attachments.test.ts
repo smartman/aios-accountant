@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   shortenAttachmentFilename,
   uploadDocumentAttachment,
-} from "./smartaccounts-attachments";
+} from "./attachments";
 
 function buildCredentials(seed: string) {
   return {

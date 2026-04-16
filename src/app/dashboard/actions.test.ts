@@ -14,7 +14,7 @@ vi.mock("@/lib/user-accounting-connections", () => ({
   upsertAccountingConnection: vi.fn(),
 }));
 
-vi.mock("@/lib/smartaccounts-adapter", () => ({
+vi.mock("@/lib/smartaccounts", () => ({
   smartAccountsProviderAdapter: {
     validateCredentials: vi.fn(),
   },
@@ -62,7 +62,7 @@ describe("saveAccountingConnection success cases", () => {
       import("./actions"),
       import("@/lib/workos"),
       import("@/lib/user-accounting-connections"),
-      import("@/lib/smartaccounts-adapter"),
+      import("@/lib/smartaccounts"),
       import("next/cache"),
     ]);
 
@@ -170,7 +170,7 @@ describe("saveAccountingConnection failure cases", () => {
       import("./actions"),
       import("@/lib/workos"),
       import("@/lib/user-accounting-connections"),
-      import("@/lib/smartaccounts-adapter"),
+      import("@/lib/smartaccounts"),
     ]);
 
     vi.mocked(getUser).mockResolvedValue({
@@ -208,7 +208,7 @@ describe("saveAccountingConnection failure cases", () => {
     ] = await Promise.all([
       import("./actions"),
       import("@/lib/workos"),
-      import("@/lib/smartaccounts-adapter"),
+      import("@/lib/smartaccounts"),
     ]);
 
     vi.mocked(getUser).mockResolvedValue({

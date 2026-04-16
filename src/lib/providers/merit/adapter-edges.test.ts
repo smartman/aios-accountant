@@ -5,7 +5,7 @@ import type {
   FindOrCreateVendorParams,
   MeritCredentials,
   ProviderRuntimeContext,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 
 const mocks = vi.hoisted(() => ({
   clearCachedValuesByPrefix: vi.fn(),
@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getBanks: vi.fn(),
   getPaymentTypes: vi.fn(),
   getTaxes: vi.fn(),
+  getUnits: vi.fn(),
   meritDate: vi.fn((value?: string | null) => (value ? "20260414" : undefined)),
   meritDateTime: vi.fn(() => "202604141200"),
   meritRequest: vi.fn(),
@@ -28,8 +29,8 @@ const mocks = vi.hoisted(() => ({
   validateMeritV2Access: vi.fn(),
 }));
 
-vi.mock("./merit-core", () => mocks);
-vi.mock("./merit-data", () => ({
+vi.mock("./core", () => mocks);
+vi.mock("./data", () => ({
   createVendor: mocks.createVendor,
   findExistingPurchaseInvoice: mocks.findExistingPurchaseInvoice,
   findVendor: mocks.findVendor,
@@ -67,6 +68,7 @@ function buildContext(): Extract<
         },
       ],
       paymentTypes: [{ id: "ptype-1", name: "Main bank" }],
+      units: [{ code: "tk", name: "tk" }],
       vendors: [],
     },
   };
@@ -180,6 +182,7 @@ beforeEach(() => {
   mocks.getTaxes.mockResolvedValue([
     { id: "tax-22", code: "22", name: "VAT", rate: 22 },
   ]);
+  mocks.getUnits.mockResolvedValue([{ code: "tk", name: "tk" }]);
   mocks.meritRequest.mockResolvedValue({
     PIHId: "invoice-1",
     PaymentId: "payment-1",
@@ -188,7 +191,7 @@ beforeEach(() => {
 
 describe("merit adapter validation and context", () => {
   it("validates credentials and keeps short api keys readable in the summary", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     const summary = await meritProviderAdapter.validateCredentials(
       buildCredentials("abc"),
@@ -199,9 +202,13 @@ describe("merit adapter validation and context", () => {
   });
 
   it("normalizes context from Merit helper loaders", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     const context = await meritProviderAdapter.loadContext(buildCredentials());
+    expect(context.provider).toBe("merit");
+    if (context.provider !== "merit") {
+      throw new Error("Expected Merit provider context.");
+    }
 
     expect(context.referenceData.accounts).toEqual([
       { code: "4000", label: "4000 - Services" },
@@ -210,12 +217,13 @@ describe("merit adapter validation and context", () => {
       id: "bank-1",
       name: "Main bank",
     });
+    expect(context.raw.units).toEqual([{ code: "tk", name: "tk" }]);
   });
 });
 
 describe("merit adapter vendor and invoice flows", () => {
   it("returns existing vendors and throws when a created vendor id is missing", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
     mocks.findVendor.mockResolvedValueOnce({
       id: "vendor-existing",
       name: "Vendor OÜ",
@@ -245,7 +253,7 @@ describe("merit adapter vendor and invoice flows", () => {
   });
 
   it("falls back to name-based vendor search when registry lookup misses", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
     mocks.findVendor
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "vendor-name", name: "Vendor OÜ" });
@@ -270,7 +278,7 @@ describe("merit adapter vendor and invoice flows", () => {
   });
 
   it("delegates existing invoice lookups to the Merit data helper", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     await expect(
       meritProviderAdapter.findExistingInvoice(
@@ -288,7 +296,7 @@ describe("merit adapter vendor and invoice flows", () => {
 
 describe("merit adapter invoice creation", () => {
   it("creates purchase invoices, skips non-PDF attachments, and validates returned ids", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     const invoice = await meritProviderAdapter.createPurchaseInvoice(
       buildCredentials(),
@@ -307,7 +315,16 @@ describe("merit adapter invoice creation", () => {
     expect(mocks.meritRequest).toHaveBeenCalledWith(
       "sendpurchinvoice",
       buildCredentials(),
-      expect.not.objectContaining({ Attachment: expect.anything() }),
+      expect.objectContaining({
+        InvoiceRow: [
+          expect.objectContaining({
+            Item: expect.objectContaining({ UOMName: "tk" }),
+          }),
+          expect.objectContaining({
+            Item: expect.objectContaining({ UOMName: "tk" }),
+          }),
+        ],
+      }),
     );
 
     mocks.meritRequest.mockResolvedValueOnce({});
@@ -335,13 +352,28 @@ describe("merit adapter invoice creation", () => {
         buildContext(),
       ),
     ).resolves.toEqual({ invoiceId: "invoice-id", attachedFile: true });
-    expect(mocks.clearCachedValuesByPrefix).toHaveBeenCalledTimes(3);
+
+    mocks.meritRequest.mockResolvedValueOnce({ Id: "invoice-no-units" });
+    await expect(
+      meritProviderAdapter.createPurchaseInvoice(
+        buildCredentials(),
+        buildInvoiceParams(),
+        {
+          ...buildContext(),
+          raw: {
+            ...buildContext().raw,
+            units: undefined,
+          },
+        },
+      ),
+    ).resolves.toEqual({ invoiceId: "invoice-no-units", attachedFile: false });
+    expect(mocks.clearCachedValuesByPrefix).toHaveBeenCalledTimes(4);
   });
 });
 
 describe("merit adapter payment and attachment flows", () => {
   it("throws when no bank or amount is available and falls back to the invoice id for payment ids", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     await expect(
       meritProviderAdapter.createPayment(
@@ -429,7 +461,7 @@ describe("merit adapter payment and attachment flows", () => {
   });
 
   it("treats attachDocument as a no-op", async () => {
-    const { meritProviderAdapter } = await import("./merit");
+    const { meritProviderAdapter } = await import("./index");
 
     await expect(
       meritProviderAdapter.attachDocument(

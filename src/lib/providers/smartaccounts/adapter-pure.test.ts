@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { __test__ } from "./smartaccounts-adapter";
+import { __test__ } from "./adapter";
 
 function buildExtraction() {
   return {

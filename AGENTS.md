@@ -54,3 +54,10 @@ The lint configuration must register each of the following as an error when viol
 - Max function length: 120 lines
 - Max complexity: 15
 - Max nesting depth: 4
+
+# Architecture Expectations
+
+- Prefer best-practice modularization in all aspects of the codebase.
+- Group `src/lib` by domain or provider instead of allowing flat top-level file growth.
+- Keep entrypoints thin and split provider-specific logic, API clients, payload builders, helpers, and tests into focused modules.
+- When a domain accumulates many related files, introduce or extend a subfolder structure before adding more root-level files.

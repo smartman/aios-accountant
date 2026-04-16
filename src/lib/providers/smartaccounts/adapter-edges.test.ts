@@ -4,7 +4,7 @@ import type {
   FindOrCreateVendorParams,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
-} from "./accounting-provider-types";
+} from "../../accounting-provider-types";
 
 const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   uploadDocumentAttachment: vi.fn(),
 }));
 
-vi.mock("./smartaccounts", () => mocks);
+vi.mock("./index", () => mocks);
 
 function buildCredentials(): SmartAccountsCredentials {
   return {
@@ -164,8 +164,7 @@ beforeEach(() => {
 
 describe("smartaccounts adapter validation and context", () => {
   it("validates credentials and keeps short secrets unmasked", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     const summary = await smartAccountsProviderAdapter.validateCredentials({
       apiKey: "public",
@@ -176,8 +175,7 @@ describe("smartaccounts adapter validation and context", () => {
   });
 
   it("throws when SmartAccounts returns no accounts and normalizes the loaded context", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
     mocks.getAccounts.mockResolvedValueOnce([]);
 
     await expect(
@@ -195,8 +193,7 @@ describe("smartaccounts adapter validation and context", () => {
   });
 
   it("keeps optional account and VAT metadata undefined when SmartAccounts omits it", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
     mocks.getAccounts.mockResolvedValueOnce([
       { code: "4999", description: "Misc" },
     ]);
@@ -223,8 +220,7 @@ describe("smartaccounts adapter validation and context", () => {
 
 describe("smartaccounts adapter vendor flows", () => {
   it("rejects invoices without a usable vendor search term", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await expect(
       smartAccountsProviderAdapter.findOrCreateVendor(
@@ -247,8 +243,7 @@ describe("smartaccounts adapter vendor flows", () => {
   });
 
   it("returns existing vendors and creates missing vendors with normalized payloads", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
     mocks.findVendor.mockResolvedValueOnce({
       id: "vendor-existing",
       name: "Vendor OÜ",
@@ -303,8 +298,7 @@ describe("smartaccounts adapter vendor flows", () => {
 
 describe("smartaccounts adapter invoice creation", () => {
   it("reuses exact and relevant article codes, creates missing ones, and validates invoice dates", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     const exactContext = {
       ...buildContext(),
@@ -365,8 +359,7 @@ describe("smartaccounts adapter invoice creation", () => {
 
 describe("smartaccounts adapter invoice lookup", () => {
   it("looks up existing invoices with the default date fallback", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await smartAccountsProviderAdapter.findExistingInvoice(
       buildCredentials(),
@@ -394,8 +387,7 @@ describe("smartaccounts adapter invoice lookup", () => {
   });
 
   it("passes through issue dates when they are already available", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await smartAccountsProviderAdapter.findExistingInvoice(
       buildCredentials(),
@@ -416,8 +408,7 @@ describe("smartaccounts adapter invoice lookup", () => {
   });
 
   it("falls back to the entry date when the issue date is missing", async () => {
-    const { smartAccountsProviderAdapter } =
-      await import("./smartaccounts-adapter");
+    const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await smartAccountsProviderAdapter.findExistingInvoice(
       buildCredentials(),

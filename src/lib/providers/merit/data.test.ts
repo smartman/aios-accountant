@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createVendor,
-  findExistingPurchaseInvoice,
-  findVendor,
-} from "./merit-data";
-import { clearMeritCachesForTests } from "./merit-core";
+import { createVendor, findExistingPurchaseInvoice, findVendor } from "./data";
+import { clearMeritCachesForTests } from "./core";
 
 function buildCredentials(seed: string) {
   return {
