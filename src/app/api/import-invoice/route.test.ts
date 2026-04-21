@@ -4,22 +4,33 @@ import type {
   ProviderRuntimeContext,
   SmartAccountsCredentials,
 } from "@/lib/accounting-provider-types";
+import type { AccountingProviderActivities } from "@/lib/accounting-provider-activities";
 import type { InvoiceExtraction } from "@/lib/invoice-import-types";
 import type { StoredAccountingConnection } from "@/lib/user-accounting-connections";
 
 const hoisted = vi.hoisted(() => ({
   meritProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
+    findVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
+    listArticles: vi.fn(),
+    getVendorArticleHistory: vi.fn(),
+    createVendor: vi.fn(),
+    createArticle: vi.fn(),
+    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
   },
   smartAccountsProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
+    findVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
+    listArticles: vi.fn(),
+    getVendorArticleHistory: vi.fn(),
+    createVendor: vi.fn(),
+    createArticle: vi.fn(),
+    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -125,12 +136,36 @@ function buildContext(): ProviderRuntimeContext {
   };
 }
 
-function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> {
+function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> &
+  AccountingProviderActivities<SmartAccountsCredentials> {
   return {
     provider: "smartaccounts",
     validateCredentials: vi.fn(),
     loadContext: vi.fn(async () => buildContext()),
-    findOrCreateVendor: vi.fn(async () => ({
+    findVendor: vi.fn(async () => ({
+      vendorId: "vendor-1",
+      vendorName: "Vendor OÜ",
+    })),
+    createVendor: vi.fn(async () => ({
+      vendorId: "vendor-1",
+      vendorName: "Vendor OÜ",
+    })),
+    listArticles: vi.fn(async () => [
+      {
+        code: "FURNITURE",
+        description: "Furniture",
+        purchaseAccountCode: "4000",
+        taxCode: "VAT22",
+      },
+    ]),
+    getVendorArticleHistory: vi.fn(async () => []),
+    createArticle: vi.fn(async () => ({
+      code: "FURNITURE",
+      description: "Furniture",
+    })),
+    findOrCreateVendor: vi.fn<
+      AccountingProviderAdapter<SmartAccountsCredentials>["findOrCreateVendor"]
+    >(async () => ({
       vendorId: "vendor-1",
       vendorName: "Vendor OÜ",
       createdVendor: false,
@@ -146,7 +181,8 @@ function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> {
       paymentAccount: { type: "BANK" as const, name: "Main bank" },
     })),
     attachDocument: vi.fn(async () => {}),
-  };
+  } as AccountingProviderAdapter<SmartAccountsCredentials> &
+    AccountingProviderActivities<SmartAccountsCredentials>;
 }
 
 function buildSavedConnection(
@@ -206,211 +242,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-});
-
-describe("importWithAdapter payment flows", () => {
-  it("returns a completed import with a warning when payment creation fails", async () => {
-    const { importWithAdapter } = await import("./route");
-
-    const adapter = buildAdapter();
-    vi.mocked(adapter.createPayment).mockRejectedValueOnce(
-      new Error("Temporary provider outage"),
-    );
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter,
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "application/pdf",
-      filename: "invoice.pdf",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(result.invoiceId).toBe("invoice-1");
-    expect(result.createdPayment).toBe(false);
-    expect(result.alreadyExisted).toBe(false);
-    expect(result.extraction.warnings).toContain(
-      "Invoice was created, but recording the payment failed: Temporary provider outage",
-    );
-  });
-
-  it("uses an existing vendor before checking for duplicate invoices", async () => {
-    const { importWithAdapter } = await import("./route");
-    hoisted.smartAccountsFindVendor.mockResolvedValueOnce({
-      id: "vendor-existing",
-      name: "Vendor OÜ",
-    });
-
-    const adapter = buildAdapter();
-    vi.mocked(adapter.findExistingInvoice).mockResolvedValueOnce({
-      invoiceId: "existing-invoice",
-    });
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter,
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "application/pdf",
-      filename: "invoice.pdf",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(result.alreadyExisted).toBe(true);
-    expect(adapter.findOrCreateVendor).not.toHaveBeenCalled();
-    expect(adapter.createPurchaseInvoice).not.toHaveBeenCalled();
-  });
-
-  it("generates a fallback invoice number and warning when extraction omits one", async () => {
-    const [{ importWithAdapter }, { extractInvoiceWithOpenRouter }] =
-      await Promise.all([import("./route"), import("@/lib/openrouter")]);
-
-    vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValueOnce(
-      buildExtraction({
-        invoice: {
-          ...buildExtraction().invoice,
-          invoiceNumber: null,
-        },
-      }),
-    );
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter: buildAdapter(),
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "application/pdf",
-      filename: "invoice.pdf",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(result.invoiceNumber).toBe("AUTO-20260414-ABCDEF12");
-    expect(result.extraction.warnings[0]).toContain(
-      "fallback number was generated",
-    );
-  });
-
-  it("returns an existing invoice result without creating a duplicate", async () => {
-    const { importWithAdapter } = await import("./route");
-
-    const adapter = buildAdapter();
-    vi.mocked(adapter.findExistingInvoice).mockResolvedValueOnce({
-      invoiceId: "existing-invoice",
-    });
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter,
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "application/pdf",
-      filename: "invoice.pdf",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(result.alreadyExisted).toBe(true);
-    expect(result.invoiceId).toBe("existing-invoice");
-    expect(adapter.createPurchaseInvoice).not.toHaveBeenCalled();
-  });
-});
-
-describe("importWithAdapter attachment and validation", () => {
-  it("falls back to attachDocument when inline attachment is unavailable", async () => {
-    const { importWithAdapter } = await import("./route");
-
-    const adapter = buildAdapter();
-    vi.mocked(adapter.createPurchaseInvoice).mockResolvedValueOnce({
-      invoiceId: "invoice-2",
-      attachedFile: false,
-    });
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter,
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "image/png",
-      filename: "invoice.png",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(adapter.attachDocument).toHaveBeenCalledOnce();
-    expect(result.attachedFile).toBe(true);
-  });
-
-  it("returns a warning when attachment upload fails", async () => {
-    const { importWithAdapter } = await import("./route");
-
-    const adapter = buildAdapter();
-    vi.mocked(adapter.createPurchaseInvoice).mockResolvedValueOnce({
-      invoiceId: "invoice-3",
-      attachedFile: false,
-    });
-    vi.mocked(adapter.attachDocument).mockRejectedValueOnce(
-      new Error("Attachment rejected"),
-    );
-
-    const result = await importWithAdapter({
-      savedConnection: buildSavedConnection(),
-      adapter,
-      credentials: {
-        apiKey: "public",
-        secretKey: "secret",
-      },
-      mimeType: "application/pdf",
-      filename: "invoice.pdf",
-      buffer: Buffer.from("invoice"),
-      fingerprint: "abcdef1234567890",
-    });
-
-    expect(result.attachedFile).toBe(false);
-    expect(result.extraction.warnings).toContain(
-      "Invoice was created, but attaching the original file failed: Attachment rejected",
-    );
-  });
-
-  it("throws when the provider context has no accounts", async () => {
-    const { importWithAdapter } = await import("./route");
-    const adapter = buildAdapter();
-    vi.mocked(adapter.loadContext).mockResolvedValueOnce({
-      ...buildContext(),
-      referenceData: {
-        ...buildContext().referenceData,
-        accounts: [],
-      },
-    });
-
-    await expect(
-      importWithAdapter({
-        savedConnection: buildSavedConnection(),
-        adapter,
-        credentials: {
-          apiKey: "public",
-          secretKey: "secret",
-        },
-        mimeType: "application/pdf",
-        filename: "invoice.pdf",
-        buffer: Buffer.from("invoice"),
-        fingerprint: "abcdef1234567890",
-      }),
-    ).rejects.toThrow("returned no chart of accounts");
-  });
 });
 
 describe("POST auth and validation", () => {

@@ -3,6 +3,7 @@ import {
   MeritAccount,
   MeritBank,
   MeritCredentials,
+  MeritItem,
   MeritPaymentType,
   MeritTax,
   MeritUnit,
@@ -14,6 +15,7 @@ export const CACHE_TTLS = {
   banks: 10 * 60 * 1000,
   paymentTypes: 10 * 60 * 1000,
   units: 10 * 60 * 1000,
+  items: 10 * 60 * 1000,
   vendors: 5 * 60 * 1000,
   purchaseInvoices: 2 * 60 * 1000,
 } as const;
@@ -29,6 +31,8 @@ const MERIT_ENDPOINT_VERSIONS = {
   getvendors: "v1",
   getpaymenttypes: "v2",
   getunits: "v1",
+  getitems: "v1",
+  senditems: "v2",
   sendvendor: "v2",
   getpurchorders: "v2",
   sendpurchinvoice: "v2",
@@ -355,6 +359,29 @@ function normalizeUnit(record: Record<string, unknown>): MeritUnit | null {
   return { code, name };
 }
 
+function normalizeItem(record: Record<string, unknown>): MeritItem | null {
+  const code = toOptionalString(record.Code);
+  const description =
+    toOptionalString(record.Description) ?? toOptionalString(record.Name);
+  if (!code || !description) {
+    return null;
+  }
+
+  return {
+    id: toOptionalString(record.ItemId),
+    code,
+    description,
+    unit: toOptionalString(record.UnitofMeasureName),
+    type: toOptionalNumber(record.Type),
+    usage: toOptionalNumber(record.Usage),
+    purchaseAccountCode: toOptionalString(record.PurchaseAccountCode),
+    salesAccountCode: toOptionalString(record.SalesAccountCode),
+    inventoryAccountCode: toOptionalString(record.InventoryAccountCode),
+    costAccountCode: toOptionalString(record.CostAccountCode),
+    taxId: toOptionalString(record.TaxId),
+  };
+}
+
 export async function getAccounts(
   credentials: MeritCredentials,
 ): Promise<MeritAccount[]> {
@@ -426,6 +453,19 @@ export async function getUnits(
     async () => {
       const response = await meritRequest<unknown>("getunits", credentials, {});
       return extractList(response).map(normalizeUnit).filter(isNonNull);
+    },
+  );
+}
+
+export async function getItems(
+  credentials: MeritCredentials,
+): Promise<MeritItem[]> {
+  return cachedValue(
+    namespacedCacheKey(credentials, "items"),
+    CACHE_TTLS.items,
+    async () => {
+      const response = await meritRequest<unknown>("getitems", credentials, {});
+      return extractList(response).map(normalizeItem).filter(isNonNull);
     },
   );
 }

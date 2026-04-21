@@ -1,25 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  AccountingProviderAdapter,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
 } from "@/lib/accounting-provider-types";
+import type { AccountingProviderActivities } from "@/lib/accounting-provider-activities";
 import type { InvoiceExtraction } from "@/lib/invoice-import-types";
 import type { StoredAccountingConnection } from "@/lib/user-accounting-connections";
 
 const hoisted = vi.hoisted(() => ({
   meritProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
+    findVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
+    listArticles: vi.fn(),
+    getVendorArticleHistory: vi.fn(),
+    createVendor: vi.fn(),
+    createArticle: vi.fn(),
+    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
   },
   smartAccountsProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
+    findVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
+    listArticles: vi.fn(),
+    getVendorArticleHistory: vi.fn(),
+    createVendor: vi.fn(),
+    createArticle: vi.fn(),
+    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -125,11 +135,34 @@ function buildContext(): ProviderRuntimeContext {
   };
 }
 
-function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> {
+function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> & {
+  findOrCreateVendor: ReturnType<typeof vi.fn>;
+} {
   return {
     provider: "smartaccounts",
     validateCredentials: vi.fn(),
     loadContext: vi.fn(async () => buildContext()),
+    findVendor: vi.fn(async () => ({
+      vendorId: "vendor-1",
+      vendorName: "Vendor OÜ",
+    })),
+    createVendor: vi.fn(async () => ({
+      vendorId: "vendor-1",
+      vendorName: "Vendor OÜ",
+    })),
+    listArticles: vi.fn(async () => [
+      {
+        code: "FURNITURE",
+        description: "Furniture",
+        purchaseAccountCode: "4000",
+        taxCode: "VAT22",
+      },
+    ]),
+    getVendorArticleHistory: vi.fn(async () => []),
+    createArticle: vi.fn(async () => ({
+      code: "FURNITURE",
+      description: "Furniture",
+    })),
     findOrCreateVendor: vi.fn(async () => ({
       vendorId: "vendor-1",
       vendorName: "Vendor OÜ",
@@ -242,6 +275,7 @@ describe("POST imports", () => {
 
     expect(response.status).toBe(200);
     expect(payload.provider).toBe("smartaccounts");
+    expect(payload.draft.rows).toHaveLength(1);
     expect(
       hoisted.smartAccountsProviderAdapter.loadContext,
     ).toHaveBeenCalledOnce();
@@ -268,8 +302,6 @@ describe("POST imports", () => {
 
     expect(response.status).toBe(200);
     expect(payload.provider).toBe("merit");
-    expect(
-      hoisted.meritProviderAdapter.createPurchaseInvoice,
-    ).toHaveBeenCalledOnce();
+    expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledOnce();
   });
 });

@@ -72,6 +72,7 @@ const PAYMENT_PROPERTIES = {
 } as const;
 
 const ROW_PROPERTIES = {
+  sourceArticleCode: { type: ["string", "null"] },
   description: { type: "string" },
   quantity: { type: ["number", "null"] },
   unit: { type: ["string", "null"] },
@@ -182,6 +183,7 @@ function buildUserPrompt(
     "Set payment.isPaid = true only when the document clearly shows it is already paid or is a receipt-like fully paid document.",
     "payment.paymentChannelHint should be BANK for transfers/cards and CASH for cash receipts when reasonably clear; otherwise null.",
     "If the invoice has multiple meaningful rows, return them. If not, return one summarized row.",
+    "If a supplier-specific product or article code is shown on a row, return it as sourceArticleCode. This is source evidence only, not the accounting item code.",
     "If something is unclear, keep fields null and add a warning.",
     `Available purchase accounts: ${JSON.stringify(simplifiedAccounts)}`,
     `Available tax codes: ${JSON.stringify(simplifiedTaxCodes)}`,

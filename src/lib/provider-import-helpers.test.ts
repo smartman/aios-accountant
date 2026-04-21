@@ -158,6 +158,7 @@ describe("resolvePurchaseRows fallback helpers", () => {
       }),
     ).toBe("AUTO-20260407-ABCDEF12");
     expect(fallbackRowFromInvoice(extraction)).toEqual({
+      sourceArticleCode: null,
       description: "Paid by card",
       quantity: 1,
       unit: "pcs",

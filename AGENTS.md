@@ -1,11 +1,3 @@
-<!-- BEGIN:nextjs-agent-rules -->
-
-# This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-
-<!-- END:nextjs-agent-rules -->
-
 # Official API Docs
 
 Verified on 2026-04-15:
@@ -30,6 +22,8 @@ Do not add or rely on ad-hoc import scripts for local testing in this repo.
 
 Invoice import testing should be done through the app UI using Playwright MCP, with credentials read from `.env.local`.
 
+If actions or end-to-end behavior are tested for accounting-provider features, sanity and correctness checks must be performed for all supported accounting providers, not just one.
+
 `npm run dev` is started externally for this repo. Assume the existing dev server will automatically pick up file changes, and do not ask for or suggest restarting it unless the user explicitly requests that restart.
 
 Keep the Playwright MCP browser session and browser window open while testing so progress stays visible to the user. Do not close the browser session or browser window between steps unless the user explicitly asks or the work is fully complete.
@@ -40,6 +34,7 @@ Do not print secret values in logs, test output, or commit them into tracked fil
 
 After finishing every task, ensure the repo is in a passing state before considering the work complete. Run each of the following commands locally and confirm they all succeed:
 
+- `npm audit` — dependency vulnerabilities must be resolved or explicitly reviewed and accepted by the user.
 - `npm test` — all relevant tests must pass, and unit test coverage must be at least 90% for lines, functions, branches, and statements.
 - `npm run typecheck` — typechecking must pass.
 - `npm run format:check` — formatting checks must pass.
@@ -47,6 +42,8 @@ After finishing every task, ensure the repo is in a passing state before conside
 - `npm run build` — the production build must succeed.
 
 # Linting Requirements
+
+Do not change ESLint rules, thresholds, ignores, or lint-policy behavior unless the user explicitly asks for that change.
 
 The lint configuration must register each of the following as an error when violated:
 

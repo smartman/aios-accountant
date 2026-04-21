@@ -1,25 +1,17 @@
 import {
   AccountingProviderAdapter,
   CreatePaymentParams,
-  CreatePurchaseInvoiceParams,
   FindExistingInvoiceParams,
-  FindOrCreateVendorParams,
   ProviderPaymentResult,
-  ProviderRuntimeContext,
   ProviderVendorResult,
   SavedConnectionSummary,
   SmartAccountsCredentials,
   assertProviderContext,
   toSafeIsoString,
 } from "../../accounting-provider-types";
-import {
-  SmartAccountsAccount,
-  SmartAccountsVendor,
-} from "../../invoice-import-types";
+import { AccountingProviderActivities } from "../../accounting-provider-activities";
 import {
   choosePaymentAccount,
-  chooseRelevantArticle,
-  chooseUnpaidAccount,
   createArticle,
   createPayment,
   createVendor,
@@ -31,203 +23,21 @@ import {
   getArticles,
   getBankAccounts,
   getCashAccounts,
+  getVendorInvoiceHistory,
   getVatPcs,
+  listCatalogArticles,
   uploadDocumentAttachment,
 } from "./index";
-
-function maskSecret(value: string): string {
-  const trimmed = value.trim();
-
-  if (trimmed.length <= 3) {
-    return trimmed;
-  }
-
-  return `${"*".repeat(trimmed.length - 3)}${trimmed.slice(-3)}`;
-}
-
-function normalizeNumber(value: number | null | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
-}
-
-function firstNonEmpty(
-  ...values: Array<string | null | undefined>
-): string | null {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-
-  return null;
-}
-
-function toSmartAccountsDate(
-  value: string | null | undefined,
-): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoMatch) {
-    const [, year, month, day] = isoMatch;
-    return `${day}.${month}.${year}`;
-  }
-
-  const estonianMatch = trimmed.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (estonianMatch) {
-    return trimmed;
-  }
-
-  const parsed = new Date(trimmed);
-  if (!Number.isNaN(parsed.getTime())) {
-    const year = parsed.getUTCFullYear();
-    const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(parsed.getUTCDate()).padStart(2, "0");
-    return `${day}.${month}.${year}`;
-  }
-
-  return undefined;
-}
-
-function buildVendorAddress(
-  extraction: FindOrCreateVendorParams["extraction"],
-): SmartAccountsVendor["address"] | undefined {
-  const hasAddress =
-    extraction.vendor.countryCode ||
-    extraction.vendor.city ||
-    extraction.vendor.postalCode ||
-    extraction.vendor.addressLine1 ||
-    extraction.vendor.addressLine2;
-
-  if (!hasAddress) {
-    return undefined;
-  }
-
-  return {
-    country: extraction.vendor.countryCode ?? undefined,
-    city: extraction.vendor.city ?? undefined,
-    postalCode: extraction.vendor.postalCode ?? undefined,
-    address1: extraction.vendor.addressLine1 ?? undefined,
-    address2: extraction.vendor.addressLine2 ?? undefined,
-  };
-}
-
-function buildVendorPayload(
-  extraction: FindOrCreateVendorParams["extraction"],
-  accounts: SmartAccountsAccount[],
-): SmartAccountsVendor {
-  const unpaidAccount = chooseUnpaidAccount(accounts);
-
-  return {
-    name: extraction.vendor.name ?? "Unknown vendor",
-    regCode: extraction.vendor.regCode ?? undefined,
-    vatNumber: extraction.vendor.vatNumber ?? undefined,
-    bankAccount: extraction.vendor.bankAccount ?? undefined,
-    accountUnpaid: unpaidAccount?.code,
-    address: buildVendorAddress(extraction),
-  };
-}
-
-async function ensureArticlesExist(
-  credentials: SmartAccountsCredentials,
-  params: CreatePurchaseInvoiceParams,
-  context: Extract<ProviderRuntimeContext, { provider: "smartaccounts" }>,
-): Promise<void> {
-  const articles = [...context.raw.articles];
-
-  for (const row of params.rows) {
-    const exact = articles.find((article) => article.code === row.code);
-    if (exact) {
-      row.code = exact.code;
-      continue;
-    }
-
-    const relevant = chooseRelevantArticle({
-      articles,
-      description: row.description,
-      accountPurchase: row.accountCode,
-      unit: row.unit,
-      vatPc: row.taxCode,
-    });
-    if (relevant) {
-      row.code = relevant.code;
-      continue;
-    }
-
-    const created = await createArticle(credentials, {
-      code: row.code,
-      description: row.description,
-      type: "SERVICE",
-      activePurchase: true,
-      activeSales: false,
-      unit: row.unit ?? "pcs",
-      vatPc: row.taxCode ?? undefined,
-      accountPurchase: row.accountCode,
-    });
-
-    row.code = created.code;
-    articles.push({
-      code: created.code,
-      description: row.description,
-      unit: row.unit ?? "pcs",
-      type: "SERVICE",
-      activePurchase: true,
-      activeSales: false,
-      accountPurchase: row.accountCode,
-      vatPc: row.taxCode,
-    });
-  }
-}
-
-function buildInvoicePayload(
-  params: CreatePurchaseInvoiceParams,
-): Record<string, unknown> {
-  const currency = params.extraction.invoice.currency ?? "EUR";
-  const issueDate = firstNonEmpty(
-    params.extraction.invoice.issueDate,
-    params.extraction.invoice.entryDate,
-  );
-  const issueDateForSmartAccounts = toSmartAccountsDate(issueDate);
-
-  if (!issueDate || !issueDateForSmartAccounts) {
-    throw new Error(
-      "The invoice date could not be extracted from the uploaded file.",
-    );
-  }
-
-  return {
-    vendorId: params.vendorId,
-    date: issueDateForSmartAccounts,
-    entryDate:
-      toSmartAccountsDate(
-        firstNonEmpty(params.extraction.invoice.entryDate, issueDate),
-      ) ?? issueDateForSmartAccounts,
-    dueDate: toSmartAccountsDate(params.extraction.invoice.dueDate),
-    invoiceNumber: params.extraction.invoice.invoiceNumber ?? undefined,
-    referenceNumber: params.extraction.invoice.referenceNumber ?? undefined,
-    currency,
-    isCalculateVat: true,
-    amount: normalizeNumber(params.extraction.invoice.amountExcludingVat),
-    vatAmount: normalizeNumber(params.extraction.invoice.vatAmount),
-    totalAmount: normalizeNumber(params.extraction.invoice.totalAmount),
-    comment: params.extraction.invoice.notes ?? undefined,
-    rows: params.rows.map((row, index) => ({
-      code: row.code,
-      description: row.description,
-      quantity: row.quantity ?? 1,
-      unit: row.unit ?? undefined,
-      price: row.price ?? undefined,
-      sum: row.sum ?? undefined,
-      vatPc: row.taxCode ?? undefined,
-      order: index + 1,
-      accountPurchase: row.accountCode,
-    })),
-  };
-}
+import {
+  buildVendorAddress,
+  buildInvoicePayload,
+  buildVendorPayload,
+  findExplicitPaymentAccount,
+  firstNonEmpty,
+  maskSecret,
+  normalizeNumber,
+  toSmartAccountsDate,
+} from "./adapter-helpers";
 
 async function loadSmartAccountsContext(credentials: SmartAccountsCredentials) {
   const [accounts, vatPcs, bankAccounts, cashAccounts, articles] =
@@ -278,197 +88,269 @@ async function loadSmartAccountsContext(credentials: SmartAccountsCredentials) {
   };
 }
 
-export const smartAccountsProviderAdapter: AccountingProviderAdapter<SmartAccountsCredentials> =
-  {
-    provider: "smartaccounts",
+export const smartAccountsProviderAdapter: AccountingProviderAdapter<SmartAccountsCredentials> &
+  AccountingProviderActivities<SmartAccountsCredentials> = {
+  provider: "smartaccounts",
 
-    async validateCredentials(credentials): Promise<SavedConnectionSummary> {
-      const accounts = await getAccounts(credentials);
-      if (!accounts.length) {
-        throw new Error(
-          "SmartAccounts returned no chart of accounts for these credentials.",
-        );
-      }
-
-      return {
-        provider: "smartaccounts",
-        label: "SmartAccounts",
-        detail: "SmartAccounts credentials verified successfully.",
-        verifiedAt: toSafeIsoString(new Date()),
-        publicId: credentials.apiKey,
-        secretMasked: maskSecret(credentials.secretKey),
-      };
-    },
-
-    async loadContext(credentials) {
-      return loadSmartAccountsContext(credentials);
-    },
-
-    async findOrCreateVendor(
-      credentials,
-      params,
-      context,
-    ): Promise<ProviderVendorResult> {
-      const smartAccountsContext = assertProviderContext(
-        context,
-        "smartaccounts",
+  async validateCredentials(credentials): Promise<SavedConnectionSummary> {
+    const accounts = await getAccounts(credentials);
+    if (!accounts.length) {
+      throw new Error(
+        "SmartAccounts returned no chart of accounts for these credentials.",
       );
-      const vendorSearchTerm = firstNonEmpty(
-        params.extraction.vendor.regCode,
-        params.extraction.vendor.name,
-        params.extraction.vendor.vatNumber,
-      );
+    }
 
-      if (!vendorSearchTerm) {
-        throw new Error(
-          "The invoice did not contain a usable vendor name or registry code.",
-        );
-      }
+    return {
+      provider: "smartaccounts",
+      label: "SmartAccounts",
+      detail: "SmartAccounts credentials verified successfully.",
+      verifiedAt: toSafeIsoString(new Date()),
+      publicId: credentials.apiKey,
+      secretMasked: maskSecret(credentials.secretKey),
+    };
+  },
 
-      const existingVendor = await findVendor(credentials, vendorSearchTerm);
-      if (existingVendor?.id) {
-        return {
+  async loadContext(credentials) {
+    return loadSmartAccountsContext(credentials);
+  },
+
+  async findVendor(credentials, input) {
+    const vendorSearchTerm = firstNonEmpty(
+      input.extraction.vendor.regCode,
+      input.extraction.vendor.vatNumber,
+      input.extraction.vendor.name,
+    );
+
+    if (!vendorSearchTerm) {
+      return null;
+    }
+
+    const existingVendor = await findVendor(credentials, vendorSearchTerm);
+    return existingVendor?.id
+      ? {
           vendorId: existingVendor.id,
           vendorName: existingVendor.name,
-          createdVendor: false,
-          existingVendor,
-        };
-      }
+        }
+      : null;
+  },
 
-      const created = await createVendor(
-        credentials,
-        buildVendorPayload(
-          params.extraction,
-          smartAccountsContext.raw.accounts,
-        ),
-      );
-
-      return {
-        vendorId: created.vendorId,
-        vendorName: params.extraction.vendor.name ?? "Unknown vendor",
-        createdVendor: true,
-        existingVendor: null,
-      };
-    },
-
-    async findExistingInvoice(credentials, params: FindExistingInvoiceParams) {
-      const dateFrom =
-        toSmartAccountsDate(
-          params.extraction.invoice.issueDate ??
-            params.extraction.invoice.entryDate ??
-            "2000-01-01",
-        ) ?? "01.01.2000";
-
-      return findExistingVendorInvoice(
-        credentials,
-        params.vendorId,
-        params.invoiceNumber,
-        dateFrom,
-      );
-    },
-
-    async createPurchaseInvoice(credentials, params, context) {
-      const smartAccountsContext = assertProviderContext(
-        context,
-        "smartaccounts",
-      );
-      await ensureArticlesExist(credentials, params, smartAccountsContext);
-      const created = await createVendorInvoice(
-        credentials,
-        buildInvoicePayload(params),
-      );
-
-      return {
-        invoiceId: created.invoiceId,
-        attachedFile: false,
-      };
-    },
-
-    async createPayment(
-      credentials,
-      params: CreatePaymentParams,
+  async createVendor(credentials, input, context) {
+    const smartAccountsContext = assertProviderContext(
       context,
-    ): Promise<ProviderPaymentResult> {
-      const smartAccountsContext = assertProviderContext(
-        context,
-        "smartaccounts",
+      "smartaccounts",
+    );
+    const created = await createVendor(
+      credentials,
+      buildVendorPayload(input.extraction, smartAccountsContext.raw.accounts),
+    );
+
+    return {
+      vendorId: created.vendorId,
+      vendorName: input.extraction.vendor.name ?? "Unknown vendor",
+    };
+  },
+
+  async findOrCreateVendor(
+    credentials,
+    params,
+    context,
+  ): Promise<ProviderVendorResult> {
+    const smartAccountsContext = assertProviderContext(
+      context,
+      "smartaccounts",
+    );
+    const vendorSearchTerm = firstNonEmpty(
+      params.extraction.vendor.regCode,
+      params.extraction.vendor.name,
+      params.extraction.vendor.vatNumber,
+    );
+
+    if (!vendorSearchTerm) {
+      throw new Error(
+        "The invoice did not contain a usable vendor name or registry code.",
       );
-      const selectedPaymentAccount = choosePaymentAccount({
+    }
+
+    const existingVendor = await findVendor(credentials, vendorSearchTerm);
+    if (existingVendor?.id) {
+      return {
+        vendorId: existingVendor.id,
+        vendorName: existingVendor.name,
+        createdVendor: false,
+        existingVendor,
+      };
+    }
+
+    const created = await createVendor(
+      credentials,
+      buildVendorPayload(params.extraction, smartAccountsContext.raw.accounts),
+    );
+
+    return {
+      vendorId: created.vendorId,
+      vendorName: params.extraction.vendor.name ?? "Unknown vendor",
+      createdVendor: true,
+      existingVendor: null,
+    };
+  },
+
+  async findExistingInvoice(credentials, params: FindExistingInvoiceParams) {
+    const dateFrom =
+      toSmartAccountsDate(
+        params.extraction.invoice.issueDate ??
+          params.extraction.invoice.entryDate ??
+          "2000-01-01",
+      ) ?? "01.01.2000";
+
+    return findExistingVendorInvoice(
+      credentials,
+      params.vendorId,
+      params.invoiceNumber,
+      dateFrom,
+    );
+  },
+
+  async listArticles(credentials, context) {
+    assertProviderContext(context, "smartaccounts");
+    return listCatalogArticles(credentials);
+  },
+
+  async getVendorArticleHistory(credentials, params, context) {
+    assertProviderContext(context, "smartaccounts");
+    return getVendorInvoiceHistory(credentials, params);
+  },
+
+  async createArticle(credentials, input, context) {
+    assertProviderContext(context, "smartaccounts");
+    const created = await createArticle(credentials, {
+      code: input.code,
+      description: input.description,
+      type: input.type ?? "SERVICE",
+      activePurchase: true,
+      activeSales: false,
+      unit: input.unit ?? "pcs",
+      vatPc: input.taxCode ?? undefined,
+      accountPurchase: input.purchaseAccountCode,
+    });
+
+    return {
+      code: created.code,
+      description: input.description,
+      unit: input.unit,
+      purchaseAccountCode: input.purchaseAccountCode,
+      taxCode: input.taxCode,
+      type: input.type,
+      activePurchase: true,
+    };
+  },
+
+  async createPurchaseInvoice(credentials, params, context) {
+    assertProviderContext(context, "smartaccounts");
+    const created = await createVendorInvoice(
+      credentials,
+      buildInvoicePayload(params),
+    );
+
+    return {
+      invoiceId: created.invoiceId,
+      attachedFile: false,
+    };
+  },
+
+  async createPayment(
+    credentials,
+    params: CreatePaymentParams,
+    context,
+  ): Promise<ProviderPaymentResult> {
+    const smartAccountsContext = assertProviderContext(
+      context,
+      "smartaccounts",
+    );
+    const currency = params.extraction.invoice.currency ?? "EUR";
+    const selectedPaymentAccount =
+      findExplicitPaymentAccount({
         bankAccounts: smartAccountsContext.raw.bankAccounts,
         cashAccounts: smartAccountsContext.raw.cashAccounts,
-        currency: params.extraction.invoice.currency ?? "EUR",
+        paymentAccountName: params.paymentAccountName ?? null,
+        currency,
+        channelHint: params.extraction.payment.paymentChannelHint,
+      }) ??
+      choosePaymentAccount({
+        bankAccounts: smartAccountsContext.raw.bankAccounts,
+        cashAccounts: smartAccountsContext.raw.cashAccounts,
+        currency,
         channelHint: params.extraction.payment.paymentChannelHint,
       });
 
-      if (!selectedPaymentAccount) {
-        throw new Error(
-          "The invoice looks paid, but SmartAccounts has no usable bank or cash account for the payment.",
-        );
-      }
+    if (!selectedPaymentAccount) {
+      throw new Error(
+        "The invoice looks paid, but SmartAccounts has no usable bank or cash account for the payment.",
+      );
+    }
 
-      const paymentAmount =
-        params.extraction.payment.paymentAmount ??
-        params.extraction.invoice.totalAmount ??
-        params.extraction.invoice.amountExcludingVat;
+    const paymentAmount =
+      params.extraction.payment.paymentAmount ??
+      params.extraction.invoice.totalAmount ??
+      params.extraction.invoice.amountExcludingVat;
 
-      if (!paymentAmount) {
-        throw new Error(
-          "The invoice looks paid, but the payment amount could not be determined.",
-        );
-      }
+    if (!paymentAmount) {
+      throw new Error(
+        "The invoice looks paid, but the payment amount could not be determined.",
+      );
+    }
 
-      const payment = await createPayment(credentials, {
-        date:
-          toSmartAccountsDate(
-            params.extraction.payment.paymentDate ??
-              params.extraction.invoice.issueDate ??
-              params.extraction.invoice.entryDate,
-          ) ?? undefined,
-        partnerType: "VENDOR",
-        vendorId: params.vendorId,
-        accountType: selectedPaymentAccount.type,
-        accountName: selectedPaymentAccount.name,
-        currency: params.extraction.invoice.currency ?? "EUR",
-        amount: paymentAmount,
-        document: params.extraction.invoice.invoiceNumber ?? undefined,
-        rows: [
-          {
-            description:
-              params.extraction.invoice.invoiceNumber ??
-              "Imported invoice payment",
-            amount: paymentAmount,
-            type: "VENDOR_INVOICE",
-            id: params.invoiceId,
-          },
-        ],
-      });
-
-      return {
-        paymentId: payment.paymentId,
-        paymentAccount: {
-          type: selectedPaymentAccount.type,
-          name: selectedPaymentAccount.name,
-          currency: selectedPaymentAccount.currency,
-          accountCode: selectedPaymentAccount.account,
+    const payment = await createPayment(credentials, {
+      date:
+        toSmartAccountsDate(
+          params.extraction.payment.paymentDate ??
+            params.extraction.invoice.issueDate ??
+            params.extraction.invoice.entryDate,
+        ) ?? undefined,
+      partnerType: "VENDOR",
+      vendorId: params.vendorId,
+      accountType: selectedPaymentAccount.type,
+      accountName: selectedPaymentAccount.name,
+      currency,
+      amount: paymentAmount,
+      document: params.extraction.invoice.invoiceNumber ?? undefined,
+      rows: [
+        {
+          description:
+            params.extraction.invoice.invoiceNumber ??
+            "Imported invoice payment",
+          amount: paymentAmount,
+          type: "VENDOR_INVOICE",
+          id: params.invoiceId,
         },
-      };
-    },
+      ],
+    });
 
-    async attachDocument(credentials, params) {
-      await uploadDocumentAttachment({
-        credentials,
-        docId: params.invoiceId,
-        filename: params.filename,
-        mimeType: params.mimeType,
-        fileContentBase64: params.fileContentBase64,
-      });
-    },
-  };
+    return {
+      paymentId: payment.paymentId,
+      paymentAccount: {
+        type: selectedPaymentAccount.type,
+        name: selectedPaymentAccount.name,
+        currency: selectedPaymentAccount.currency,
+        accountCode: selectedPaymentAccount.account,
+      },
+    };
+  },
+
+  async attachDocument(credentials, params) {
+    await uploadDocumentAttachment({
+      credentials,
+      docId: params.invoiceId,
+      filename: params.filename,
+      mimeType: params.mimeType,
+      fileContentBase64: params.fileContentBase64,
+    });
+  },
+};
 
 export const __test__ = {
+  buildVendorAddress,
   buildInvoicePayload,
   buildVendorPayload,
-  buildVendorAddress,
   firstNonEmpty,
   maskSecret,
   normalizeNumber,

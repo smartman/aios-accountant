@@ -310,6 +310,29 @@ describe("merit adapter pure invoice total fallbacks", () => {
         [],
       ).TotalAmount,
     ).toBe(224.8);
+    expect(
+      __test__.buildPurchaseInvoiceBody(
+        {
+          ...buildInvoiceParams(),
+          rows: [],
+          extraction: {
+            ...buildInvoiceParams().extraction,
+            invoice: {
+              ...buildInvoiceParams().extraction.invoice,
+              currency: null,
+              amountExcludingVat: null,
+              totalAmount: null,
+            },
+          },
+        },
+        [],
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        CurrencyCode: "EUR",
+        TotalAmount: undefined,
+      }),
+    );
   });
 });
 

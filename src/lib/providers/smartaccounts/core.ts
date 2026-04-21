@@ -20,6 +20,11 @@ export const CACHE_TTLS = {
 const memoryCache = new Map<string, { expiresAt: number; value: unknown }>();
 const inflightCache = new Map<string, Promise<unknown>>();
 
+export function clearSmartAccountsCachesForTests(): void {
+  memoryCache.clear();
+  inflightCache.clear();
+}
+
 function assertCredentials(
   credentials: SmartAccountsCredentials,
 ): SmartAccountsCredentials {
@@ -76,7 +81,10 @@ export function signSmartAccountsRequest(
     .digest("hex");
 }
 
-async function readSmartAccountsError(response: Response): Promise<string> {
+async function readSmartAccountsError(
+  response: Response,
+  requestLabel: string,
+): Promise<string> {
   const text = await response.text();
 
   try {
@@ -87,9 +95,9 @@ async function readSmartAccountsError(response: Response): Promise<string> {
         : typeof parsed.error === "string"
           ? parsed.error
           : text;
-    return `SmartAccounts ${response.status}: ${message}`;
+    return `SmartAccounts ${requestLabel} ${response.status}: ${message}`;
   } catch {
-    return `SmartAccounts ${response.status}: ${text || response.statusText}`;
+    return `SmartAccounts ${requestLabel} ${response.status}: ${text || response.statusText}`;
   }
 }
 
@@ -176,6 +184,7 @@ export async function smartAccountsRequest<T>(
   });
   const signature = signSmartAccountsRequest(query, bodyText, credentials);
   const url = `${SMARTACCOUNTS_API_ROOT}${path}:${methodName}?${query}&signature=${signature}`;
+  const requestLabel = `${options?.httpMethod ?? (options?.body ? "POST" : "GET")} ${path}:${methodName}`;
 
   const response = await fetch(url, {
     method: options?.httpMethod ?? (options?.body ? "POST" : "GET"),
@@ -189,7 +198,7 @@ export async function smartAccountsRequest<T>(
   });
 
   if (!response.ok) {
-    throw new Error(await readSmartAccountsError(response));
+    throw new Error(await readSmartAccountsError(response, requestLabel));
   }
 
   return (await response.json()) as T;

@@ -119,6 +119,7 @@ function buildMeritContext(): MeritRuntimeContext {
       banks: [],
       paymentTypes: [],
       units: [{ code: "tk", name: "tk" }],
+      items: [],
       vendors: [],
     },
   };

@@ -94,14 +94,16 @@ describe("smartaccounts-core request helpers", () => {
         "get",
         buildCredentials("json-error"),
       ),
-    ).rejects.toThrow("SmartAccounts 401: Denied");
+    ).rejects.toThrow("SmartAccounts GET /settings/accounts:get 401: Denied");
     await expect(
       smartAccountsRequest(
         "/settings/accounts",
         "get",
         buildCredentials("text-error"),
       ),
-    ).rejects.toThrow("SmartAccounts 500: Gateway failed");
+    ).rejects.toThrow(
+      "SmartAccounts GET /settings/accounts:get 500: Gateway failed",
+    );
     await expect(
       smartAccountsRequest("/settings/accounts", "get", {
         apiKey: "",

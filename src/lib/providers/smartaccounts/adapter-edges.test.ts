@@ -297,7 +297,7 @@ describe("smartaccounts adapter vendor flows", () => {
 });
 
 describe("smartaccounts adapter invoice creation", () => {
-  it("reuses exact and relevant article codes, creates missing ones, and validates invoice dates", async () => {
+  it("uses the reviewed article codes as-is and validates invoice dates", async () => {
     const { smartAccountsProviderAdapter } = await import("./adapter");
 
     const exactContext = {
@@ -316,17 +316,6 @@ describe("smartaccounts adapter invoice creation", () => {
     );
     expect(mocks.createArticle).not.toHaveBeenCalled();
 
-    mocks.chooseRelevantArticle.mockReturnValueOnce({ code: "ARTICLE01" });
-    await smartAccountsProviderAdapter.createPurchaseInvoice(
-      buildCredentials(),
-      {
-        ...buildInvoiceParams(),
-        rows: [{ ...buildInvoiceParams().rows[0], code: "NEWROW" }],
-      },
-      buildContext(),
-    );
-    expect(mocks.createArticle).not.toHaveBeenCalled();
-
     await smartAccountsProviderAdapter.createPurchaseInvoice(
       buildCredentials(),
       {
@@ -335,7 +324,17 @@ describe("smartaccounts adapter invoice creation", () => {
       },
       buildContext(),
     );
-    expect(mocks.createArticle).toHaveBeenCalledOnce();
+    expect(mocks.createArticle).not.toHaveBeenCalled();
+    expect(mocks.createVendorInvoice).toHaveBeenLastCalledWith(
+      buildCredentials(),
+      expect.objectContaining({
+        rows: [
+          expect.objectContaining({
+            code: "CREATE01",
+          }),
+        ],
+      }),
+    );
 
     await expect(
       smartAccountsProviderAdapter.createPurchaseInvoice(

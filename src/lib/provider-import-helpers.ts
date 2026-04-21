@@ -262,6 +262,7 @@ export function fallbackRowFromInvoice(
   extraction: InvoiceExtraction,
 ): InvoiceExtractionRow {
   return {
+    sourceArticleCode: null,
     description:
       extraction.invoice.notes ??
       extraction.vendor.name ??
