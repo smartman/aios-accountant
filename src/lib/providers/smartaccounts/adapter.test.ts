@@ -206,7 +206,6 @@ describe("smartAccountsProviderAdapter invoice flows", () => {
   it("creates purchase invoices, payments, and attachments", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock
-      .mockResolvedValueOnce(responseJson({ code: "ROW01" }))
       .mockResolvedValueOnce(responseJson({ invoiceId: "invoice-1" }))
       .mockResolvedValueOnce(responseJson({ paymentId: "payment-1" }))
       .mockResolvedValueOnce(responseJson({ ok: true }));
@@ -236,6 +235,7 @@ describe("smartAccountsProviderAdapter invoice flows", () => {
       vendorName: "Vendor OÜ",
       extraction: buildVendorParams().extraction,
       referenceData: buildContext().referenceData,
+      paymentAccountName: null,
     };
 
     const invoice = await smartAccountsProviderAdapter.createPurchaseInvoice(
@@ -272,7 +272,7 @@ describe("smartAccountsProviderAdapter invoice flows", () => {
         accountCode: "1020",
       },
     });
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

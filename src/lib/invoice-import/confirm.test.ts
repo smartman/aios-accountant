@@ -1,0 +1,116 @@
+import { expect, it, vi } from "vitest";
+import { confirmInvoiceImport } from "./confirm";
+import { buildDraft, buildSavedConnection } from "./confirm.test-support";
+
+it("returns the first validation error before loading provider state", async () => {
+  const draft = buildDraft();
+  draft.vendor.name = "";
+  const activities = {
+    loadContext: vi.fn(),
+  };
+
+  await expect(
+    confirmInvoiceImport({
+      savedConnection: buildSavedConnection(),
+      activities: activities as never,
+      credentials: { apiId: "merit-id", apiKey: "merit-key" } as never,
+      mimeType: "image/png",
+      filename: "invoice.png",
+      buffer: Buffer.from("invoice"),
+      draft,
+    }),
+  ).rejects.toThrow("Vendor name is required.");
+  expect(activities.loadContext).not.toHaveBeenCalled();
+});
+
+it("falls back to an existing vendor when createVendor reports a duplicate", async () => {
+  const draft = buildDraft();
+  const activities = {
+    loadContext: vi.fn().mockResolvedValue({
+      provider: "merit",
+      referenceData: {
+        accounts: [{ code: "4004", type: "EXPENSE", label: "4004 - Assets" }],
+        taxCodes: [{ code: "VAT22", rate: 22, description: "22%" }],
+        paymentAccounts: [{ type: "BANK", name: "LHV", currency: "EUR" }],
+      },
+    }),
+    findVendor: vi.fn().mockResolvedValue({
+      vendorId: "vendor-existing",
+      vendorName: "Office Supplies OU",
+    }),
+    createVendor: vi.fn().mockRejectedValue(new Error("Vendor already exists")),
+    findExistingInvoice: vi.fn().mockResolvedValue(null),
+    createArticle: vi.fn(),
+    createPurchaseInvoice: vi.fn().mockResolvedValue({
+      invoiceId: "invoice-1",
+      attachedFile: true,
+    }),
+    createPayment: vi.fn(),
+    attachDocument: vi.fn(),
+  };
+
+  const result = await confirmInvoiceImport({
+    savedConnection: buildSavedConnection(),
+    activities: activities as never,
+    credentials: { apiId: "merit-id", apiKey: "merit-key" } as never,
+    mimeType: "image/png",
+    filename: "invoice.png",
+    buffer: Buffer.from("invoice"),
+    draft,
+  });
+
+  expect(activities.createVendor).toHaveBeenCalledOnce();
+  expect(activities.findVendor).toHaveBeenCalledOnce();
+  expect(activities.createPurchaseInvoice).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      vendorId: "vendor-existing",
+    }),
+    expect.anything(),
+  );
+  expect(result.vendorId).toBe("vendor-existing");
+  expect(result.createdVendor).toBe(false);
+});
+
+it("returns an existing invoice result when a duplicate is found", async () => {
+  const draft = buildDraft();
+  draft.vendor.selectionMode = "existing";
+  draft.vendor.existingVendorId = "vendor-existing";
+  const activities = {
+    loadContext: vi.fn().mockResolvedValue({
+      provider: "merit",
+      referenceData: {
+        accounts: [{ code: "4004", type: "EXPENSE", label: "4004 - Assets" }],
+        taxCodes: [{ code: "VAT22", rate: 22, description: "22%" }],
+        paymentAccounts: [],
+      },
+    }),
+    findVendor: vi.fn(),
+    createVendor: vi.fn(),
+    findExistingInvoice: vi
+      .fn()
+      .mockResolvedValue({ invoiceId: "invoice-existing" }),
+    createArticle: vi.fn(),
+    createPurchaseInvoice: vi.fn(),
+    createPayment: vi.fn(),
+    attachDocument: vi.fn(),
+  };
+
+  const result = await confirmInvoiceImport({
+    savedConnection: buildSavedConnection(),
+    activities: activities as never,
+    credentials: { apiId: "merit-id", apiKey: "merit-key" } as never,
+    mimeType: "image/png",
+    filename: "invoice.png",
+    buffer: Buffer.from("invoice"),
+    draft,
+  });
+
+  expect(activities.createVendor).not.toHaveBeenCalled();
+  expect(activities.createPurchaseInvoice).not.toHaveBeenCalled();
+  expect(result).toMatchObject({
+    alreadyExisted: true,
+    invoiceId: "invoice-existing",
+    vendorId: "vendor-existing",
+  });
+});

@@ -134,6 +134,7 @@ export interface CreatePaymentParams {
   vendorName: string;
   extraction: InvoiceExtraction;
   referenceData: ProviderReferenceData;
+  paymentAccountName?: string | null;
 }
 
 export interface AttachDocumentParams {
@@ -203,12 +204,27 @@ export interface MeritUnit {
   name: string;
 }
 
+export interface MeritItem {
+  id?: string;
+  code: string;
+  description: string;
+  unit?: string;
+  type?: number;
+  usage?: number;
+  purchaseAccountCode?: string;
+  salesAccountCode?: string;
+  inventoryAccountCode?: string;
+  costAccountCode?: string;
+  taxId?: string;
+}
+
 export interface MeritProviderContext {
   accounts: MeritAccount[];
   taxes: MeritTax[];
   banks: MeritBank[];
   paymentTypes: MeritPaymentType[];
   units?: MeritUnit[];
+  items?: MeritItem[];
   vendors: MeritVendor[];
 }
 

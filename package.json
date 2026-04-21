@@ -21,7 +21,7 @@
     "@workos-inc/authkit-nextjs": "^3.0.0",
     "date-fns": "^4.1.0",
     "fast-check": "^4.6.0",
-    "next": "16.2.2",
+    "next": "16.2.4",
     "papaparse": "^5.5.3",
     "pg": "^8.20.0",
     "prisma": "^7.7.0",
@@ -35,9 +35,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.2",
+    "eslint-config-next": "16.2.4",
     "prettier": "^3.6.2",
     "typescript": "^5",
     "vitest": "^4.1.4"
+  },
+  "//": [
+    "overrides.@hono/node-server pins Prisma's transitive dependency to 1.19.13 to resolve GHSA-92pp-h63x-v22m until Prisma updates @prisma/dev.",
+    "overrides.hono pins Prisma's transitive dependency to 4.12.14 to resolve GHSA-458j-xx4x-4375 until Prisma updates @prisma/dev."
+  ],
+  "overrides": {
+    "@hono/node-server": "1.19.13",
+    "hono": "4.12.14"
   }
 }

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUser, signOut } from "@/lib/workos";
-import InvoiceUpload from "./InvoiceUpload";
-import ConnectionSettings from "./ConnectionSettings";
+import DashboardWorkspace from "./DashboardWorkspace";
 import { getStoredAccountingConnection } from "@/lib/user-accounting-connections";
 
 export default async function DashboardPage() {
@@ -73,12 +72,8 @@ export default async function DashboardPage() {
           padding: "2rem 1.25rem 4rem",
         }}
       >
-        <ConnectionSettings
+        <DashboardWorkspace
           currentConnection={savedConnection?.summary ?? null}
-        />
-        <InvoiceUpload
-          canImport={Boolean(savedConnection)}
-          activeProvider={savedConnection?.summary.provider ?? null}
         />
       </main>
     </div>

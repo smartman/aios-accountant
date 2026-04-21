@@ -67,6 +67,7 @@ export interface SmartAccountsArticle {
 }
 
 export interface InvoiceExtractionRow {
+  sourceArticleCode?: string | null;
   description: string;
   quantity: number | null;
   unit: string | null;
@@ -111,6 +112,7 @@ export interface InvoiceExtraction {
     paymentAmount: number | null;
     paymentChannelHint: "BANK" | "CASH" | null;
     reason: string | null;
+    paymentAccountName?: string | null;
   };
   rows: InvoiceExtractionRow[];
   warnings: string[];
@@ -137,6 +139,106 @@ export interface ImportedInvoiceResult {
   } | null;
   extraction: InvoiceExtraction;
   alreadyExisted: boolean;
+}
+
+export interface InvoiceImportReviewArticleCandidate {
+  code: string;
+  description: string;
+  unit: string | null;
+  purchaseAccountCode: string | null;
+  taxCode: string | null;
+  type: string | null;
+  score: number;
+  reasons: string[];
+  historyMatches: number;
+  recentInvoiceDate: string | null;
+}
+
+export interface InvoiceImportDraftRow {
+  id: string;
+  sourceArticleCode: string | null;
+  description: string;
+  quantity: number;
+  unit: string | null;
+  price: number | null;
+  sum: number | null;
+  vatRate: number | null;
+  taxCode: string | null;
+  accountCode: string;
+  accountSelectionReason: string;
+  articleDecision: "existing" | "create";
+  reviewed: boolean;
+  selectedArticleCode: string | null;
+  selectedArticleDescription: string | null;
+  articleCandidates: InvoiceImportReviewArticleCandidate[];
+  suggestionStatus: "clear" | "ambiguous" | "missing";
+  newArticle: {
+    code: string;
+    description: string;
+    unit: string;
+    type: string;
+    purchaseAccountCode: string;
+    taxCode: string | null;
+  };
+}
+
+export interface InvoiceImportDraft {
+  provider: "smartaccounts" | "merit";
+  vendor: {
+    name: string;
+    regCode: string | null;
+    vatNumber: string | null;
+    bankAccount: string | null;
+    email: string | null;
+    phone: string | null;
+    countryCode: string | null;
+    city: string | null;
+    postalCode: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    selectionMode: "existing" | "create";
+    existingVendorId: string | null;
+    existingVendorName: string | null;
+  };
+  invoice: {
+    documentType: string | null;
+    invoiceNumber: string;
+    referenceNumber: string | null;
+    currency: string;
+    issueDate: string;
+    dueDate: string | null;
+    entryDate: string | null;
+    amountExcludingVat: number | null;
+    vatAmount: number | null;
+    totalAmount: number | null;
+    notes: string | null;
+  };
+  payment: {
+    isPaid: boolean;
+    paymentDate: string | null;
+    paymentAmount: number | null;
+    paymentChannelHint: "BANK" | "CASH" | null;
+    reason: string | null;
+    paymentAccountName: string | null;
+  };
+  actions: {
+    createVendor: boolean;
+    recordPayment: boolean;
+  };
+  rows: InvoiceImportDraftRow[];
+  warnings: string[];
+  duplicateInvoiceId: string | null;
+}
+
+export interface InvoiceImportPreviewResult {
+  provider: "smartaccounts" | "merit";
+  draft: InvoiceImportDraft;
+  extraction: InvoiceExtraction;
+  referenceData: {
+    accounts: Array<{ code: string; label: string }>;
+    taxCodes: Array<{ code: string; description: string }>;
+    paymentAccounts: Array<{ name: string; type: "BANK" | "CASH" }>;
+  };
 }
 
 export type InvoiceBatchItemStatus =

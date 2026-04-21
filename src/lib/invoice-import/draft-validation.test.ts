@@ -1,0 +1,157 @@
+import { describe, expect, it } from "vitest";
+import type { InvoiceImportDraft } from "../invoice-import-types";
+import { computeDraftNetTotal, validateDraft } from "./draft-validation";
+
+function buildDraft(): InvoiceImportDraft {
+  return {
+    provider: "merit" as const,
+    vendor: {
+      name: "Office Supplies OU",
+      regCode: "12345678",
+      vatNumber: null,
+      bankAccount: null,
+      email: null,
+      phone: null,
+      countryCode: "EE",
+      city: null,
+      postalCode: null,
+      addressLine1: null,
+      addressLine2: null,
+      selectionMode: "create" as const,
+      existingVendorId: null,
+      existingVendorName: null,
+    },
+    invoice: {
+      documentType: "invoice",
+      invoiceNumber: "INV-1",
+      referenceNumber: null,
+      currency: "EUR",
+      issueDate: "2026-04-20",
+      dueDate: null,
+      entryDate: "2026-04-20",
+      amountExcludingVat: 120,
+      vatAmount: 26.4,
+      totalAmount: 146.4,
+      notes: null,
+    },
+    payment: {
+      isPaid: false,
+      paymentDate: null,
+      paymentAmount: null,
+      paymentChannelHint: null,
+      reason: null,
+      paymentAccountName: null,
+    },
+    actions: {
+      createVendor: true,
+      recordPayment: false,
+    },
+    rows: [
+      {
+        id: "row-1",
+        sourceArticleCode: "CHAIR-XL-001",
+        description: "Office chair ergonomic",
+        quantity: 1,
+        unit: "pcs",
+        price: 120,
+        sum: null,
+        vatRate: 22,
+        taxCode: "VAT22",
+        accountCode: "4004",
+        accountSelectionReason: "Matched low-value asset account.",
+        articleDecision: "existing" as const,
+        reviewed: true,
+        selectedArticleCode: "vv",
+        selectedArticleDescription: "Väikevahendid kuluks",
+        articleCandidates: [],
+        suggestionStatus: "clear" as const,
+        newArticle: {
+          code: "vv",
+          description: "Väikevahendid kuluks",
+          unit: "pcs",
+          type: "SERVICE",
+          purchaseAccountCode: "4004",
+          taxCode: "VAT22",
+        },
+      },
+    ],
+    warnings: [],
+    duplicateInvoiceId: null,
+  };
+}
+
+describe("draft validation", () => {
+  it("computes row totals from explicit sums or price times quantity", () => {
+    const draft = buildDraft();
+    expect(computeDraftNetTotal(draft.rows)).toBe(120);
+    draft.rows[0].sum = 118.4;
+    expect(computeDraftNetTotal(draft.rows)).toBe(118.4);
+    draft.rows[0].sum = null;
+    draft.rows[0].price = null;
+    expect(computeDraftNetTotal(draft.rows)).toBe(0);
+  });
+
+  it("returns no errors for a valid reviewed draft", () => {
+    expect(validateDraft(buildDraft())).toEqual([]);
+  });
+
+  it("requires at least one invoice row", () => {
+    const draft = buildDraft();
+    draft.rows = [];
+    draft.invoice.amountExcludingVat = 0;
+
+    expect(validateDraft(draft)).toContain(
+      "Invoice must contain at least one row.",
+    );
+  });
+
+  it("reports missing vendor, invoice, and payment fields", () => {
+    const draft = buildDraft();
+    draft.vendor.name = "";
+    draft.invoice.invoiceNumber = "";
+    draft.invoice.issueDate = "";
+    draft.actions.recordPayment = true;
+
+    expect(validateDraft(draft)).toEqual(
+      expect.arrayContaining([
+        "Vendor name is required.",
+        "Invoice number is required.",
+        "Invoice date is required.",
+        "Payment date is required when recording payment.",
+        "Payment amount is required when recording payment.",
+      ]),
+    );
+  });
+
+  it("reports row-level review and article issues", () => {
+    const draft = buildDraft();
+    draft.rows[0].description = "";
+    draft.rows[0].accountCode = "";
+    draft.rows[0].reviewed = false;
+    draft.rows[0].selectedArticleCode = "";
+
+    expect(validateDraft(draft)).toEqual(
+      expect.arrayContaining([
+        "Row row-1 is missing a description.",
+        "Row row-1 is missing a purchase account.",
+        "Row row-1 must be reviewed before confirming.",
+        "Row row-1 must select an accounting article.",
+      ]),
+    );
+  });
+
+  it("reports missing new-article definitions and header/row mismatches", () => {
+    const draft = buildDraft();
+    draft.invoice.amountExcludingVat = 99;
+    draft.rows[0].articleDecision = "create";
+    draft.rows[0].newArticle.code = "";
+    draft.rows[0].newArticle.description = "";
+
+    expect(validateDraft(draft)).toEqual(
+      expect.arrayContaining([
+        "Invoice header net amount must match the sum of row amounts.",
+        "Row row-1 must define the new accounting article.",
+      ]),
+    );
+  });
+});

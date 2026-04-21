@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type {
   CreatePaymentParams,
   ProviderRuntimeContext,
@@ -107,6 +107,7 @@ function buildPaymentParams(): CreatePaymentParams {
       warnings: [],
     },
     referenceData: buildContext().referenceData,
+    paymentAccountName: null,
   };
 }
 
@@ -122,105 +123,27 @@ beforeEach(() => {
   mocks.uploadDocumentAttachment.mockResolvedValue(undefined);
 });
 
-describe("smartaccounts adapter payment validation", () => {
-  it("throws when no payment account or amount can be resolved", async () => {
-    const { smartAccountsProviderAdapter } = await import("./adapter");
-    mocks.choosePaymentAccount.mockReturnValueOnce(null);
+it("throws when no payment account or amount can be resolved", async () => {
+  const { smartAccountsProviderAdapter } = await import("./adapter");
+  mocks.choosePaymentAccount.mockReturnValueOnce(null);
 
-    await expect(
-      smartAccountsProviderAdapter.createPayment(
-        buildCredentials(),
-        buildPaymentParams(),
-        buildContext(),
-      ),
-    ).rejects.toThrow("no usable bank or cash account");
-
-    mocks.choosePaymentAccount.mockReturnValueOnce({
-      type: "BANK",
-      name: "Main bank",
-      currency: "EUR",
-      account: "1020",
-    });
-
-    await expect(
-      smartAccountsProviderAdapter.createPayment(
-        buildCredentials(),
-        {
-          ...buildPaymentParams(),
-          extraction: {
-            ...buildPaymentParams().extraction,
-            payment: {
-              ...buildPaymentParams().extraction.payment,
-              paymentAmount: null,
-            },
-            invoice: {
-              ...buildPaymentParams().extraction.invoice,
-              totalAmount: null,
-              amountExcludingVat: null,
-            },
-          },
-        },
-        buildContext(),
-      ),
-    ).rejects.toThrow("payment amount could not be determined");
-  });
-});
-
-describe("smartaccounts adapter payment payloads", () => {
-  it("maps payment payloads and document uploads through the SmartAccounts helpers", async () => {
-    const { smartAccountsProviderAdapter } = await import("./adapter");
-
-    const payment = await smartAccountsProviderAdapter.createPayment(
+  await expect(
+    smartAccountsProviderAdapter.createPayment(
       buildCredentials(),
-      {
-        ...buildPaymentParams(),
-        extraction: {
-          ...buildPaymentParams().extraction,
-          invoice: {
-            ...buildPaymentParams().extraction.invoice,
-            currency: "USD",
-            invoiceNumber: null,
-          },
-        },
-      },
+      buildPaymentParams(),
       buildContext(),
-    );
+    ),
+  ).rejects.toThrow("no usable bank or cash account");
 
-    await smartAccountsProviderAdapter.attachDocument(
-      buildCredentials(),
-      {
-        invoiceId: "invoice-1",
-        filename: "invoice.pdf",
-        mimeType: "application/pdf",
-        fileContentBase64: "ZmFrZQ==",
-      },
-      buildContext(),
-    );
-
-    expect(mocks.createPayment).toHaveBeenCalledWith(
-      buildCredentials(),
-      expect.objectContaining({
-        accountName: "Main bank",
-        currency: "USD",
-        document: undefined,
-      }),
-    );
-    expect(payment).toEqual({
-      paymentId: "payment-1",
-      paymentAccount: {
-        type: "BANK",
-        name: "Main bank",
-        currency: "EUR",
-        accountCode: "1020",
-      },
-    });
-    expect(mocks.uploadDocumentAttachment).toHaveBeenCalledOnce();
+  mocks.choosePaymentAccount.mockReturnValueOnce({
+    type: "BANK",
+    name: "Main bank",
+    currency: "EUR",
+    account: "1020",
   });
 
-  it("defaults missing payment dates and currency values in payment payloads", async () => {
-    const { smartAccountsProviderAdapter } = await import("./adapter");
-
-    await smartAccountsProviderAdapter.createPayment(
+  await expect(
+    smartAccountsProviderAdapter.createPayment(
       buildCredentials(),
       {
         ...buildPaymentParams(),
@@ -228,32 +151,151 @@ describe("smartaccounts adapter payment payloads", () => {
           ...buildPaymentParams().extraction,
           payment: {
             ...buildPaymentParams().extraction.payment,
-            paymentDate: null,
+            paymentAmount: null,
           },
           invoice: {
             ...buildPaymentParams().extraction.invoice,
-            currency: null,
-            issueDate: null,
-            entryDate: null,
-            invoiceNumber: null,
+            totalAmount: null,
+            amountExcludingVat: null,
           },
         },
       },
       buildContext(),
-    );
+    ),
+  ).rejects.toThrow("payment amount could not be determined");
+});
 
-    expect(mocks.createPayment).toHaveBeenCalledWith(
-      buildCredentials(),
-      expect.objectContaining({
-        date: undefined,
-        currency: "EUR",
-        document: undefined,
-        rows: [
-          expect.objectContaining({
-            description: "Imported invoice payment",
-          }),
-        ],
-      }),
-    );
+it("uses an explicitly selected SmartAccounts payment account when provided", async () => {
+  const { smartAccountsProviderAdapter } = await import("./adapter");
+  mocks.choosePaymentAccount
+    .mockReturnValueOnce({
+      type: "CASH",
+      name: "Cash desk",
+      currency: "EUR",
+      account: "1000",
+    })
+    .mockReturnValueOnce({
+      type: "BANK",
+      name: "Main bank",
+      currency: "EUR",
+      account: "1020",
+    });
+
+  const payment = await smartAccountsProviderAdapter.createPayment(
+    buildCredentials(),
+    {
+      ...buildPaymentParams(),
+      paymentAccountName: "Cash desk",
+    },
+    buildContext(),
+  );
+
+  expect(mocks.choosePaymentAccount).toHaveBeenNthCalledWith(1, {
+    bankAccounts: [],
+    cashAccounts: [{ name: "Cash desk", currency: "EUR", account: "1000" }],
+    currency: "EUR",
+    channelHint: "BANK",
   });
+  expect(mocks.createPayment).toHaveBeenCalledWith(
+    buildCredentials(),
+    expect.objectContaining({
+      accountType: "CASH",
+      accountName: "Cash desk",
+    }),
+  );
+  expect(payment.paymentAccount).toMatchObject({
+    type: "CASH",
+    name: "Cash desk",
+    accountCode: "1000",
+  });
+});
+
+it("maps payment payloads and document uploads through the SmartAccounts helpers", async () => {
+  const { smartAccountsProviderAdapter } = await import("./adapter");
+
+  const payment = await smartAccountsProviderAdapter.createPayment(
+    buildCredentials(),
+    {
+      ...buildPaymentParams(),
+      extraction: {
+        ...buildPaymentParams().extraction,
+        invoice: {
+          ...buildPaymentParams().extraction.invoice,
+          currency: "USD",
+          invoiceNumber: null,
+        },
+      },
+    },
+    buildContext(),
+  );
+
+  await smartAccountsProviderAdapter.attachDocument(
+    buildCredentials(),
+    {
+      invoiceId: "invoice-1",
+      filename: "invoice.pdf",
+      mimeType: "application/pdf",
+      fileContentBase64: "ZmFrZQ==",
+    },
+    buildContext(),
+  );
+
+  expect(mocks.createPayment).toHaveBeenCalledWith(
+    buildCredentials(),
+    expect.objectContaining({
+      accountName: "Main bank",
+      currency: "USD",
+      document: undefined,
+    }),
+  );
+  expect(payment).toEqual({
+    paymentId: "payment-1",
+    paymentAccount: {
+      type: "BANK",
+      name: "Main bank",
+      currency: "EUR",
+      accountCode: "1020",
+    },
+  });
+  expect(mocks.uploadDocumentAttachment).toHaveBeenCalledOnce();
+});
+
+it("defaults missing payment dates and currency values in payment payloads", async () => {
+  const { smartAccountsProviderAdapter } = await import("./adapter");
+
+  await smartAccountsProviderAdapter.createPayment(
+    buildCredentials(),
+    {
+      ...buildPaymentParams(),
+      extraction: {
+        ...buildPaymentParams().extraction,
+        payment: {
+          ...buildPaymentParams().extraction.payment,
+          paymentDate: null,
+        },
+        invoice: {
+          ...buildPaymentParams().extraction.invoice,
+          currency: null,
+          issueDate: null,
+          entryDate: null,
+          invoiceNumber: null,
+        },
+      },
+    },
+    buildContext(),
+  );
+
+  expect(mocks.createPayment).toHaveBeenCalledWith(
+    buildCredentials(),
+    expect.objectContaining({
+      date: undefined,
+      currency: "EUR",
+      document: undefined,
+      rows: [
+        expect.objectContaining({
+          description: "Imported invoice payment",
+        }),
+      ],
+    }),
+  );
 });

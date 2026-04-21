@@ -54,3 +54,6 @@ playwright-mcp-*.tgz
 # local codex metadata
 skills-lock.json
 /src/generated
+
+# local test invoice files
+/test-invoices/

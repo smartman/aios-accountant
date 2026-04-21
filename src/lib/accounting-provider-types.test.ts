@@ -43,6 +43,7 @@ function buildContext(
       taxes: [],
       banks: [],
       paymentTypes: [],
+      items: [],
       vendors: [],
     },
   };

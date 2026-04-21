@@ -109,7 +109,9 @@ describe("smartaccounts attachment filenames", () => {
         mimeType: "application/pdf",
         fileContentBase64: "ZmFrZQ==",
       }),
-    ).rejects.toThrow("SmartAccounts 400: Attachment rejected");
+    ).rejects.toThrow(
+      "SmartAccounts POST /general/files:add 400: Attachment rejected",
+    );
 
     expect(fetchMock).toHaveBeenCalledOnce();
   });

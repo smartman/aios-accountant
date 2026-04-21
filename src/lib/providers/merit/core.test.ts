@@ -7,8 +7,10 @@ import {
   extractList,
   getAccounts,
   getBanks,
+  getItems,
   getPaymentTypes,
   getTaxes,
+  getUnits,
   meritDate,
   meritDateTime,
   meritRequest,
@@ -194,92 +196,127 @@ describe("merit-core requests", () => {
   });
 });
 
-describe("merit-core resource loading", () => {
-  it("normalizes accounts, taxes, banks, and payment types", async () => {
-    const credentials = buildCredentials("resources");
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
+it("normalizes accounts, taxes, banks, payment types, units, and items", async () => {
+  const credentials = buildCredentials("resources");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
 
-      if (url.includes("/getaccounts?")) {
-        return jsonResponse([
-          { AccountID: "1", Code: "4000", NameEN: "Services" },
-          { Name: "skip" },
-        ]);
-      }
-      if (url.includes("/gettaxes?")) {
-        return jsonResponse([
-          { Id: "tax-1", Code: "22", NameEN: "VAT", TaxPct: "22" },
-          { Id: "tax-2", TaxPct: "0" },
-        ]);
-      }
-      if (url.includes("/getbanks?")) {
-        return jsonResponse([
-          { BankId: "bank-1", Name: "Main bank", CurrencyCode: "EUR" },
-          { BankId: "x" },
-        ]);
-      }
-      if (url.includes("/getpaymenttypes?")) {
-        return jsonResponse([
-          { Id: "ptype-1", Name: "Bank", SourceType: "1" },
-          { Name: "skip" },
-        ]);
-      }
+    if (url.includes("/getaccounts?")) {
+      return jsonResponse([
+        { AccountID: "1", Code: "4000", NameEN: "Services" },
+        { Name: "skip" },
+      ]);
+    }
+    if (url.includes("/gettaxes?")) {
+      return jsonResponse([
+        { Id: "tax-1", Code: "22", NameEN: "VAT", TaxPct: "22" },
+        { Id: "tax-2", TaxPct: "0" },
+        { Code: "skip" },
+      ]);
+    }
+    if (url.includes("/getbanks?")) {
+      return jsonResponse([
+        { BankId: "bank-1", Name: "Main bank", CurrencyCode: "EUR" },
+        { BankId: "x" },
+      ]);
+    }
+    if (url.includes("/getpaymenttypes?")) {
+      return jsonResponse([
+        { Id: "ptype-1", Name: "Bank", SourceType: "1" },
+        { Name: "skip" },
+      ]);
+    }
+    if (url.includes("/getunits?")) {
+      return jsonResponse([{ Code: "pcs", Name: "Pieces" }, { Code: "skip" }]);
+    }
+    if (url.includes("/getitems?")) {
+      return jsonResponse([
+        {
+          ItemId: "item-1",
+          Code: "FURNITURE",
+          Description: "Furniture",
+          UnitofMeasureName: "pcs",
+          Usage: 2,
+          PurchaseAccountCode: "4000",
+          TaxId: "tax-1",
+          Type: 2,
+        },
+        { Code: "BROKEN" },
+      ]);
+    }
 
-      return jsonResponse([]);
-    });
-
-    await expect(getAccounts(credentials)).resolves.toEqual([
-      {
-        id: "1",
-        code: "4000",
-        name: undefined,
-        nameEn: "Services",
-        taxName: undefined,
-        taxNameEn: undefined,
-      },
-    ]);
-    await expect(getTaxes(credentials)).resolves.toEqual([
-      {
-        id: "tax-1",
-        code: "22",
-        name: "VAT",
-        rate: 22,
-      },
-      {
-        id: "tax-2",
-        code: "tax-2",
-        name: undefined,
-        rate: 0,
-      },
-    ]);
-    await expect(getBanks(credentials)).resolves.toEqual([
-      {
-        id: "bank-1",
-        name: "Main bank",
-        iban: undefined,
-        currencyCode: "EUR",
-        accountCode: undefined,
-      },
-    ]);
-    await expect(getPaymentTypes(credentials)).resolves.toEqual([
-      {
-        id: "ptype-1",
-        name: "Bank",
-        sourceType: 1,
-        currencyCode: undefined,
-      },
-    ]);
+    return jsonResponse([]);
   });
 
-  it("validates v2 access by querying payment types and purchase orders", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(jsonResponse([]));
+  await expect(getAccounts(credentials)).resolves.toEqual([
+    {
+      id: "1",
+      code: "4000",
+      name: undefined,
+      nameEn: "Services",
+      taxName: undefined,
+      taxNameEn: undefined,
+    },
+  ]);
+  await expect(getTaxes(credentials)).resolves.toEqual([
+    {
+      id: "tax-1",
+      code: "22",
+      name: "VAT",
+      rate: 22,
+    },
+    {
+      id: "tax-2",
+      code: "tax-2",
+      name: undefined,
+      rate: 0,
+    },
+  ]);
+  await expect(getBanks(credentials)).resolves.toEqual([
+    {
+      id: "bank-1",
+      name: "Main bank",
+      iban: undefined,
+      currencyCode: "EUR",
+      accountCode: undefined,
+    },
+  ]);
+  await expect(getPaymentTypes(credentials)).resolves.toEqual([
+    {
+      id: "ptype-1",
+      name: "Bank",
+      sourceType: 1,
+      currencyCode: undefined,
+    },
+  ]);
+  await expect(getUnits(credentials)).resolves.toEqual([
+    { code: "pcs", name: "Pieces" },
+  ]);
+  await expect(getItems(credentials)).resolves.toEqual([
+    {
+      id: "item-1",
+      code: "FURNITURE",
+      description: "Furniture",
+      unit: "pcs",
+      type: 2,
+      usage: 2,
+      purchaseAccountCode: "4000",
+      salesAccountCode: undefined,
+      inventoryAccountCode: undefined,
+      costAccountCode: undefined,
+      taxId: "tax-1",
+    },
+  ]);
+});
 
-    await validateMeritV2Access(buildCredentials("validate"));
+it("validates v2 access by querying payment types and purchase orders", async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(jsonResponse([]));
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/getpaymenttypes?");
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/getpurchorders?");
-  });
+  await validateMeritV2Access(buildCredentials("validate"));
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/getpaymenttypes?");
+  expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/getpurchorders?");
 });

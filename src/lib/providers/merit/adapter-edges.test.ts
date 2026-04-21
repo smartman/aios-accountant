@@ -69,6 +69,7 @@ function buildContext(): Extract<
       ],
       paymentTypes: [{ id: "ptype-1", name: "Main bank" }],
       units: [{ code: "tk", name: "tk" }],
+      items: [],
       vendors: [],
     },
   };
@@ -157,6 +158,7 @@ function buildPaymentParams(): CreatePaymentParams {
     vendorName: "Vendor OÜ",
     extraction: buildVendorParams().extraction,
     referenceData: buildContext().referenceData,
+    paymentAccountName: null,
   };
 }
 
