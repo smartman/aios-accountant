@@ -161,7 +161,7 @@ describe("resolvePurchaseRows fallback helpers", () => {
       sourceArticleCode: null,
       description: "Paid by card",
       quantity: 1,
-      unit: "pcs",
+      unit: null,
       price: 181.29,
       sum: 224.8,
       vatRate: null,

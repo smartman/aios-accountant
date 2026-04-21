@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   CreatePurchaseInvoiceParams,
   FindExistingInvoiceParams,
-  FindOrCreateVendorParams,
   MeritCredentials,
   ProviderRuntimeContext,
 } from "../../accounting-provider-types";
+import type { InvoiceExtraction } from "../../invoice-import-types";
 import { clearMeritCachesForTests, meritProviderAdapter } from "./index";
 
 type MeritRuntimeContext = Extract<
@@ -13,51 +13,43 @@ type MeritRuntimeContext = Extract<
   { provider: "merit" }
 >;
 
-function buildVendorParams(): FindOrCreateVendorParams {
+function buildVendorExtraction(): InvoiceExtraction {
   return {
-    extraction: {
-      vendor: {
-        name: "Vendor OÜ",
-        regCode: "12345678",
-        vatNumber: null,
-        bankAccount: null,
-        email: null,
-        phone: null,
-        countryCode: "EE",
-        city: "Tallinn",
-        postalCode: null,
-        addressLine1: null,
-        addressLine2: null,
-      },
-      invoice: {
-        documentType: "invoice",
-        invoiceNumber: "INV-1",
-        referenceNumber: null,
-        currency: "EUR",
-        issueDate: "2026-04-14",
-        dueDate: "2026-04-21",
-        entryDate: "2026-04-14",
-        amountExcludingVat: 100,
-        vatAmount: 22,
-        totalAmount: 122,
-        notes: null,
-      },
-      payment: {
-        isPaid: false,
-        paymentDate: null,
-        paymentAmount: null,
-        paymentChannelHint: null,
-        reason: null,
-      },
-      rows: [],
-      warnings: [],
+    vendor: {
+      name: "Vendor OÜ",
+      regCode: "12345678",
+      vatNumber: null,
+      bankAccount: null,
+      email: null,
+      phone: null,
+      countryCode: "EE",
+      city: "Tallinn",
+      postalCode: null,
+      addressLine1: null,
+      addressLine2: null,
+    },
+    invoice: {
+      documentType: "invoice",
+      invoiceNumber: "INV-1",
+      referenceNumber: null,
+      currency: "EUR",
+      issueDate: "2026-04-14",
+      dueDate: "2026-04-21",
+      entryDate: "2026-04-14",
+      amountExcludingVat: 100,
+      vatAmount: 22,
+      totalAmount: 122,
+      notes: null,
+    },
+    payment: {
+      isPaid: false,
+      paymentDate: null,
+      paymentAmount: null,
+      paymentChannelHint: null,
+      reason: null,
     },
     rows: [],
-    referenceData: {
-      accounts: [],
-      taxCodes: [],
-      paymentAccounts: [],
-    },
+    warnings: [],
   };
 }
 
@@ -138,38 +130,33 @@ afterEach(() => {
 describe("merit cache invalidation", () => {
   it("reuses a newly created vendor on the next lookup", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          Id: "vendor-1",
-          Name: "Vendor OÜ",
-        }),
-      } as Response);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Id: "vendor-1",
+        Name: "Vendor OÜ",
+      }),
+    } as Response);
 
-    const first = await meritProviderAdapter.findOrCreateVendor(
+    await meritProviderAdapter.createVendor(
       credentials,
-      buildVendorParams(),
+      {
+        extraction: buildVendorExtraction(),
+        referenceData: buildMeritContext().referenceData,
+      },
       buildMeritContext(),
     );
-    const second = await meritProviderAdapter.findOrCreateVendor(
+    const second = await meritProviderAdapter.findVendor(
       credentials,
-      buildVendorParams(),
+      { extraction: buildVendorExtraction() },
       buildMeritContext(),
     );
 
-    expect(first.createdVendor).toBe(true);
-    expect(second.createdVendor).toBe(false);
+    if (!second) {
+      throw new Error("Expected cached vendor lookup to return a vendor.");
+    }
     expect(second.vendorId).toBe("vendor-1");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("clears cached invoice searches after creating a purchase invoice", async () => {
@@ -327,34 +314,28 @@ describe("merit context loading", () => {
 describe("merit vendor and invoice operations", () => {
   it("creates a new vendor when no existing match is found", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          Id: "vendor-2",
-          Name: "Vendor OÜ",
-        }),
-      } as Response);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Id: "vendor-2",
+        Name: "Vendor OÜ",
+      }),
+    } as Response);
 
-    const result = await meritProviderAdapter.findOrCreateVendor(
+    const result = await meritProviderAdapter.createVendor(
       credentials,
-      buildVendorParams(),
+      {
+        extraction: buildVendorExtraction(),
+        referenceData: buildMeritContext().referenceData,
+      },
       buildMeritContext(),
     );
 
     expect(result).toMatchObject({
       vendorId: "vendor-2",
-      createdVendor: true,
+      vendorName: "Vendor OÜ",
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("creates purchase invoices and reuses the payment id fallback", async () => {
@@ -407,7 +388,7 @@ describe("merit vendor and invoice operations", () => {
         invoiceId: "invoice-2",
         vendorId: "vendor-1",
         vendorName: "Vendor OÜ",
-        extraction: buildVendorParams().extraction,
+        extraction: buildVendorExtraction(),
         referenceData: buildMeritContext().referenceData,
       },
       {
@@ -478,14 +459,14 @@ describe("merit payment guards", () => {
 
 function buildExtractionWithoutPaymentAmount() {
   return {
-    ...buildVendorParams().extraction,
+    ...buildVendorExtraction(),
     invoice: {
-      ...buildVendorParams().extraction.invoice,
+      ...buildVendorExtraction().invoice,
       totalAmount: null,
       amountExcludingVat: null,
     },
     payment: {
-      ...buildVendorParams().extraction.payment,
+      ...buildVendorExtraction().payment,
       isPaid: true,
       paymentAmount: null,
     },

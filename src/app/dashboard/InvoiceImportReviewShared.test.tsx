@@ -5,7 +5,9 @@ import {
   ImportResultCard,
   createBlankRow,
   fieldStyle,
+  fieldClass,
   formatCurrency,
+  statusChipClass,
   sectionTitle,
   updateRow,
 } from "./InvoiceImportReviewShared";
@@ -74,7 +76,7 @@ function buildDraft(): InvoiceImportDraft {
         articleCandidates: [],
         suggestionStatus: "clear",
         newArticle: {
-          code: "ARTICLE-1",
+          code: "",
           description: "Article",
           unit: "pcs",
           type: "SERVICE",
@@ -84,7 +86,7 @@ function buildDraft(): InvoiceImportDraft {
       },
     ],
     warnings: [],
-    duplicateInvoiceId: null,
+    duplicateInvoice: null,
   };
 }
 
@@ -93,7 +95,7 @@ it("formats currency values and exposes the shared field style", () => {
   expect(formatCurrency(Number.NaN)).toBe("N/A");
   expect(fieldStyle()).toMatchObject({
     width: "100%",
-    borderRadius: "8px",
+    borderRadius: "12px",
   });
 });
 
@@ -119,7 +121,9 @@ it("creates monotonic row ids after rows have been deleted", () => {
   const newRow = createBlankRow(buildDraft());
 
   expect(newRow.id).toBe("row-3");
-  expect(newRow.newArticle.code).toBe("NEW_3");
+  expect(newRow.unit).toBeNull();
+  expect(newRow.newArticle.code).toBe("");
+  expect(newRow.newArticle.unit).toBe("");
 });
 
 it("handles drafts whose existing rows do not follow the row-N pattern", () => {
@@ -130,6 +134,20 @@ it("handles drafts whose existing rows do not follow the row-N pattern", () => {
 
   expect(newRow.id).toBe("row-1");
   expect(newRow.accountCode).toBe("4000");
+});
+
+it("builds shared field classes with optional extras", () => {
+  expect(fieldClass("bg-red-500")).toContain("w-full min-h-[48px]");
+  expect(fieldClass("bg-red-500")).toContain("bg-red-500");
+});
+
+it("maps status chip styles for all known states", () => {
+  expect(statusChipClass("success")).toContain("border-emerald-300");
+  expect(statusChipClass("clear")).toContain("border-emerald-300");
+  expect(statusChipClass("warning")).toContain("border-amber-300");
+  expect(statusChipClass("ambiguous")).toContain("border-amber-300");
+  expect(statusChipClass("missing")).toContain("border-rose-300");
+  expect(statusChipClass()).toContain("border-slate-300");
 });
 
 it("falls back to blank account defaults when no rows exist", () => {

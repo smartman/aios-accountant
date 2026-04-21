@@ -38,10 +38,11 @@ function assertCredentials(
 export function getSmartAccountsCacheNamespace(
   credentials: SmartAccountsCredentials,
 ): string {
+  const cacheScope = credentials.cacheScope ?? "global";
   return crypto
     .createHash("sha256")
     .update(
-      `smartaccounts:${credentials.apiKey}:${credentials.secretKey}`,
+      `smartaccounts:${credentials.apiKey}:${credentials.secretKey}:scope:${cacheScope}`,
       "utf8",
     )
     .digest("hex");
@@ -162,6 +163,20 @@ export function namespacedCacheKey(
   key: string,
 ): string {
   return `${getSmartAccountsCacheNamespace(credentials)}:${key}`;
+}
+
+export function clearCachedValuesByPrefix(prefix: string): void {
+  for (const key of memoryCache.keys()) {
+    if (key.startsWith(prefix)) {
+      memoryCache.delete(key);
+    }
+  }
+
+  for (const key of inflightCache.keys()) {
+    if (key.startsWith(prefix)) {
+      inflightCache.delete(key);
+    }
+  }
 }
 
 export async function smartAccountsRequest<T>(

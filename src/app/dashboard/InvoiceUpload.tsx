@@ -51,22 +51,15 @@ function getProviderMessage(
   activeProvider: "smartaccounts" | "merit" | null,
 ): string {
   return canImport
-    ? `Imported invoices will be sent to ${activeProvider === "merit" ? "Merit" : "SmartAccounts"}.`
+    ? `Imported invoices will be sent to ${
+        activeProvider === "merit" ? "Merit" : "SmartAccounts"
+      }.`
     : "Save and validate a Merit or SmartAccounts connection before importing invoices.";
 }
 
 function ImportError({ error }: { error: string }) {
   return (
-    <div
-      style={{
-        padding: "1rem 1.25rem",
-        borderRadius: "12px",
-        background: "var(--error-bg)",
-        border: "1px solid var(--error)",
-        color: "var(--error)",
-        marginBottom: "1.5rem",
-      }}
-    >
+    <div className="mb-6 rounded-lg border border-red-500 bg-red-500/20 px-5 py-4 text-red-500">
       {error}
     </div>
   );
@@ -75,96 +68,62 @@ function ImportError({ error }: { error: string }) {
 function ImportInvoiceCard({
   canImport,
   hasSelectedFile,
+  selectedFileName,
   loading,
   confirming,
   onImport,
   onFileChange,
-  onRequestProviderChange,
   providerMessage,
 }: {
   canImport: boolean;
   hasSelectedFile: boolean;
+  selectedFileName: string | null;
   loading: boolean;
   confirming: boolean;
   onImport: () => void;
   onFileChange: (file: File | null) => void;
-  onRequestProviderChange?: () => void;
   providerMessage: string;
 }) {
   return (
-    <div
-      className="glass-card"
-      style={{ padding: "2rem", marginBottom: "2rem" }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "flex-start",
-          flexWrap: "wrap",
-          marginBottom: "1rem",
-        }}
-      >
-        <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>
-          Import invoice
-        </h2>
-
-        {onRequestProviderChange ? (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onRequestProviderChange}
-          >
-            Change accounting provider
-          </button>
-        ) : null}
-      </div>
-      <p
-        style={{
-          color: "var(--text-muted)",
-          marginTop: 0,
-          marginBottom: "1rem",
-        }}
-      >
+    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-100 p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900">
+      <h2 className="mb-4 m-0 text-xl font-semibold">Import invoice</h2>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
         {providerMessage}
       </p>
 
-      <div
-        style={{
-          display: "flex",
-          gap: "1rem",
-          alignItems: "flex-end",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ flex: 1, minWidth: "220px" }}>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-[220px] flex-1">
           <label
             htmlFor="invoice-file"
-            style={{
-              display: "block",
-              fontSize: "0.875rem",
-              marginBottom: "0.5rem",
-              color: "var(--text-muted)",
-            }}
+            className="mb-2 block text-sm text-slate-500 dark:text-slate-400"
           >
             PDF or image file
+          </label>
+          <label
+            htmlFor="invoice-file"
+            className="flex min-h-[56px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
+          >
+            <span className="inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+              Choose file
+            </span>
+            <span className="min-w-0 truncate text-sm text-slate-600 dark:text-slate-300">
+              {selectedFileName ?? "No file chosen"}
+            </span>
           </label>
           <input
             id="invoice-file"
             type="file"
             accept="application/pdf,image/*"
-            className="input-field"
+            className="sr-only"
             disabled={!canImport || loading || confirming}
             onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
           />
         </div>
 
         <button
-          className="btn btn-primary"
+          className="inline-flex min-h-[56px] items-center justify-center whitespace-nowrap rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
           onClick={onImport}
           disabled={!hasSelectedFile || loading || confirming || !canImport}
-          style={{ whiteSpace: "nowrap" }}
         >
           {loading ? "Preparing review…" : "Import invoice"}
         </button>
@@ -176,11 +135,9 @@ function ImportInvoiceCard({
 export default function InvoiceUpload({
   canImport,
   activeProvider,
-  onRequestProviderChange,
 }: {
   canImport: boolean;
   activeProvider: "smartaccounts" | "merit" | null;
-  onRequestProviderChange?: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -243,6 +200,7 @@ export default function InvoiceUpload({
       <ImportInvoiceCard
         canImport={canImport}
         hasSelectedFile={file !== null}
+        selectedFileName={file?.name ?? null}
         loading={loading}
         confirming={confirming}
         onImport={handleImport}
@@ -252,7 +210,6 @@ export default function InvoiceUpload({
           setDraft(null);
           setResult(null);
         }}
-        onRequestProviderChange={onRequestProviderChange}
         providerMessage={providerMessage}
       />
 

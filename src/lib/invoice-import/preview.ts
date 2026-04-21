@@ -11,6 +11,10 @@ import {
 } from "../provider-import-helpers";
 import { StoredAccountingConnection } from "../user-accounting-connections";
 import {
+  buildPreviewDuplicateInvoice,
+  buildPreviewArticleOptions,
+  buildPreviewArticleTypeOptions,
+  buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
   createRowId,
   defaultNewArticleCode,
@@ -88,15 +92,18 @@ function buildDraftRow(params: {
     catalog: params.catalog,
     history: params.history,
   });
-  const defaultCandidate = candidates[0] ?? null;
+  const suggestionStatus = getArticleSuggestionStatus(candidates);
+  const defaultCandidate =
+    suggestionStatus === "clear" ? (candidates[0] ?? null) : null;
 
   return {
     ...baseRow,
-    articleDecision: defaultCandidate ? "existing" : "create",
+    articleDecision: "existing",
+    unit: defaultCandidate?.unit ?? baseRow.unit,
     selectedArticleCode: defaultCandidate?.code ?? null,
     selectedArticleDescription: defaultCandidate?.description ?? null,
     articleCandidates: candidates,
-    suggestionStatus: getArticleSuggestionStatus(candidates),
+    suggestionStatus,
     newArticle: buildSuggestedNewArticle({
       sourceArticleCode,
       resolvedRow: params.resolvedRow,
@@ -131,7 +138,7 @@ function buildBaseDraftRow(params: {
     newArticle: {
       code: "",
       description: "",
-      unit: params.resolvedRow.unit ?? "pcs",
+      unit: params.resolvedRow.unit ?? "",
       type: "SERVICE",
       purchaseAccountCode: params.resolvedRow.accountCode,
       taxCode: params.resolvedRow.taxCode ?? null,
@@ -150,7 +157,7 @@ function buildSuggestedNewArticle(params: {
       accountCode: params.resolvedRow.accountCode,
     }),
     description: params.resolvedRow.description,
-    unit: params.resolvedRow.unit ?? "pcs",
+    unit: params.resolvedRow.unit ?? "",
     type: "SERVICE",
     purchaseAccountCode: params.resolvedRow.accountCode,
     taxCode: params.resolvedRow.taxCode ?? null,
@@ -348,7 +355,11 @@ function buildPreviewDraft(params: {
     },
     rows: params.rows,
     warnings: params.extraction.warnings,
-    duplicateInvoiceId: params.duplicateInvoiceId,
+    duplicateInvoice: buildPreviewDuplicateInvoice({
+      duplicateInvoiceId: params.duplicateInvoiceId,
+      vendorMatch: params.vendorMatch,
+      invoiceNumber: params.extraction.invoice.invoiceNumber,
+    }),
   };
 }
 
@@ -380,13 +391,6 @@ export async function previewInvoiceImport<TCredentials>(params: {
     context.referenceData.accounts,
     context.referenceData.taxCodes,
   );
-  const sourceRows = extraction.rows.length
-    ? extraction.rows
-    : [fallbackRowFromInvoice(extraction)];
-  const resolvedRows = resolvePurchaseRows({
-    extraction,
-    referenceData: context.referenceData,
-  });
   const vendorMatch = await findPreviewVendor({
     savedConnection: params.savedConnection,
     activities: params.activities,
@@ -417,17 +421,29 @@ export async function previewInvoiceImport<TCredentials>(params: {
     vendorMatch,
     duplicateInvoiceId: duplicate?.invoiceId ?? null,
     rows: buildDraftRows({
-      sourceRows,
-      resolvedRows,
+      sourceRows: extraction.rows.length
+        ? extraction.rows
+        : [fallbackRowFromInvoice(extraction)],
+      resolvedRows: resolvePurchaseRows({
+        extraction,
+        referenceData: context.referenceData,
+      }),
       catalog,
       history,
     }),
   });
-
+  const articleOptions = buildPreviewArticleOptions(catalog);
   const preview = {
     provider: params.savedConnection.provider,
     draft,
     extraction,
+    articleTypeOptions: buildPreviewArticleTypeOptions(catalog),
+    unitOptions: buildPreviewUnitOptions({ catalog, context }),
+    articleOptions,
+    sourceArticleOptions: articleOptions.map((article) => ({
+      code: article.code,
+      description: article.description,
+    })),
     referenceData: {
       accounts: context.referenceData.accounts.map((account) => ({
         code: account.code,

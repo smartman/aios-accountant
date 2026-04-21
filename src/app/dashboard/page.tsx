@@ -23,41 +23,20 @@ export default async function DashboardPage() {
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "1rem",
-          padding: "1rem 1.5rem",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--background)",
-          flexWrap: "wrap",
-        }}
-      >
-        <p
-          style={{
-            textTransform: "uppercase",
-            letterSpacing: "0.18em",
-            fontSize: "0.75rem",
-            fontWeight: 700,
-            opacity: 0.72,
-            margin: 0,
-          }}
-        >
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950">
+        <p className="font-semibold uppercase tracking-[0.18em] opacity-72">
           AI Accountant
         </p>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <span style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
             {user.email}
           </span>
 
           <form action={handleSignOut}>
             <button
               type="submit"
-              className="btn btn-secondary"
-              style={{ fontSize: "0.875rem", padding: "0.5rem 1rem" }}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-60 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
             >
               Sign out
             </button>
@@ -65,13 +44,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main
-        style={{
-          maxWidth: "960px",
-          margin: "0 auto",
-          padding: "2rem 1.25rem 4rem",
-        }}
-      >
+      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
         <DashboardWorkspace
           currentConnection={savedConnection?.summary ?? null}
         />

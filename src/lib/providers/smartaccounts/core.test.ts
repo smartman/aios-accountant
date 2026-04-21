@@ -3,8 +3,12 @@ import {
   accountLabel,
   asRecord,
   extractArray,
+  cachedValue,
+  clearCachedValuesByPrefix,
+  clearSmartAccountsCachesForTests,
   getSmartAccountsCacheNamespace,
   isNonNull,
+  setCachedValue,
   namespacedCacheKey,
   normalizeVendor,
   signSmartAccountsRequest,
@@ -46,6 +50,7 @@ function errorResponse(status: number, payload: string): Response {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  clearSmartAccountsCachesForTests();
 });
 
 describe("smartaccounts-core request helpers", () => {
@@ -113,6 +118,50 @@ describe("smartaccounts-core request helpers", () => {
   });
 });
 
+describe("smartaccounts-core cache behavior", () => {
+  it("includes cache scope in the namespace and prefixes by user", () => {
+    const credentials = buildCredentials("scope");
+    const scoped = getSmartAccountsCacheNamespace({
+      ...credentials,
+      cacheScope: "user-1",
+    });
+    const global = getSmartAccountsCacheNamespace(credentials);
+
+    expect(scoped).toHaveLength(64);
+    expect(global).toHaveLength(64);
+    expect(scoped).not.toBe(global);
+    expect(
+      namespacedCacheKey({ ...credentials, cacheScope: "user-1" }, "vats"),
+    ).toContain("vats");
+  });
+
+  it("clears cached values and inflight operations by key prefix", async () => {
+    const pendingLoader = vi.fn(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
+      return "fresh";
+    });
+
+    const inFlight = cachedValue("user1:inflight", 60_000, pendingLoader);
+    setCachedValue("user1:cache", 60_000, "stale");
+    const loader = vi.fn(async () => "fresh");
+    await expect(cachedValue("user1:cache", 60_000, loader)).resolves.toBe(
+      "stale",
+    );
+    const noMatch = cachedValue("other:cache", 60_000, async () => "other");
+
+    clearCachedValuesByPrefix("user1:");
+
+    const next = await cachedValue("user1:cache", 60_000, loader);
+    await expect(inFlight).resolves.toBe("fresh");
+    expect(loader).toHaveBeenCalledOnce();
+    expect(next).toBe("fresh");
+
+    await expect(noMatch).resolves.toBe("other");
+  });
+});
+
 describe("smartaccounts-core normalization helpers", () => {
   it("extracts arrays and normalizes scalar values", () => {
     expect(asRecord({ key: "value" })).toEqual({ key: "value" });
@@ -131,7 +180,9 @@ describe("smartaccounts-core normalization helpers", () => {
 
     expect(toOptionalString("  text  ")).toBe("text");
     expect(toOptionalString("   ")).toBeUndefined();
+    expect(toOptionalNumber(12)).toBe(12);
     expect(toOptionalNumber(" 12,5 ")).toBe(12.5);
+    expect(toOptionalNumber(Number.NaN)).toBeUndefined();
     expect(toOptionalNumber("bad")).toBeUndefined();
     expect(toOptionalBoolean(true)).toBe(true);
     expect(toOptionalBoolean("true")).toBeUndefined();
@@ -160,6 +211,10 @@ describe("smartaccounts-core normalization helpers", () => {
       },
     });
     expect(normalizeVendor({ id: "missing-name" })).toBeNull();
+    expect(normalizeVendor({ name: "Vendor no address" })).toMatchObject({
+      name: "Vendor no address",
+      address: undefined,
+    });
     expect(
       accountLabel({
         code: "4000",
@@ -273,5 +328,73 @@ describe("smartaccounts-core resource loading", () => {
         vatPc: undefined,
       },
     ]);
+
+    expect(
+      extractArray(
+        {
+          values: [10, 20],
+          text: "skip",
+        },
+        ["items"],
+      ),
+    ).toEqual([10, 20]);
+    expect(extractArray({ text: "no-arrays" }, ["entries"])).toEqual([]);
+  });
+});
+
+describe("smartaccounts-core request formatting", () => {
+  it("handles request signing error body variants and fallback date parts", async () => {
+    const credentials = buildCredentials("errors");
+    const formatToPartsSpy = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "formatToParts")
+      .mockReturnValue([
+        { type: "day", value: "01" },
+        { type: "month", value: "01" },
+        { type: "year", value: "2026" },
+        { type: "minute", value: "00" },
+        { type: "second", value: "00" },
+      ]);
+
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: async () => '{"message":"Missing hour"}',
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        text: async () => "",
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true }),
+      } as Response);
+
+    await expect(
+      smartAccountsRequest("/settings/accounts", "get", credentials),
+    ).rejects.toThrow(
+      "SmartAccounts GET /settings/accounts:get 400: Missing hour",
+    );
+    await expect(
+      smartAccountsRequest("/settings/accounts", "get", credentials, {
+        body: { active: true },
+      }),
+    ).rejects.toThrow(
+      "SmartAccounts POST /settings/accounts:get 500: Internal Server Error",
+    );
+
+    await expect(
+      smartAccountsRequest("/settings/accounts", "get", credentials, {
+        query: { pageNumber: 1, optional: undefined },
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    formatToPartsSpy.mockRestore();
   });
 });

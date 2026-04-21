@@ -125,10 +125,11 @@ it("falls back to the first payment account and derives tax/article labels", asy
     { code: "VAT22", description: "VAT22 - 22%" },
   ]);
   expect(preview.draft.rows[0]).toMatchObject({
-    articleDecision: "create",
+    articleDecision: "existing",
+    selectedArticleCode: null,
     newArticle: {
       code: "SPECIAL_SETUP_FEE",
-      unit: "pcs",
+      unit: "",
     },
   });
 });

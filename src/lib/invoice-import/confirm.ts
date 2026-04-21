@@ -15,6 +15,7 @@ import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
 } from "./observability";
+import { formatInvoiceImportRowLabel } from "./row-label";
 import {
   assertReferenceAccounts,
   attachFileIfNeeded,
@@ -97,14 +98,17 @@ async function resolveVendorForConfirm<TCredentials>(params: {
   draft: InvoiceImportDraft;
   extraction: InvoiceExtraction;
 }): Promise<ResolvedVendorForConfirm> {
-  if (
-    params.draft.vendor.selectionMode === "existing" &&
-    params.draft.vendor.existingVendorId?.trim()
-  ) {
+  const matchedVendor = await params.activities.findVendor(
+    params.credentials,
+    {
+      extraction: params.extraction,
+    },
+    params.context,
+  );
+
+  if (matchedVendor) {
     return {
-      vendorId: params.draft.vendor.existingVendorId,
-      vendorName:
-        params.draft.vendor.existingVendorName ?? params.draft.vendor.name,
+      ...matchedVendor,
       createdVendor: false,
     };
   }
@@ -123,16 +127,16 @@ async function resolveVendorForConfirm<TCredentials>(params: {
       createdVendor: true,
     };
   } catch (error) {
-    const matchedVendor = await params.activities.findVendor(
+    const fallbackVendor = await params.activities.findVendor(
       params.credentials,
       {
         extraction: params.extraction,
       },
       params.context,
     );
-    if (matchedVendor) {
+    if (fallbackVendor) {
       return {
-        ...matchedVendor,
+        ...fallbackVendor,
         createdVendor: false,
       };
     }
@@ -174,8 +178,9 @@ async function resolveDraftRows<TCredentials>(params: {
   for (const row of params.draft.rows) {
     let articleCode = row.selectedArticleCode;
     let articleDescription = row.selectedArticleDescription;
+    const shouldCreateArticle = row.articleDecision === "create";
 
-    if (row.articleDecision === "create") {
+    if (shouldCreateArticle) {
       const created = await measureInvoiceImportPhase({
         workflow: "confirm",
         provider: params.savedConnection.provider,
@@ -202,7 +207,9 @@ async function resolveDraftRows<TCredentials>(params: {
     }
 
     if (!articleCode || !articleDescription) {
-      throw new Error(`Row ${row.id} is missing an accounting article.`);
+      throw new Error(
+        `${formatInvoiceImportRowLabel(row.id)} is missing an accounting article.`,
+      );
     }
 
     resolvedRows.push({
@@ -384,7 +391,7 @@ export async function confirmInvoiceImport<TCredentials>(
     provider: params.savedConnection.provider,
     phase: "resolveVendor",
     metadata: {
-      selectionMode: params.draft.vendor.selectionMode,
+      hasPreviewVendorMatch: Boolean(params.draft.vendor.existingVendorId),
     },
     run: () =>
       resolveVendorForConfirm({

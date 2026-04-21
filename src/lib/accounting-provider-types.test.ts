@@ -99,7 +99,7 @@ describe("accounting-provider-types helpers", () => {
     expect(isSmartAccountsVendor({ id: "vendor-1", name: "Vendor OÜ" })).toBe(
       true,
     );
-    expect(isSmartAccountsVendor({ id: "vendor-1" })).toBe(false);
+    expect(isSmartAccountsVendor({ id: "vendor-1" } as never)).toBe(false);
     expect(isSmartAccountsVendor(null)).toBe(false);
   });
 });

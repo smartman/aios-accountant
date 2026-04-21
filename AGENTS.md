@@ -30,6 +30,30 @@ Keep the Playwright MCP browser session and browser window open while testing so
 
 Do not print secret values in logs, test output, or commit them into tracked files.
 
+# Playwright MCP Recovery
+
+1. Stop stale Playwright MCP processes:
+   - `pkill -f '@playwright/mcp' || true`
+
+2. Use the known-good stdio config in `~/.codex/config.toml`:
+   - `@playwright/mcp@0.0.70`
+   - `--isolated`
+   - `--output-dir=/Users/smartman/.playwright-mcp`
+   - `--output-mode=file`
+   - `--save-session`
+   - `--console-level=debug`
+
+3. Do not use `--user-data-dir` together with `--isolated`.
+
+4. Fully restart Codex so it reloads the MCP config.
+
+5. If Playwright still fails, start the standalone HTTP server:
+   - `env HOME=/Users/smartman/.codex/playwright-home XDG_CACHE_HOME=/Users/smartman/.codex/playwright-home/.cache PLAYWRIGHT_BROWSERS_PATH=/Users/smartman/.codex/playwright-browsers npx -y @playwright/mcp@0.0.70 --port 8931 --isolated --output-dir=/Users/smartman/.playwright-mcp --save-session --console-level=debug`
+
+6. If using the HTTP fallback, set `~/.codex/config.toml` to:
+   - `url = "http://127.0.0.1:8931/mcp"`
+   - restart Codex again
+
 # Task Completion Requirements
 
 After finishing every task, ensure the repo is in a passing state before considering the work complete. Run each of the following commands locally and confirm they all succeed:

@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CreatePaymentParams,
   CreatePurchaseInvoiceParams,
-  FindOrCreateVendorParams,
   MeritCredentials,
   ProviderRuntimeContext,
 } from "../../accounting-provider-types";
+import type { InvoiceExtraction } from "../../invoice-import-types";
 
 const mocks = vi.hoisted(() => ({
   clearCachedValuesByPrefix: vi.fn(),
@@ -75,54 +75,50 @@ function buildContext(): Extract<
   };
 }
 
-function buildVendorParams(): FindOrCreateVendorParams {
+function buildVendorExtraction(): InvoiceExtraction {
   return {
-    extraction: {
-      vendor: {
-        name: "Vendor OÜ",
-        regCode: "12345678",
-        vatNumber: null,
-        bankAccount: "EE123",
-        email: null,
-        phone: null,
-        countryCode: "EE",
-        city: "Tallinn",
-        postalCode: "10111",
-        addressLine1: "Tartu mnt 1",
-        addressLine2: null,
-      },
-      invoice: {
-        documentType: "invoice",
-        invoiceNumber: "INV-1",
-        referenceNumber: "REF-1",
-        currency: "EUR",
-        issueDate: "2026-04-14",
-        dueDate: "2026-04-21",
-        entryDate: "2026-04-14",
-        amountExcludingVat: 100,
-        vatAmount: 22,
-        totalAmount: 122,
-        notes: "Consulting",
-      },
-      payment: {
-        isPaid: true,
-        paymentDate: "2026-04-14",
-        paymentAmount: 122,
-        paymentChannelHint: "BANK",
-        reason: "Card payment",
-      },
-      rows: [],
-      warnings: [],
+    vendor: {
+      name: "Vendor OÜ",
+      regCode: "12345678",
+      vatNumber: null,
+      bankAccount: "EE123",
+      email: null,
+      phone: null,
+      countryCode: "EE",
+      city: "Tallinn",
+      postalCode: "10111",
+      addressLine1: "Tartu mnt 1",
+      addressLine2: null,
+    },
+    invoice: {
+      documentType: "invoice",
+      invoiceNumber: "INV-1",
+      referenceNumber: "REF-1",
+      currency: "EUR",
+      issueDate: "2026-04-14",
+      dueDate: "2026-04-21",
+      entryDate: "2026-04-14",
+      amountExcludingVat: 100,
+      vatAmount: 22,
+      totalAmount: 122,
+      notes: "Consulting",
+    },
+    payment: {
+      isPaid: true,
+      paymentDate: "2026-04-14",
+      paymentAmount: 122,
+      paymentChannelHint: "BANK",
+      reason: "Card payment",
     },
     rows: [],
-    referenceData: buildContext().referenceData,
+    warnings: [],
   };
 }
 
 function buildInvoiceParams(): CreatePurchaseInvoiceParams {
   return {
     vendorId: "vendor-1",
-    extraction: buildVendorParams().extraction,
+    extraction: buildVendorExtraction(),
     rows: [
       {
         code: "ROW01",
@@ -156,7 +152,7 @@ function buildPaymentParams(): CreatePaymentParams {
     invoiceId: "invoice-1",
     vendorId: "vendor-1",
     vendorName: "Vendor OÜ",
-    extraction: buildVendorParams().extraction,
+    extraction: buildVendorExtraction(),
     referenceData: buildContext().referenceData,
     paymentAccountName: null,
   };
@@ -231,24 +227,24 @@ describe("merit adapter vendor and invoice flows", () => {
       name: "Vendor OÜ",
     });
 
-    const existing = await meritProviderAdapter.findOrCreateVendor(
+    const existing = await meritProviderAdapter.findVendor(
       buildCredentials(),
-      buildVendorParams(),
+      { extraction: buildVendorExtraction() },
       buildContext(),
     );
     expect(existing).toMatchObject({
       vendorId: "vendor-existing",
-      createdVendor: false,
     });
 
-    mocks.findVendor.mockResolvedValueOnce(null);
-    mocks.findVendor.mockResolvedValueOnce(null);
     mocks.createVendor.mockResolvedValueOnce({ name: "Vendor OÜ" });
 
     await expect(
-      meritProviderAdapter.findOrCreateVendor(
+      meritProviderAdapter.createVendor(
         buildCredentials(),
-        buildVendorParams(),
+        {
+          extraction: buildVendorExtraction(),
+          referenceData: buildContext().referenceData,
+        },
         buildContext(),
       ),
     ).rejects.toThrow("Merit did not return a vendor id.");
@@ -260,15 +256,14 @@ describe("merit adapter vendor and invoice flows", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "vendor-name", name: "Vendor OÜ" });
 
-    const result = await meritProviderAdapter.findOrCreateVendor(
+    const result = await meritProviderAdapter.findVendor(
       buildCredentials(),
-      buildVendorParams(),
+      { extraction: buildVendorExtraction() },
       buildContext(),
     );
 
     expect(result).toMatchObject({
       vendorId: "vendor-name",
-      createdVendor: false,
     });
     expect(mocks.findVendor).toHaveBeenNthCalledWith(1, buildCredentials(), {
       regNo: "12345678",
@@ -288,7 +283,7 @@ describe("merit adapter vendor and invoice flows", () => {
         {
           vendorId: "vendor-1",
           invoiceNumber: "INV-1",
-          extraction: buildVendorParams().extraction,
+          extraction: buildVendorExtraction(),
         },
         buildContext(),
       ),
