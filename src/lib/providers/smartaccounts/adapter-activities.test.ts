@@ -174,4 +174,10 @@ it("exposes SmartAccounts article activities for the shared workflow", async () 
       description: "Furniture",
     }),
   );
+  expect(mocks.createArticle).toHaveBeenCalledWith(
+    { apiKey: "public", secretKey: "secret" },
+    expect.objectContaining({
+      unit: undefined,
+    }),
+  );
 });

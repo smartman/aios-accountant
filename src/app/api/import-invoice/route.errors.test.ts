@@ -5,7 +5,6 @@ const hoisted = vi.hoisted(() => ({
   getUser: vi.fn(),
   meritProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
@@ -13,7 +12,6 @@ const hoisted = vi.hoisted(() => ({
   },
   smartAccountsProviderAdapter: {
     loadContext: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     findExistingInvoice: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),

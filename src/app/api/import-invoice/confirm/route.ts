@@ -16,6 +16,10 @@ import { meritProviderAdapter } from "@/lib/merit";
 import { smartAccountsProviderAdapter } from "@/lib/smartaccounts";
 import { getStoredAccountingConnection } from "@/lib/user-accounting-connections";
 import { getUser } from "@/lib/workos";
+import {
+  scopeMeritCredentials,
+  scopeSmartAccountsCredentials,
+} from "@/lib/accounting-provider-cache";
 
 export const runtime = "nodejs";
 
@@ -46,8 +50,11 @@ export async function POST(request: Request) {
         ? await confirmInvoiceImport({
             savedConnection,
             activities: smartAccountsProviderAdapter,
-            credentials: savedConnection.credentials
-              .credentials as SmartAccountsCredentials,
+            credentials: scopeSmartAccountsCredentials(
+              savedConnection.credentials
+                .credentials as SmartAccountsCredentials,
+              user.id,
+            ),
             mimeType,
             filename,
             buffer,
@@ -56,8 +63,10 @@ export async function POST(request: Request) {
         : await confirmInvoiceImport({
             savedConnection,
             activities: meritProviderAdapter,
-            credentials: savedConnection.credentials
-              .credentials as MeritCredentials,
+            credentials: scopeMeritCredentials(
+              savedConnection.credentials.credentials as MeritCredentials,
+              user.id,
+            ),
             mimeType,
             filename,
             buffer,

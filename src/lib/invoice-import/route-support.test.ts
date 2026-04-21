@@ -63,7 +63,7 @@ describe("invoice import route support", () => {
         actions: {},
         rows: [],
         warnings: [],
-        duplicateInvoiceId: null,
+        duplicateInvoice: null,
       }),
     );
 

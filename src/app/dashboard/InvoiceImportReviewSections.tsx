@@ -3,11 +3,29 @@ import {
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
 import {
-  createBlankRow,
-  fieldStyle,
+  compactFieldLabelClass,
+  stackedFieldLabelClass,
+  fieldClass,
   sectionTitle,
 } from "./InvoiceImportReviewShared";
-import InvoiceImportRowEditor from "./InvoiceImportRowEditor";
+
+const reviewSectionClass =
+  "flex flex-col gap-5 rounded-[18px] border border-slate-300/25 bg-white/40 p-[1.35rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.32),_0_10px_24px_rgba(15,23,42,0.06)] dark:border-slate-700/30 dark:bg-slate-900/20";
+const reviewSectionHeaderClass =
+  "flex flex-wrap items-start justify-between gap-4";
+const reviewSectionCopyClass =
+  "mt-[0.35rem] max-w-[42ch] text-sm leading-6 text-slate-500 dark:text-slate-400";
+const reviewInlineNoteClass =
+  "rounded-[14px] border border-slate-300/25 bg-white/20 p-[0.9rem_1rem] text-sm text-slate-500 dark:border-slate-600/40 dark:bg-slate-900/30 dark:text-slate-200";
+const reviewInlineNoteMatchedClass =
+  "rounded-[14px] border border-emerald-300/60 bg-emerald-50 p-[0.9rem_1rem] text-sm text-slate-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100";
+const reviewFieldLabelClass = stackedFieldLabelClass;
+const fieldGridClass = "grid w-full grid-cols-1 gap-4 sm:grid-cols-2";
+const paymentFieldsClass =
+  "mt-4 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 items-end";
+const checkboxLineClass = "inline-flex flex-row items-center gap-2.5";
+const paymentFieldLabelClass = compactFieldLabelClass;
+export { RowsSection } from "./InvoiceImportRowsSection";
 
 export function VendorSection({
   draft,
@@ -20,13 +38,32 @@ export function VendorSection({
     draft.vendor.existingVendorName ?? draft.vendor.existingVendorId;
 
   return (
-    <section>
-      {sectionTitle("Vendor")}
-      <div className="field-grid">
-        <label>
-          <span>Name</span>
+    <section className={reviewSectionClass}>
+      <div className={reviewSectionHeaderClass}>
+        <div>
+          {sectionTitle("Vendor")}
+          <p className={reviewSectionCopyClass}>
+            Confirm the supplier identity. Matching vendors are reused
+            automatically and a new vendor is created only when no match exists.
+          </p>
+        </div>
+      </div>
+      <div
+        className={
+          existingVendorLabel
+            ? reviewInlineNoteMatchedClass
+            : reviewInlineNoteClass
+        }
+      >
+        {existingVendorLabel
+          ? `Preview match: ${existingVendorLabel}. Confirm will reuse this vendor if the details still match.`
+          : "No exact vendor match was found in preview. Confirm will create a new vendor only if a matching vendor still cannot be found."}
+      </div>
+      <div className={fieldGridClass}>
+        <label className="flex min-w-0 flex-col gap-2 text-sm">
+          <span className={reviewFieldLabelClass}>Name</span>
           <input
-            style={fieldStyle()}
+            className={fieldClass()}
             value={draft.vendor.name}
             onChange={(event) =>
               setDraft({
@@ -36,10 +73,10 @@ export function VendorSection({
             }
           />
         </label>
-        <label>
-          <span>Registry code</span>
+        <label className="flex min-w-0 flex-col gap-2 text-sm">
+          <span className={reviewFieldLabelClass}>Registry code</span>
           <input
-            style={fieldStyle()}
+            className={fieldClass()}
             value={draft.vendor.regCode ?? ""}
             onChange={(event) =>
               setDraft({
@@ -52,10 +89,10 @@ export function VendorSection({
             }
           />
         </label>
-        <label>
-          <span>VAT number</span>
+        <label className="flex min-w-0 flex-col gap-2 text-sm">
+          <span className={reviewFieldLabelClass}>VAT number</span>
           <input
-            style={fieldStyle()}
+            className={fieldClass()}
             value={draft.vendor.vatNumber ?? ""}
             onChange={(event) =>
               setDraft({
@@ -68,38 +105,10 @@ export function VendorSection({
             }
           />
         </label>
-        <label>
-          <span>Vendor handling</span>
-          <select
-            style={fieldStyle()}
-            value={draft.vendor.selectionMode}
-            onChange={(event) =>
-              setDraft({
-                ...draft,
-                actions: {
-                  ...draft.actions,
-                  createVendor: event.target.value === "create",
-                },
-                vendor: {
-                  ...draft.vendor,
-                  selectionMode: event.target.value as "existing" | "create",
-                },
-              })
-            }
-          >
-            {draft.vendor.existingVendorId ? (
-              <option value="existing">
-                Use existing vendor ({existingVendorLabel})
-              </option>
-            ) : null}
-            <option value="create">Create vendor on confirm</option>
-          </select>
-        </label>
       </div>
     </section>
   );
 }
-
 function InvoiceIdentityFields({
   draft,
   setDraft,
@@ -109,10 +118,10 @@ function InvoiceIdentityFields({
 }) {
   return (
     <>
-      <label>
-        <span>Invoice number</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Invoice number</span>
         <input
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.invoiceNumber}
           onChange={(event) =>
             setDraft({
@@ -125,11 +134,11 @@ function InvoiceIdentityFields({
           }
         />
       </label>
-      <label>
-        <span>Issue date</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Issue date</span>
         <input
           type="date"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.issueDate}
           onChange={(event) =>
             setDraft({
@@ -142,11 +151,11 @@ function InvoiceIdentityFields({
           }
         />
       </label>
-      <label>
-        <span>Due date</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Due date</span>
         <input
           type="date"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.dueDate ?? ""}
           onChange={(event) =>
             setDraft({
@@ -159,10 +168,10 @@ function InvoiceIdentityFields({
           }
         />
       </label>
-      <label>
-        <span>Currency</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Currency</span>
         <input
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.currency}
           onChange={(event) =>
             setDraft({
@@ -185,11 +194,11 @@ function InvoiceAmountFields({
 }) {
   return (
     <>
-      <label>
-        <span>Net amount</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Net amount</span>
         <input
           type="number"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.amountExcludingVat ?? ""}
           onChange={(event) =>
             setDraft({
@@ -204,11 +213,11 @@ function InvoiceAmountFields({
           }
         />
       </label>
-      <label>
-        <span>VAT amount</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>VAT amount</span>
         <input
           type="number"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.vatAmount ?? ""}
           onChange={(event) =>
             setDraft({
@@ -223,11 +232,11 @@ function InvoiceAmountFields({
           }
         />
       </label>
-      <label>
-        <span>Total amount</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Total amount</span>
         <input
           type="number"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.invoice.totalAmount ?? ""}
           onChange={(event) =>
             setDraft({
@@ -242,10 +251,10 @@ function InvoiceAmountFields({
           }
         />
       </label>
-      <label style={{ gridColumn: "1 / -1" }}>
-        <span>Notes</span>
+      <label className="col-span-full flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Notes</span>
         <textarea
-          style={{ ...fieldStyle(), minHeight: "90px" }}
+          className={fieldClass("min-h-[90px]")}
           value={draft.invoice.notes ?? ""}
           onChange={(event) =>
             setDraft({
@@ -261,7 +270,6 @@ function InvoiceAmountFields({
     </>
   );
 }
-
 export function InvoiceSection({
   draft,
   setDraft,
@@ -270,16 +278,22 @@ export function InvoiceSection({
   setDraft: (draft: InvoiceImportDraft) => void;
 }) {
   return (
-    <section>
-      {sectionTitle("Invoice")}
-      <div className="field-grid">
+    <section className={reviewSectionClass}>
+      <div className={reviewSectionHeaderClass}>
+        <div>
+          {sectionTitle("Invoice")}
+          <p className={reviewSectionCopyClass}>
+            Review the document details and totals that will be imported.
+          </p>
+        </div>
+      </div>
+      <div className={fieldGridClass}>
         <InvoiceIdentityFields draft={draft} setDraft={setDraft} />
         <InvoiceAmountFields draft={draft} setDraft={setDraft} />
       </div>
     </section>
   );
 }
-
 export function PaymentSection({
   preview,
   draft,
@@ -290,16 +304,19 @@ export function PaymentSection({
   setDraft: (draft: InvoiceImportDraft) => void;
 }) {
   return (
-    <section style={{ marginTop: "2rem" }}>
-      {sectionTitle("Payment")}
-      <div className="field-grid">
+    <section className={`${reviewSectionClass} mt-8`}>
+      <div className={reviewSectionHeaderClass}>
+        <div>{sectionTitle("Payment")}</div>
+      </div>
+      <div className="rounded-[14px] border border-slate-300/20 bg-white/20 p-[0.9rem_1rem]">
         <PaymentToggle draft={draft} setDraft={setDraft} />
+      </div>
+      <div className={paymentFieldsClass}>
         <PaymentFields preview={preview} draft={draft} setDraft={setDraft} />
       </div>
     </section>
   );
 }
-
 function PaymentToggle({
   draft,
   setDraft,
@@ -308,9 +325,10 @@ function PaymentToggle({
   setDraft: (draft: InvoiceImportDraft) => void;
 }) {
   return (
-    <label className="checkbox-line">
+    <label className={`${checkboxLineClass} flex-wrap`}>
       <input
         type="checkbox"
+        className="mt-px h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
         checked={draft.actions.recordPayment}
         onChange={(event) =>
           setDraft({
@@ -330,7 +348,6 @@ function PaymentToggle({
     </label>
   );
 }
-
 function PaymentFields({
   preview,
   draft,
@@ -342,11 +359,11 @@ function PaymentFields({
 }) {
   return (
     <>
-      <label>
-        <span>Payment date</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={paymentFieldLabelClass}>Payment date</span>
         <input
           type="date"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.payment.paymentDate ?? ""}
           onChange={(event) =>
             setDraft({
@@ -359,11 +376,11 @@ function PaymentFields({
           }
         />
       </label>
-      <label>
-        <span>Payment amount</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={paymentFieldLabelClass}>Payment amount</span>
         <input
           type="number"
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.payment.paymentAmount ?? ""}
           onChange={(event) =>
             setDraft({
@@ -378,10 +395,10 @@ function PaymentFields({
           }
         />
       </label>
-      <label>
-        <span>Payment channel</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={paymentFieldLabelClass}>Payment channel</span>
         <select
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.payment.paymentChannelHint ?? ""}
           onChange={(event) =>
             setDraft({
@@ -401,10 +418,10 @@ function PaymentFields({
           <option value="CASH">Cash</option>
         </select>
       </label>
-      <label>
-        <span>Payment account</span>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={paymentFieldLabelClass}>Payment account</span>
         <select
-          style={fieldStyle()}
+          className={fieldClass()}
           value={draft.payment.paymentAccountName ?? ""}
           onChange={(event) =>
             setDraft({
@@ -428,56 +445,5 @@ function PaymentFields({
         </select>
       </label>
     </>
-  );
-}
-
-export function RowsSection({
-  preview,
-  draft,
-  setDraft,
-}: {
-  preview: InvoiceImportPreviewResult;
-  draft: InvoiceImportDraft;
-  setDraft: (draft: InvoiceImportDraft) => void;
-}) {
-  return (
-    <section style={{ marginTop: "2rem" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-          alignItems: "center",
-          flexWrap: "wrap",
-          marginBottom: "1rem",
-        }}
-      >
-        {sectionTitle("Rows")}
-        <button
-          className="btn btn-secondary"
-          type="button"
-          onClick={() =>
-            setDraft({
-              ...draft,
-              rows: [...draft.rows, createBlankRow(draft)],
-            })
-          }
-        >
-          Add row
-        </button>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {draft.rows.map((row) => (
-          <InvoiceImportRowEditor
-            key={row.id}
-            draft={draft}
-            row={row}
-            preview={preview}
-            setDraft={setDraft}
-          />
-        ))}
-      </div>
-    </section>
   );
 }

@@ -70,7 +70,7 @@ it("throws when an existing-article row has no final article selection", async (
       buffer: Buffer.from("invoice"),
       draft,
     }),
-  ).rejects.toThrow("Row row-1 must select an accounting article.");
+  ).rejects.toThrow("Row 1 must select an accounting article.");
 });
 
 it("throws when article creation does not return a usable accounting article", async () => {
@@ -112,5 +112,5 @@ it("throws when article creation does not return a usable accounting article", a
       buffer: Buffer.from("invoice"),
       draft,
     }),
-  ).rejects.toThrow("Row row-1 is missing an accounting article.");
+  ).rejects.toThrow("Row 1 is missing an accounting article.");
 });

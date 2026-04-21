@@ -1,19 +1,19 @@
 import {
-  AccountingProviderAdapter,
   CreatePaymentParams,
   CreatePurchaseInvoiceParams,
   FindExistingInvoiceParams,
-  FindOrCreateVendorParams,
   MeritCredentials,
   MeritTax,
   MeritUnit,
   ProviderPaymentResult,
-  ProviderVendorResult,
   SavedConnectionSummary,
   assertProviderContext,
   toSafeIsoString,
 } from "../../accounting-provider-types";
-import { AccountingProviderActivities } from "../../accounting-provider-activities";
+import {
+  AccountingProviderActivities,
+  ProviderCreateVendorInput,
+} from "../../accounting-provider-activities";
 import {
   clearCachedValuesByPrefix,
   getAccounts,
@@ -96,54 +96,17 @@ async function loadMeritContext(credentials: MeritCredentials) {
 
 async function findExistingMeritVendor(
   credentials: MeritCredentials,
-  params: FindOrCreateVendorParams,
+  extraction: ProviderCreateVendorInput["extraction"],
 ) {
   return (
     (await findVendor(credentials, {
-      regNo: params.extraction.vendor.regCode,
-      vatRegNo: params.extraction.vendor.vatNumber,
+      regNo: extraction.vendor.regCode,
+      vatRegNo: extraction.vendor.vatNumber,
     })) ??
     (await findVendor(credentials, {
-      name: params.extraction.vendor.name,
+      name: extraction.vendor.name,
     }))
   );
-}
-
-function toVendorResult(
-  created: Awaited<ReturnType<typeof createVendor>>,
-): ProviderVendorResult {
-  if (!created.id) {
-    throw new Error("Merit did not return a vendor id.");
-  }
-
-  return {
-    vendorId: created.id,
-    vendorName: created.name,
-    createdVendor: true,
-    existingVendor: null,
-  };
-}
-
-async function resolveVendor(
-  credentials: MeritCredentials,
-  params: FindOrCreateVendorParams,
-): Promise<ProviderVendorResult> {
-  const existingVendor = await findExistingMeritVendor(credentials, params);
-
-  if (existingVendor?.id) {
-    return {
-      vendorId: existingVendor.id,
-      vendorName: existingVendor.name,
-      createdVendor: false,
-      existingVendor,
-    };
-  }
-
-  const created = await createVendor(
-    credentials,
-    buildMeritVendorPayload(params),
-  );
-  return toVendorResult(created);
 }
 
 function buildTaxAmounts(
@@ -237,179 +200,166 @@ function buildPurchaseInvoiceBody(
   };
 }
 
-export const meritProviderAdapter: AccountingProviderAdapter<MeritCredentials> &
-  AccountingProviderActivities<MeritCredentials> = {
-  provider: "merit",
+export const meritProviderAdapter: AccountingProviderActivities<MeritCredentials> =
+  {
+    provider: "merit",
 
-  async validateCredentials(credentials): Promise<SavedConnectionSummary> {
-    await validateMeritV2Access(credentials);
+    async validateCredentials(credentials): Promise<SavedConnectionSummary> {
+      await validateMeritV2Access(credentials);
 
-    return {
-      provider: "merit",
-      label: "Merit",
-      detail: "Merit credentials verified successfully.",
-      verifiedAt: toSafeIsoString(new Date()),
-      publicId: credentials.apiId,
-      secretMasked: maskSecret(credentials.apiKey),
-    };
-  },
-
-  async loadContext(credentials) {
-    return loadMeritContext(credentials);
-  },
-
-  async findVendor(credentials, input) {
-    const existingVendor = await findExistingMeritVendor(credentials, {
-      extraction: input.extraction,
-      rows: [],
-      referenceData: {
-        accounts: [],
-        taxCodes: [],
-        paymentAccounts: [],
-      },
-    });
-
-    return existingVendor?.id
-      ? {
-          vendorId: existingVendor.id,
-          vendorName: existingVendor.name,
-        }
-      : null;
-  },
-
-  async createVendor(credentials, input) {
-    const created = await createVendor(
-      credentials,
-      buildMeritVendorPayload({
-        extraction: input.extraction,
-        rows: [],
-        referenceData: input.referenceData,
-      }),
-    );
-    if (!created.id) {
-      throw new Error("Merit did not return a vendor id.");
-    }
-    return {
-      vendorId: created.id,
-      vendorName: created.name,
-    };
-  },
-
-  async findOrCreateVendor(
-    credentials,
-    params: FindOrCreateVendorParams,
-  ): Promise<ProviderVendorResult> {
-    return resolveVendor(credentials, params);
-  },
-
-  async findExistingInvoice(credentials, params: FindExistingInvoiceParams) {
-    return findExistingPurchaseInvoice(credentials, params);
-  },
-
-  async listArticles(credentials, context) {
-    assertProviderContext(context, "merit");
-    return listItems(credentials);
-  },
-
-  async getVendorArticleHistory(credentials, params, context) {
-    assertProviderContext(context, "merit");
-    return getVendorInvoiceHistory(credentials, params);
-  },
-
-  async createArticle(credentials, input, context) {
-    assertProviderContext(context, "merit");
-    return createItem(credentials, input);
-  },
-
-  async createPurchaseInvoice(credentials, params, context) {
-    const meritContext = assertProviderContext(context, "merit");
-    const body = buildPurchaseInvoiceBody(params, meritContext.raw.units ?? []);
-    body.TaxAmount = buildTaxAmounts(params, meritContext.raw.taxes);
-
-    if (params.attachment?.mimeType === "application/pdf") {
-      body.Attachment = {
-        FileName: params.attachment.filename,
-        FileContent: params.attachment.fileContentBase64,
+      return {
+        provider: "merit",
+        label: "Merit",
+        detail: "Merit credentials verified successfully.",
+        verifiedAt: toSafeIsoString(new Date()),
+        publicId: credentials.apiId,
+        secretMasked: maskSecret(credentials.apiKey),
       };
-    }
+    },
 
-    const response = await meritRequest<Record<string, unknown>>(
-      "sendpurchinvoice",
-      credentials,
-      body,
-    );
-    clearCachedValuesByPrefix(
-      namespacedCacheKey(credentials, "purchaseInvoices:"),
-    );
-    const invoiceId =
-      toOptionalString(response.BillId) ??
-      toOptionalString(response.Id) ??
-      toOptionalString(response.PIHId);
+    async loadContext(credentials) {
+      return loadMeritContext(credentials);
+    },
 
-    if (!invoiceId) {
-      throw new Error("Merit did not return a purchase invoice id.");
-    }
-
-    return {
-      invoiceId,
-      attachedFile: Boolean(body.Attachment),
-    };
-  },
-
-  async createPayment(
-    credentials,
-    params: CreatePaymentParams,
-    context,
-  ): Promise<ProviderPaymentResult> {
-    const meritContext = assertProviderContext(context, "merit");
-    const paymentAccount =
-      findExplicitMeritBank(
-        meritContext.raw.banks,
-        meritContext.raw.paymentTypes,
-        params.paymentAccountName,
-      ) ??
-      pickMeritBank(
-        meritContext.raw.banks,
-        meritContext.raw.paymentTypes,
-        params.extraction.invoice.currency ?? "EUR",
+    async findVendor(credentials, input) {
+      const existingVendor = await findExistingMeritVendor(
+        credentials,
+        input.extraction,
       );
 
-    if (!paymentAccount?.id) {
-      throw new Error(
-        "The invoice looks paid, but Merit has no usable bank account for the payment.",
+      return existingVendor?.id
+        ? {
+            vendorId: existingVendor.id,
+            vendorName: existingVendor.name,
+          }
+        : null;
+    },
+
+    async createVendor(credentials, input) {
+      const created = await createVendor(
+        credentials,
+        buildMeritVendorPayload(input),
       );
-    }
+      if (!created.id) {
+        throw new Error("Merit did not return a vendor id.");
+      }
+      return {
+        vendorId: created.id,
+        vendorName: created.name,
+      };
+    },
 
-    const paymentAmount =
-      params.extraction.payment.paymentAmount ??
-      params.extraction.invoice.totalAmount ??
-      params.extraction.invoice.amountExcludingVat;
+    async findExistingInvoice(credentials, params: FindExistingInvoiceParams) {
+      return findExistingPurchaseInvoice(credentials, params);
+    },
 
-    if (!paymentAmount) {
-      throw new Error(
-        "The invoice looks paid, but the payment amount could not be determined.",
+    async listArticles(credentials, context) {
+      assertProviderContext(context, "merit");
+      return listItems(credentials);
+    },
+
+    async getVendorArticleHistory(credentials, params, context) {
+      assertProviderContext(context, "merit");
+      return getVendorInvoiceHistory(credentials, params);
+    },
+
+    async createArticle(credentials, input, context) {
+      assertProviderContext(context, "merit");
+      return createItem(credentials, input);
+    },
+
+    async createPurchaseInvoice(credentials, params, context) {
+      const meritContext = assertProviderContext(context, "merit");
+      const body = buildPurchaseInvoiceBody(
+        params,
+        meritContext.raw.units ?? [],
       );
-    }
+      body.TaxAmount = buildTaxAmounts(params, meritContext.raw.taxes);
 
-    const response = await meritRequest<Record<string, unknown>>(
-      "sendPaymentV",
-      credentials,
-      buildPaymentBody(params, paymentAccount, paymentAmount, meritDateTime),
-    );
+      if (params.attachment?.mimeType === "application/pdf") {
+        body.Attachment = {
+          FileName: params.attachment.filename,
+          FileContent: params.attachment.fileContentBase64,
+        };
+      }
 
-    return {
-      paymentId:
+      const response = await meritRequest<Record<string, unknown>>(
+        "sendpurchinvoice",
+        credentials,
+        body,
+      );
+      clearCachedValuesByPrefix(
+        namespacedCacheKey(credentials, "purchaseInvoices:"),
+      );
+      const invoiceId =
+        toOptionalString(response.BillId) ??
         toOptionalString(response.Id) ??
-        toOptionalString(response.PaymentId) ??
-        params.invoiceId,
-      paymentAccount,
-    };
-  },
+        toOptionalString(response.PIHId);
 
-  async attachDocument() {
-    // Merit supports PDF attachment inline when the purchase invoice is created.
-  },
-};
+      if (!invoiceId) {
+        throw new Error("Merit did not return a purchase invoice id.");
+      }
+
+      return {
+        invoiceId,
+        attachedFile: Boolean(body.Attachment),
+      };
+    },
+
+    async createPayment(
+      credentials,
+      params: CreatePaymentParams,
+      context,
+    ): Promise<ProviderPaymentResult> {
+      const meritContext = assertProviderContext(context, "merit");
+      const paymentAccount =
+        findExplicitMeritBank(
+          meritContext.raw.banks,
+          meritContext.raw.paymentTypes,
+          params.paymentAccountName,
+        ) ??
+        pickMeritBank(
+          meritContext.raw.banks,
+          meritContext.raw.paymentTypes,
+          params.extraction.invoice.currency ?? "EUR",
+        );
+
+      if (!paymentAccount?.id) {
+        throw new Error(
+          "The invoice looks paid, but Merit has no usable bank account for the payment.",
+        );
+      }
+
+      const paymentAmount =
+        params.extraction.payment.paymentAmount ??
+        params.extraction.invoice.totalAmount ??
+        params.extraction.invoice.amountExcludingVat;
+
+      if (!paymentAmount) {
+        throw new Error(
+          "The invoice looks paid, but the payment amount could not be determined.",
+        );
+      }
+
+      const response = await meritRequest<Record<string, unknown>>(
+        "sendPaymentV",
+        credentials,
+        buildPaymentBody(params, paymentAccount, paymentAmount, meritDateTime),
+      );
+
+      return {
+        paymentId:
+          toOptionalString(response.Id) ??
+          toOptionalString(response.PaymentId) ??
+          params.invoiceId,
+        paymentAccount,
+      };
+    },
+
+    async attachDocument() {
+      // Merit supports PDF attachment inline when the purchase invoice is created.
+    },
+  };
 
 export const __test__ = {
   buildMeritVendorPayload,

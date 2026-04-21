@@ -1,7 +1,5 @@
-import type {
-  CreatePurchaseInvoiceParams,
-  FindOrCreateVendorParams,
-} from "../../accounting-provider-types";
+import type { CreatePurchaseInvoiceParams } from "../../accounting-provider-types";
+import type { ProviderCreateVendorInput } from "../../accounting-provider-activities";
 import type {
   SmartAccountsAccount,
   SmartAccountsBankAccount,
@@ -71,7 +69,7 @@ export function toSmartAccountsDate(
 }
 
 export function buildVendorAddress(
-  extraction: FindOrCreateVendorParams["extraction"],
+  extraction: ProviderCreateVendorInput["extraction"],
 ): SmartAccountsVendor["address"] | undefined {
   const hasAddress =
     extraction.vendor.countryCode ||
@@ -94,7 +92,7 @@ export function buildVendorAddress(
 }
 
 export function buildVendorPayload(
-  extraction: FindOrCreateVendorParams["extraction"],
+  extraction: ProviderCreateVendorInput["extraction"],
   accounts: SmartAccountsAccount[],
 ): SmartAccountsVendor {
   const unpaidAccount = chooseUnpaidAccount(accounts);

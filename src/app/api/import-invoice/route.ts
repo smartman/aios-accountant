@@ -16,6 +16,10 @@ import { getStoredAccountingConnection } from "@/lib/user-accounting-connections
 import { getUser } from "@/lib/workos";
 import { meritProviderAdapter } from "@/lib/merit";
 import { smartAccountsProviderAdapter } from "@/lib/smartaccounts";
+import {
+  scopeMeritCredentials,
+  scopeSmartAccountsCredentials,
+} from "@/lib/accounting-provider-cache";
 
 export const runtime = "nodejs";
 
@@ -24,6 +28,7 @@ async function previewForSavedConnection(
   savedConnection: NonNullable<
     Awaited<ReturnType<typeof getStoredAccountingConnection>>
   >,
+  workosUserId: string,
 ) {
   const mimeType = getMimeType(file);
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -31,11 +36,14 @@ async function previewForSavedConnection(
   const filename = getSafeInvoiceFilename(file);
 
   if (savedConnection.provider === "smartaccounts") {
+    const credentials = scopeSmartAccountsCredentials(
+      savedConnection.credentials.credentials as SmartAccountsCredentials,
+      workosUserId,
+    );
     return previewInvoiceImport({
       savedConnection,
       activities: smartAccountsProviderAdapter,
-      credentials: savedConnection.credentials
-        .credentials as SmartAccountsCredentials,
+      credentials,
       mimeType,
       filename,
       buffer,
@@ -43,10 +51,14 @@ async function previewForSavedConnection(
     });
   }
 
+  const credentials = scopeMeritCredentials(
+    savedConnection.credentials.credentials as MeritCredentials,
+    workosUserId,
+  );
   return previewInvoiceImport({
     savedConnection,
     activities: meritProviderAdapter,
-    credentials: savedConnection.credentials.credentials as MeritCredentials,
+    credentials,
     mimeType,
     filename,
     buffer,
@@ -71,7 +83,11 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = validateInvoiceFile(formData.get("invoice"));
-    const result = await previewForSavedConnection(file, savedConnection);
+    const result = await previewForSavedConnection(
+      file,
+      savedConnection,
+      user.id,
+    );
 
     return NextResponse.json(result);
   } catch (error) {

@@ -227,13 +227,31 @@ export interface InvoiceImportDraft {
   };
   rows: InvoiceImportDraftRow[];
   warnings: string[];
-  duplicateInvoiceId: string | null;
+  duplicateInvoice?: {
+    invoiceId: string;
+    vendorName: string;
+    invoiceNumber: string;
+  } | null;
 }
 
 export interface InvoiceImportPreviewResult {
   provider: "smartaccounts" | "merit";
   draft: InvoiceImportDraft;
   extraction: InvoiceExtraction;
+  articleTypeOptions?: string[];
+  unitOptions?: string[];
+  articleOptions?: Array<{
+    code: string;
+    description: string | null;
+    unit?: string | null;
+    purchaseAccountCode?: string | null;
+    taxCode?: string | null;
+    type?: string | null;
+  }>;
+  sourceArticleOptions?: Array<{
+    code: string;
+    description: string | null;
+  }>;
   referenceData: {
     accounts: Array<{ code: string; label: string }>;
     taxCodes: Array<{ code: string; description: string }>;

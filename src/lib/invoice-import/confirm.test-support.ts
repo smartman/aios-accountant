@@ -64,7 +64,7 @@ export function buildDraft(): InvoiceImportDraft {
         articleCandidates: [],
         suggestionStatus: "ambiguous" as const,
         newArticle: {
-          code: "vv",
+          code: "",
           description: "Väikevahendid kuluks",
           unit: "pcs",
           type: "SERVICE",
@@ -74,7 +74,7 @@ export function buildDraft(): InvoiceImportDraft {
       },
     ],
     warnings: [],
-    duplicateInvoiceId: null,
+    duplicateInvoice: null,
   };
 }
 

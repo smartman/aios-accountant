@@ -269,7 +269,7 @@ export function fallbackRowFromInvoice(
       extraction.invoice.invoiceNumber ??
       "Imported invoice",
     quantity: 1,
-    unit: "pcs",
+    unit: null,
     price:
       extraction.invoice.amountExcludingVat ??
       extraction.invoice.totalAmount ??
@@ -327,17 +327,56 @@ export function chooseFallbackPurchaseAccount(params: {
 export function resolveTaxCode(
   row: InvoiceExtractionRow,
   taxCodes: ProviderReferenceTaxCode[],
+  fallbackTaxCode?: string,
 ): string | undefined {
   if (row.vatPc && taxCodes.some((taxCode) => taxCode.code === row.vatPc)) {
     return row.vatPc;
   }
 
   if (row.vatRate === null || row.vatRate === undefined) {
-    return undefined;
+    return fallbackTaxCode;
   }
 
   const match = taxCodes.find((taxCode) => taxCode.rate === row.vatRate);
-  return match?.code;
+  return match?.code ?? fallbackTaxCode;
+}
+
+function inferInvoiceLevelTaxCode(
+  extraction: InvoiceExtraction,
+  taxCodes: ProviderReferenceTaxCode[],
+): string | undefined {
+  const vatAmount = normalizeNumber(extraction.invoice.vatAmount);
+  const amountExcludingVat = normalizeNumber(
+    extraction.invoice.amountExcludingVat,
+  );
+  const hasExplicitRowTax = extraction.rows.some(
+    (row) => row.vatPc || (row.vatRate !== null && row.vatRate !== undefined),
+  );
+
+  if (
+    !vatAmount ||
+    vatAmount <= 0 ||
+    !amountExcludingVat ||
+    amountExcludingVat <= 0 ||
+    hasExplicitRowTax
+  ) {
+    return undefined;
+  }
+
+  const effectiveRate = (vatAmount / amountExcludingVat) * 100;
+  const rankedMatches = taxCodes
+    .filter(
+      (taxCode): taxCode is ProviderReferenceTaxCode & { rate: number } =>
+        typeof taxCode.rate === "number" && taxCode.rate > 0,
+    )
+    .map((taxCode) => ({
+      code: taxCode.code,
+      distance: Math.abs(taxCode.rate - effectiveRate),
+    }))
+    .filter((match) => match.distance <= 0.6)
+    .sort((left, right) => left.distance - right.distance);
+
+  return rankedMatches[0]?.code;
 }
 
 export function resolvePurchaseRows(params: {
@@ -347,6 +386,10 @@ export function resolvePurchaseRows(params: {
   const sourceRows = params.extraction.rows.length
     ? params.extraction.rows
     : [fallbackRowFromInvoice(params.extraction)];
+  const inferredInvoiceTaxCode = inferInvoiceLevelTaxCode(
+    params.extraction,
+    params.referenceData.taxCodes,
+  );
 
   return sourceRows.map((row, index) => {
     const matchedAccount = findReferenceAccountByCode(
@@ -393,7 +436,11 @@ export function resolvePurchaseRows(params: {
       unit: row.unit ?? undefined,
       price: normalizeNumber(row.price),
       sum: normalizeNumber(row.sum),
-      taxCode: resolveTaxCode(row, params.referenceData.taxCodes),
+      taxCode: resolveTaxCode(
+        row,
+        params.referenceData.taxCodes,
+        inferredInvoiceTaxCode,
+      ),
       accountCode: chosenAccount.code,
       accountSelectionReason:
         shouldOverrideMatchedAccount && matchedAccount

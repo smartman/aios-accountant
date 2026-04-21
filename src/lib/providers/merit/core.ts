@@ -8,6 +8,7 @@ import {
   MeritTax,
   MeritUnit,
 } from "../../accounting-provider-types";
+import { inflightCache, memoryCache } from "./core-cache";
 
 export const CACHE_TTLS = {
   accounts: 10 * 60 * 1000,
@@ -20,8 +21,6 @@ export const CACHE_TTLS = {
   purchaseInvoices: 2 * 60 * 1000,
 } as const;
 
-const memoryCache = new Map<string, { expiresAt: number; value: unknown }>();
-const inflightCache = new Map<string, Promise<unknown>>();
 const MERIT_API_ROOT = "https://aktiva.merit.ee";
 
 const MERIT_ENDPOINT_VERSIONS = {
@@ -58,9 +57,13 @@ function assertMeritCredentials(
 }
 
 export function getMeritCacheNamespace(credentials: MeritCredentials): string {
+  const cacheScope = credentials.cacheScope ?? "global";
   return crypto
     .createHash("sha256")
-    .update(`merit:${credentials.apiId}:${credentials.apiKey}`, "utf8")
+    .update(
+      `merit:${credentials.apiId}:${credentials.apiKey}:scope:${cacheScope}`,
+      "utf8",
+    )
     .digest("hex");
 }
 
@@ -494,7 +497,4 @@ export async function validateMeritV2Access(
   ]);
 }
 
-export function clearMeritCachesForTests(): void {
-  memoryCache.clear();
-  inflightCache.clear();
-}
+export { clearMeritCachesForTests } from "./core-cache";

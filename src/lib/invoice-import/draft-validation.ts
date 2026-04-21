@@ -2,33 +2,7 @@ import {
   InvoiceImportDraft,
   InvoiceImportDraftRow,
 } from "../invoice-import-types";
-
-function normalizeNumber(value: number | null | undefined): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function computeRowNet(row: InvoiceImportDraftRow): number {
-  if (typeof row.sum === "number" && Number.isFinite(row.sum)) {
-    return row.sum;
-  }
-
-  if (
-    typeof row.price === "number" &&
-    Number.isFinite(row.price) &&
-    typeof row.quantity === "number" &&
-    Number.isFinite(row.quantity)
-  ) {
-    return Number((row.price * row.quantity).toFixed(2));
-  }
-
-  return 0;
-}
-
-export function computeDraftNetTotal(rows: InvoiceImportDraftRow[]): number {
-  return Number(
-    rows.reduce((sum, row) => sum + computeRowNet(row), 0).toFixed(2),
-  );
-}
+import { formatInvoiceImportRowLabel } from "./row-label";
 
 function validateHeader(draft: InvoiceImportDraft, errors: string[]): void {
   if (!draft.vendor.name?.trim()) {
@@ -46,12 +20,34 @@ function validateHeader(draft: InvoiceImportDraft, errors: string[]): void {
   if (!draft.rows.length) {
     errors.push("Invoice must contain at least one row.");
   }
+}
 
-  const draftNet = computeDraftNetTotal(draft.rows);
-  const headerNet = normalizeNumber(draft.invoice.amountExcludingVat);
-  if (Math.abs(draftNet - headerNet) > 0.01) {
-    errors.push("Invoice header net amount must match the sum of row amounts.");
+function normalizeDuplicateValue(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+export function draftMatchesDuplicateInvoice(
+  draft: InvoiceImportDraft,
+): boolean {
+  if (!draft.duplicateInvoice) {
+    return false;
   }
+
+  const duplicateVendorName = normalizeDuplicateValue(
+    draft.duplicateInvoice.vendorName,
+  );
+  const draftVendorName = normalizeDuplicateValue(draft.vendor.name);
+  const duplicateInvoiceNumber = normalizeDuplicateValue(
+    draft.duplicateInvoice.invoiceNumber,
+  );
+  const draftInvoiceNumber = normalizeDuplicateValue(
+    draft.invoice.invoiceNumber,
+  );
+
+  return (
+    duplicateVendorName === draftVendorName &&
+    duplicateInvoiceNumber === draftInvoiceNumber
+  );
 }
 
 function validateExistingArticleRow(
@@ -59,7 +55,23 @@ function validateExistingArticleRow(
   errors: string[],
 ): void {
   if (!row.selectedArticleCode?.trim()) {
-    errors.push(`Row ${row.id} must select an accounting article.`);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} must select an accounting article.`,
+    );
+  }
+
+  const selectedArticle = row.selectedArticleCode
+    ? (row.articleCandidates.find(
+        (candidate) => candidate.code === row.selectedArticleCode,
+      ) ?? null)
+    : null;
+  const selectedArticleUnit = selectedArticle?.unit?.trim();
+  const rowUnit = row.unit?.trim() ?? "";
+
+  if (selectedArticleUnit && rowUnit !== selectedArticleUnit) {
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} must use unit ${selectedArticleUnit} for article ${row.selectedArticleCode}.`,
+    );
   }
 }
 
@@ -68,29 +80,40 @@ function validateNewArticleRow(
   errors: string[],
 ): void {
   if (!row.newArticle.code.trim() || !row.newArticle.description.trim()) {
-    errors.push(`Row ${row.id} must define the new accounting article.`);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} must define the new accounting article.`,
+    );
   }
+}
+
+function shouldCreateArticle(row: InvoiceImportDraftRow): boolean {
+  return row.articleDecision === "create";
 }
 
 function validateRow(row: InvoiceImportDraftRow, errors: string[]): void {
   if (!row.description.trim()) {
-    errors.push(`Row ${row.id} is missing a description.`);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} is missing a description.`,
+    );
   }
 
   if (!row.accountCode.trim()) {
-    errors.push(`Row ${row.id} is missing a purchase account.`);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} is missing a purchase account.`,
+    );
   }
 
   if (!row.reviewed) {
-    errors.push(`Row ${row.id} must be reviewed before confirming.`);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} must be reviewed before confirming.`,
+    );
   }
 
-  if (row.articleDecision === "existing") {
+  if (shouldCreateArticle(row)) {
+    validateNewArticleRow(row, errors);
+  } else {
     validateExistingArticleRow(row, errors);
-    return;
   }
-
-  validateNewArticleRow(row, errors);
 }
 
 function validatePayment(draft: InvoiceImportDraft, errors: string[]): void {

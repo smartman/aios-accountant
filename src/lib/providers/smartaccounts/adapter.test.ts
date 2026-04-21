@@ -3,10 +3,10 @@ import type {
   CreatePaymentParams,
   CreatePurchaseInvoiceParams,
   FindExistingInvoiceParams,
-  FindOrCreateVendorParams,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
 } from "../../accounting-provider-types";
+import type { InvoiceExtraction } from "../../invoice-import-types";
 import { smartAccountsProviderAdapter } from "./adapter";
 
 function responseJson(payload: unknown): Response {
@@ -23,51 +23,43 @@ function buildCredentials(seed: string): SmartAccountsCredentials {
   };
 }
 
-function buildVendorParams(): FindOrCreateVendorParams {
+function buildVendorExtraction(): InvoiceExtraction {
   return {
-    extraction: {
-      vendor: {
-        name: "Vendor OÜ",
-        regCode: "12345678",
-        vatNumber: null,
-        bankAccount: "EE123",
-        email: null,
-        phone: null,
-        countryCode: "EE",
-        city: "Tallinn",
-        postalCode: "10111",
-        addressLine1: "Tartu mnt 1",
-        addressLine2: null,
-      },
-      invoice: {
-        documentType: "invoice",
-        invoiceNumber: "INV-1",
-        referenceNumber: "REF-1",
-        currency: "EUR",
-        issueDate: "2026-04-14",
-        dueDate: "2026-04-21",
-        entryDate: "2026-04-14",
-        amountExcludingVat: 100,
-        vatAmount: 22,
-        totalAmount: 122,
-        notes: "Consulting",
-      },
-      payment: {
-        isPaid: true,
-        paymentDate: "2026-04-14",
-        paymentAmount: 122,
-        paymentChannelHint: "BANK",
-        reason: "Card payment",
-      },
-      rows: [],
-      warnings: [],
+    vendor: {
+      name: "Vendor OÜ",
+      regCode: "12345678",
+      vatNumber: null,
+      bankAccount: "EE123",
+      email: null,
+      phone: null,
+      countryCode: "EE",
+      city: "Tallinn",
+      postalCode: "10111",
+      addressLine1: "Tartu mnt 1",
+      addressLine2: null,
+    },
+    invoice: {
+      documentType: "invoice",
+      invoiceNumber: "INV-1",
+      referenceNumber: "REF-1",
+      currency: "EUR",
+      issueDate: "2026-04-14",
+      dueDate: "2026-04-21",
+      entryDate: "2026-04-14",
+      amountExcludingVat: 100,
+      vatAmount: 22,
+      totalAmount: 122,
+      notes: "Consulting",
+    },
+    payment: {
+      isPaid: true,
+      paymentDate: "2026-04-14",
+      paymentAmount: 122,
+      paymentChannelHint: "BANK",
+      reason: "Card payment",
     },
     rows: [],
-    referenceData: {
-      accounts: [],
-      taxCodes: [],
-      paymentAccounts: [],
-    },
+    warnings: [],
   };
 }
 
@@ -170,35 +162,36 @@ describe("smartAccountsProviderAdapter credential handling", () => {
 });
 
 describe("smartAccountsProviderAdapter vendor operations", () => {
-  it("finds or creates vendors through SmartAccounts APIs", async () => {
+  it("finds and creates vendors through SmartAccounts APIs", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock
       .mockResolvedValueOnce(
         responseJson({ vendors: [{ id: "vendor-1", name: "Vendor OÜ" }] }),
       )
-      .mockResolvedValueOnce(responseJson({ vendors: [] }))
       .mockResolvedValueOnce(responseJson({ vendorId: "vendor-2" }));
 
-    const existing = await smartAccountsProviderAdapter.findOrCreateVendor(
+    const existing = await smartAccountsProviderAdapter.findVendor(
       buildCredentials("existing"),
-      buildVendorParams(),
+      { extraction: buildVendorExtraction() },
       buildContext(),
     );
-    const created = await smartAccountsProviderAdapter.findOrCreateVendor(
+    const created = await smartAccountsProviderAdapter.createVendor(
       buildCredentials("create"),
-      buildVendorParams(),
+      {
+        extraction: buildVendorExtraction(),
+        referenceData: buildContext().referenceData,
+      },
       buildContext(),
     );
 
     expect(existing).toMatchObject({
       vendorId: "vendor-1",
-      createdVendor: false,
     });
     expect(created).toMatchObject({
       vendorId: "vendor-2",
-      createdVendor: true,
+      vendorName: "Vendor OÜ",
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -212,7 +205,7 @@ describe("smartAccountsProviderAdapter invoice flows", () => {
 
     const invoiceParams: CreatePurchaseInvoiceParams = {
       vendorId: "vendor-1",
-      extraction: buildVendorParams().extraction,
+      extraction: buildVendorExtraction(),
       rows: [
         {
           code: "ROW01",
@@ -233,7 +226,7 @@ describe("smartAccountsProviderAdapter invoice flows", () => {
       invoiceId: "invoice-1",
       vendorId: "vendor-1",
       vendorName: "Vendor OÜ",
-      extraction: buildVendorParams().extraction,
+      extraction: buildVendorExtraction(),
       referenceData: buildContext().referenceData,
       paymentAccountName: null,
     };
@@ -289,7 +282,7 @@ describe("smartAccountsProviderAdapter payment guards", () => {
       {
         vendorId: "vendor-1",
         invoiceNumber: "INV-1",
-        extraction: buildVendorParams().extraction,
+        extraction: buildVendorExtraction(),
       } satisfies FindExistingInvoiceParams,
       buildContext(),
     );
@@ -304,13 +297,13 @@ describe("smartAccountsProviderAdapter payment guards", () => {
           vendorId: "vendor-1",
           vendorName: "Vendor OÜ",
           extraction: {
-            ...buildVendorParams().extraction,
+            ...buildVendorExtraction(),
             payment: {
-              ...buildVendorParams().extraction.payment,
+              ...buildVendorExtraction().payment,
               paymentAmount: null,
             },
             invoice: {
-              ...buildVendorParams().extraction.invoice,
+              ...buildVendorExtraction().invoice,
               totalAmount: null,
               amountExcludingVat: null,
             },
@@ -336,13 +329,13 @@ describe("smartAccountsProviderAdapter payment guards", () => {
           vendorId: "vendor-1",
           vendorName: "Vendor OÜ",
           extraction: {
-            ...buildVendorParams().extraction,
+            ...buildVendorExtraction(),
             payment: {
-              ...buildVendorParams().extraction.payment,
+              ...buildVendorExtraction().payment,
               paymentAmount: null,
             },
             invoice: {
-              ...buildVendorParams().extraction.invoice,
+              ...buildVendorExtraction().invoice,
               totalAmount: null,
               amountExcludingVat: null,
             },

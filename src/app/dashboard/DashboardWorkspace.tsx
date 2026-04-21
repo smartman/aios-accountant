@@ -1,36 +1,20 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { useState } from "react";
 import type { SavedConnectionSummary } from "@/lib/accounting-provider-types";
 import ConnectionSettings from "./ConnectionSettings";
+import DashboardWorkspaceMenu from "./DashboardWorkspaceMenu";
 import InvoiceUpload from "./InvoiceUpload";
 import {
   createInitialDashboardWorkspaceState,
   DashboardTab,
-  isProviderConfigurationVisible,
   revealProviderConfiguration,
 } from "./workspace-state";
-
-function TabButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={active ? "btn btn-primary" : "btn btn-secondary"}
-      onClick={onClick}
-      style={{ minWidth: "180px" }}
-    >
-      {children}
-    </button>
-  );
-}
+import {
+  createWorkspaceMenuActions,
+  getWorkspaceSectionLabel,
+  getWorkspaceStatusLabel,
+} from "./workspace-menu";
 
 export default function DashboardWorkspace({
   currentConnection,
@@ -53,11 +37,6 @@ export default function DashboardWorkspace({
       ? "provider"
       : "import";
 
-  const providerConfigurationVisible = isProviderConfigurationVisible(
-    hasConnection,
-    providerTabAccess,
-  );
-
   function handleSelectTab(tab: DashboardTab) {
     setWorkspaceState((previousState) => ({
       ...previousState,
@@ -69,42 +48,54 @@ export default function DashboardWorkspace({
     setWorkspaceState(revealProviderConfiguration());
   }
 
-  return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          gap: "0.75rem",
-          flexWrap: "wrap",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <TabButton
-          active={activeTab === "import"}
-          onClick={() => handleSelectTab("import")}
-        >
-          Import invoices
-        </TabButton>
+  const currentProvider = currentConnection?.provider ?? null;
+  const currentSectionLabel = getWorkspaceSectionLabel(activeTab);
+  const currentStatusLabel = getWorkspaceStatusLabel(
+    hasConnection,
+    currentProvider,
+  );
+  const menuActions = createWorkspaceMenuActions({
+    activeProvider: currentProvider,
+    activeTab,
+    hasConnection,
+  });
 
-        {providerConfigurationVisible ? (
-          <TabButton
-            active={activeTab === "provider"}
-            onClick={() => handleSelectTab("provider")}
-          >
-            Accounting provider
-          </TabButton>
-        ) : null}
-      </div>
+  return (
+    <div className="space-y-6">
+      <header className="border-b border-slate-200 pb-5 dark:border-slate-800">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+              Accounting
+            </p>
+            <h2 className="mt-3 text-[clamp(1.7rem,4vw,2.4rem)] font-semibold leading-none text-slate-950 dark:text-slate-50">
+              {currentSectionLabel}
+            </h2>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              {currentStatusLabel}
+            </p>
+          </div>
+
+          <DashboardWorkspaceMenu
+            actions={menuActions}
+            onSelectAction={(actionId) => {
+              if (actionId === "provider") {
+                handleRequestProviderChange();
+                return;
+              }
+
+              handleSelectTab("import");
+            }}
+          />
+        </div>
+      </header>
 
       {activeTab === "provider" ? (
         <ConnectionSettings currentConnection={currentConnection} />
       ) : (
         <InvoiceUpload
           canImport={hasConnection}
-          activeProvider={currentConnection?.provider ?? null}
-          onRequestProviderChange={
-            hasConnection ? handleRequestProviderChange : undefined
-          }
+          activeProvider={currentProvider}
         />
       )}
     </div>

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  AccountingProviderAdapter,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
 } from "@/lib/accounting-provider-types";
@@ -17,7 +16,6 @@ const hoisted = vi.hoisted(() => ({
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
     createArticle: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -30,7 +28,6 @@ const hoisted = vi.hoisted(() => ({
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
     createArticle: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -136,8 +133,7 @@ function buildContext(): ProviderRuntimeContext {
   };
 }
 
-function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> &
-  AccountingProviderActivities<SmartAccountsCredentials> {
+function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> {
   return {
     provider: "smartaccounts",
     validateCredentials: vi.fn(),
@@ -163,14 +159,6 @@ function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> &
       code: "FURNITURE",
       description: "Furniture",
     })),
-    findOrCreateVendor: vi.fn<
-      AccountingProviderAdapter<SmartAccountsCredentials>["findOrCreateVendor"]
-    >(async () => ({
-      vendorId: "vendor-1",
-      vendorName: "Vendor OÜ",
-      createdVendor: false,
-      existingVendor: null,
-    })),
     findExistingInvoice: vi.fn(async () => null),
     createPurchaseInvoice: vi.fn(async () => ({
       invoiceId: "invoice-1",
@@ -181,8 +169,7 @@ function buildAdapter(): AccountingProviderAdapter<SmartAccountsCredentials> &
       paymentAccount: { type: "BANK" as const, name: "Main bank" },
     })),
     attachDocument: vi.fn(async () => {}),
-  } as AccountingProviderAdapter<SmartAccountsCredentials> &
-    AccountingProviderActivities<SmartAccountsCredentials>;
+  };
 }
 
 function buildSavedConnection(

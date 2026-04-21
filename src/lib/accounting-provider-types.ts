@@ -13,11 +13,13 @@ export type AccountingProvider = "smartaccounts" | "merit";
 export interface SmartAccountsCredentials {
   apiKey: string;
   secretKey: string;
+  cacheScope?: string;
 }
 
 export interface MeritCredentials {
   apiId: string;
   apiKey: string;
+  cacheScope?: string;
 }
 
 export type AccountingCredentials =
@@ -78,18 +80,6 @@ export interface ProviderResolvedRow {
   accountSelectionReason: string;
 }
 
-export interface ProviderVendorMatch {
-  id?: string;
-  name?: string;
-}
-
-export interface ProviderVendorResult {
-  vendorId: string;
-  vendorName: string;
-  createdVendor: boolean;
-  existingVendor?: ProviderVendorMatch | null;
-}
-
 export interface ProviderExistingInvoiceResult {
   invoiceId: string;
 }
@@ -102,12 +92,6 @@ export interface ProviderInvoiceResult {
 export interface ProviderPaymentResult {
   paymentId: string;
   paymentAccount: ProviderPaymentAccount;
-}
-
-export interface FindOrCreateVendorParams {
-  extraction: InvoiceExtraction;
-  rows: ProviderResolvedRow[];
-  referenceData: ProviderReferenceData;
 }
 
 export interface FindExistingInvoiceParams {
@@ -240,39 +224,6 @@ export type ProviderRuntimeContext =
       raw: MeritProviderContext;
     };
 
-export interface AccountingProviderAdapter<TCredentials> {
-  provider: AccountingProvider;
-  validateCredentials(
-    credentials: TCredentials,
-  ): Promise<SavedConnectionSummary>;
-  loadContext(credentials: TCredentials): Promise<ProviderRuntimeContext>;
-  findOrCreateVendor(
-    credentials: TCredentials,
-    params: FindOrCreateVendorParams,
-    context: ProviderRuntimeContext,
-  ): Promise<ProviderVendorResult>;
-  findExistingInvoice(
-    credentials: TCredentials,
-    params: FindExistingInvoiceParams,
-    context: ProviderRuntimeContext,
-  ): Promise<ProviderExistingInvoiceResult | null>;
-  createPurchaseInvoice(
-    credentials: TCredentials,
-    params: CreatePurchaseInvoiceParams,
-    context: ProviderRuntimeContext,
-  ): Promise<ProviderInvoiceResult>;
-  createPayment(
-    credentials: TCredentials,
-    params: CreatePaymentParams,
-    context: ProviderRuntimeContext,
-  ): Promise<ProviderPaymentResult>;
-  attachDocument(
-    credentials: TCredentials,
-    params: AttachDocumentParams,
-    context: ProviderRuntimeContext,
-  ): Promise<void>;
-}
-
 export function assertProviderContext<TProvider extends AccountingProvider>(
   context: ProviderRuntimeContext,
   provider: TProvider,
@@ -316,7 +267,7 @@ export function toSafeIsoString(value: Date | string): string {
 }
 
 export function isSmartAccountsVendor(
-  value: SmartAccountsVendor | ProviderVendorMatch | null | undefined,
+  value: SmartAccountsVendor | null | undefined,
 ): value is SmartAccountsVendor {
   return Boolean(value && typeof value === "object" && "name" in value);
 }

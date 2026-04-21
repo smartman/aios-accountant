@@ -1,12 +1,12 @@
 import type {
   CreatePaymentParams,
   CreatePurchaseInvoiceParams,
-  FindOrCreateVendorParams,
   MeritBank,
   MeritPaymentType,
   MeritTax,
   ProviderPaymentAccount,
 } from "../../accounting-provider-types";
+import type { ProviderCreateVendorInput } from "../../accounting-provider-activities";
 
 export function buildVendorObject(vendorId: string): Record<string, unknown> {
   return {
@@ -96,7 +96,7 @@ export function maskSecret(value: string): string {
   return `${"*".repeat(trimmed.length - 3)}${trimmed.slice(-3)}`;
 }
 
-export function buildMeritVendorPayload(params: FindOrCreateVendorParams) {
+export function buildMeritVendorPayload(params: ProviderCreateVendorInput) {
   return {
     name: params.extraction.vendor.name ?? "Unknown vendor",
     regNo: params.extraction.vendor.regCode ?? undefined,

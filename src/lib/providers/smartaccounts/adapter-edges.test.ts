@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CreatePurchaseInvoiceParams,
-  FindOrCreateVendorParams,
   ProviderRuntimeContext,
   SmartAccountsCredentials,
 } from "../../accounting-provider-types";
+import type { InvoiceExtraction } from "../../invoice-import-types";
 
 const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
@@ -65,54 +65,50 @@ function buildContext(): Extract<
   };
 }
 
-function buildVendorParams(): FindOrCreateVendorParams {
+function buildVendorExtraction(): InvoiceExtraction {
   return {
-    extraction: {
-      vendor: {
-        name: "Vendor OÜ",
-        regCode: "12345678",
-        vatNumber: null,
-        bankAccount: "EE123",
-        email: null,
-        phone: null,
-        countryCode: "EE",
-        city: "Tallinn",
-        postalCode: "10111",
-        addressLine1: "Tartu mnt 1",
-        addressLine2: null,
-      },
-      invoice: {
-        documentType: "invoice",
-        invoiceNumber: "INV-1",
-        referenceNumber: "REF-1",
-        currency: "EUR",
-        issueDate: "2026-04-14",
-        dueDate: "2026-04-21",
-        entryDate: "2026-04-14",
-        amountExcludingVat: 100,
-        vatAmount: 22,
-        totalAmount: 122,
-        notes: "Consulting",
-      },
-      payment: {
-        isPaid: true,
-        paymentDate: "2026-04-14",
-        paymentAmount: 122,
-        paymentChannelHint: "BANK",
-        reason: "Card payment",
-      },
-      rows: [],
-      warnings: [],
+    vendor: {
+      name: "Vendor OÜ",
+      regCode: "12345678",
+      vatNumber: null,
+      bankAccount: "EE123",
+      email: null,
+      phone: null,
+      countryCode: "EE",
+      city: "Tallinn",
+      postalCode: "10111",
+      addressLine1: "Tartu mnt 1",
+      addressLine2: null,
+    },
+    invoice: {
+      documentType: "invoice",
+      invoiceNumber: "INV-1",
+      referenceNumber: "REF-1",
+      currency: "EUR",
+      issueDate: "2026-04-14",
+      dueDate: "2026-04-21",
+      entryDate: "2026-04-14",
+      amountExcludingVat: 100,
+      vatAmount: 22,
+      totalAmount: 122,
+      notes: "Consulting",
+    },
+    payment: {
+      isPaid: true,
+      paymentDate: "2026-04-14",
+      paymentAmount: 122,
+      paymentChannelHint: "BANK",
+      reason: "Card payment",
     },
     rows: [],
-    referenceData: buildContext().referenceData,
+    warnings: [],
   };
 }
 
 function buildInvoiceParams(): CreatePurchaseInvoiceParams {
   return {
     vendorId: "vendor-1",
-    extraction: buildVendorParams().extraction,
+    extraction: buildVendorExtraction(),
     rows: [
       {
         code: "ROW01",
@@ -219,18 +215,17 @@ describe("smartaccounts adapter validation and context", () => {
 });
 
 describe("smartaccounts adapter vendor flows", () => {
-  it("rejects invoices without a usable vendor search term", async () => {
+  it("returns null when the invoice has no usable vendor search term", async () => {
     const { smartAccountsProviderAdapter } = await import("./adapter");
 
     await expect(
-      smartAccountsProviderAdapter.findOrCreateVendor(
+      smartAccountsProviderAdapter.findVendor(
         buildCredentials(),
         {
-          ...buildVendorParams(),
           extraction: {
-            ...buildVendorParams().extraction,
+            ...buildVendorExtraction(),
             vendor: {
-              ...buildVendorParams().extraction.vendor,
+              ...buildVendorExtraction().vendor,
               name: null,
               regCode: null,
               vatNumber: null,
@@ -239,7 +234,7 @@ describe("smartaccounts adapter vendor flows", () => {
         },
         buildContext(),
       ),
-    ).rejects.toThrow("usable vendor name or registry code");
+    ).resolves.toBeNull();
   });
 
   it("returns existing vendors and creates missing vendors with normalized payloads", async () => {
@@ -249,21 +244,19 @@ describe("smartaccounts adapter vendor flows", () => {
       name: "Vendor OÜ",
     });
 
-    const existing = await smartAccountsProviderAdapter.findOrCreateVendor(
+    const existing = await smartAccountsProviderAdapter.findVendor(
       buildCredentials(),
-      buildVendorParams(),
+      { extraction: buildVendorExtraction() },
       buildContext(),
     );
 
-    mocks.findVendor.mockResolvedValueOnce(null);
-    const created = await smartAccountsProviderAdapter.findOrCreateVendor(
+    const created = await smartAccountsProviderAdapter.createVendor(
       buildCredentials(),
       {
-        ...buildVendorParams(),
         extraction: {
-          ...buildVendorParams().extraction,
+          ...buildVendorExtraction(),
           vendor: {
-            ...buildVendorParams().extraction.vendor,
+            ...buildVendorExtraction().vendor,
             name: null,
             countryCode: null,
             city: null,
@@ -272,18 +265,17 @@ describe("smartaccounts adapter vendor flows", () => {
             addressLine2: null,
           },
         },
+        referenceData: buildContext().referenceData,
       },
       buildContext(),
     );
 
     expect(existing).toMatchObject({
       vendorId: "vendor-existing",
-      createdVendor: false,
     });
     expect(created).toMatchObject({
       vendorId: "vendor-1",
       vendorName: "Unknown vendor",
-      createdVendor: true,
     });
     expect(mocks.createVendor).toHaveBeenCalledWith(
       buildCredentials(),
@@ -366,9 +358,9 @@ describe("smartaccounts adapter invoice lookup", () => {
         vendorId: "vendor-1",
         invoiceNumber: "INV-1",
         extraction: {
-          ...buildVendorParams().extraction,
+          ...buildVendorExtraction(),
           invoice: {
-            ...buildVendorParams().extraction.invoice,
+            ...buildVendorExtraction().invoice,
             issueDate: null,
             entryDate: null,
           },
@@ -393,7 +385,7 @@ describe("smartaccounts adapter invoice lookup", () => {
       {
         vendorId: "vendor-1",
         invoiceNumber: "INV-2",
-        extraction: buildVendorParams().extraction,
+        extraction: buildVendorExtraction(),
       },
       buildContext(),
     );
@@ -415,9 +407,9 @@ describe("smartaccounts adapter invoice lookup", () => {
         vendorId: "vendor-1",
         invoiceNumber: "INV-3",
         extraction: {
-          ...buildVendorParams().extraction,
+          ...buildVendorExtraction(),
           invoice: {
-            ...buildVendorParams().extraction.invoice,
+            ...buildVendorExtraction().invoice,
             issueDate: null,
             entryDate: "2026-04-15",
           },

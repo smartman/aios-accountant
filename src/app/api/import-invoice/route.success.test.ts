@@ -16,7 +16,6 @@ const hoisted = vi.hoisted(() => ({
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
     createArticle: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -29,7 +28,6 @@ const hoisted = vi.hoisted(() => ({
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
     createArticle: vi.fn(),
-    findOrCreateVendor: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -135,9 +133,7 @@ function buildContext(): ProviderRuntimeContext {
   };
 }
 
-function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> & {
-  findOrCreateVendor: ReturnType<typeof vi.fn>;
-} {
+function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> {
   return {
     provider: "smartaccounts",
     validateCredentials: vi.fn(),
@@ -162,12 +158,6 @@ function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> 
     createArticle: vi.fn(async () => ({
       code: "FURNITURE",
       description: "Furniture",
-    })),
-    findOrCreateVendor: vi.fn(async () => ({
-      vendorId: "vendor-1",
-      vendorName: "Vendor OÜ",
-      createdVendor: false,
-      existingVendor: null,
     })),
     findExistingInvoice: vi.fn(async () => null),
     createPurchaseInvoice: vi.fn(async () => ({
@@ -279,6 +269,13 @@ describe("POST imports", () => {
     expect(
       hoisted.smartAccountsProviderAdapter.loadContext,
     ).toHaveBeenCalledOnce();
+    expect(
+      hoisted.smartAccountsProviderAdapter.loadContext,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cacheScope: "user-1",
+      }),
+    );
   });
 
   it("imports with the Merit adapter when a Merit connection is present", async () => {
@@ -303,5 +300,10 @@ describe("POST imports", () => {
     expect(response.status).toBe(200);
     expect(payload.provider).toBe("merit");
     expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledOnce();
+    expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cacheScope: "user-1",
+      }),
+    );
   });
 });

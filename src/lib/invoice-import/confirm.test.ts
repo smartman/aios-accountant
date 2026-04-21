@@ -34,7 +34,7 @@ it("falls back to an existing vendor when createVendor reports a duplicate", asy
         paymentAccounts: [{ type: "BANK", name: "LHV", currency: "EUR" }],
       },
     }),
-    findVendor: vi.fn().mockResolvedValue({
+    findVendor: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
       vendorId: "vendor-existing",
       vendorName: "Office Supplies OU",
     }),
@@ -60,7 +60,7 @@ it("falls back to an existing vendor when createVendor reports a duplicate", asy
   });
 
   expect(activities.createVendor).toHaveBeenCalledOnce();
-  expect(activities.findVendor).toHaveBeenCalledOnce();
+  expect(activities.findVendor).toHaveBeenCalledTimes(2);
   expect(activities.createPurchaseInvoice).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({
@@ -74,8 +74,6 @@ it("falls back to an existing vendor when createVendor reports a duplicate", asy
 
 it("returns an existing invoice result when a duplicate is found", async () => {
   const draft = buildDraft();
-  draft.vendor.selectionMode = "existing";
-  draft.vendor.existingVendorId = "vendor-existing";
   const activities = {
     loadContext: vi.fn().mockResolvedValue({
       provider: "merit",
@@ -85,7 +83,10 @@ it("returns an existing invoice result when a duplicate is found", async () => {
         paymentAccounts: [],
       },
     }),
-    findVendor: vi.fn(),
+    findVendor: vi.fn().mockResolvedValue({
+      vendorId: "vendor-existing",
+      vendorName: "Office Supplies OU",
+    }),
     createVendor: vi.fn(),
     findExistingInvoice: vi
       .fn()
@@ -106,6 +107,7 @@ it("returns an existing invoice result when a duplicate is found", async () => {
     draft,
   });
 
+  expect(activities.findVendor).toHaveBeenCalledOnce();
   expect(activities.createVendor).not.toHaveBeenCalled();
   expect(activities.createPurchaseInvoice).not.toHaveBeenCalled();
   expect(result).toMatchObject({

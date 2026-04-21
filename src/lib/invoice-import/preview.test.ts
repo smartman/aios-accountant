@@ -125,8 +125,30 @@ it("builds a reviewed draft with candidate suggestions and duplicate info", asyn
     fingerprint: "abcdef123456",
   });
 
-  expect(preview.draft.duplicateInvoiceId).toBe("dup-1");
+  expect(preview.draft.duplicateInvoice).toEqual({
+    invoiceId: "dup-1",
+    vendorName: "Vendor OÜ",
+    invoiceNumber: "INV-1",
+  });
   expect(preview.draft.payment.paymentAccountName).toBe("Main bank");
+  expect(preview.articleTypeOptions).toEqual(["SERVICE"]);
+  expect(preview.unitOptions).toEqual(["pcs"]);
+  expect(preview.articleOptions).toEqual([
+    {
+      code: "FURNITURE",
+      description: "Furniture",
+      purchaseAccountCode: "4000",
+      taxCode: "VAT22",
+      type: null,
+      unit: "pcs",
+    },
+  ]);
+  expect(preview.sourceArticleOptions).toEqual([
+    {
+      code: "FURNITURE",
+      description: "Furniture",
+    },
+  ]);
   expect(preview.draft.vendor).toMatchObject({
     selectionMode: "existing",
     existingVendorId: "vendor-1",
@@ -136,6 +158,9 @@ it("builds a reviewed draft with candidate suggestions and duplicate info", asyn
     sourceArticleCode: "CHAIR-01",
     selectedArticleCode: "FURNITURE",
     suggestionStatus: "clear",
+    newArticle: expect.objectContaining({
+      unit: "pcs",
+    }),
   });
 });
 
@@ -184,7 +209,12 @@ it("falls back to a summarized row and create-new article when there is no match
 
   expect(preview.draft.rows).toHaveLength(1);
   expect(preview.draft.rows[0]).toMatchObject({
-    articleDecision: "create",
+    articleDecision: "existing",
+    selectedArticleCode: null,
+    newArticle: expect.objectContaining({
+      code: "OFFICE_CHAIR",
+      unit: "",
+    }),
     suggestionStatus: "missing",
   });
 });

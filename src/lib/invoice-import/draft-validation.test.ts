@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { InvoiceImportDraft } from "../invoice-import-types";
-import { computeDraftNetTotal, validateDraft } from "./draft-validation";
+import {
+  draftMatchesDuplicateInvoice,
+  validateDraft,
+} from "./draft-validation";
 
 function buildDraft(): InvoiceImportDraft {
   return {
@@ -66,7 +69,7 @@ function buildDraft(): InvoiceImportDraft {
         articleCandidates: [],
         suggestionStatus: "clear" as const,
         newArticle: {
-          code: "vv",
+          code: "",
           description: "Väikevahendid kuluks",
           unit: "pcs",
           type: "SERVICE",
@@ -76,21 +79,11 @@ function buildDraft(): InvoiceImportDraft {
       },
     ],
     warnings: [],
-    duplicateInvoiceId: null,
+    duplicateInvoice: null,
   };
 }
 
 describe("draft validation", () => {
-  it("computes row totals from explicit sums or price times quantity", () => {
-    const draft = buildDraft();
-    expect(computeDraftNetTotal(draft.rows)).toBe(120);
-    draft.rows[0].sum = 118.4;
-    expect(computeDraftNetTotal(draft.rows)).toBe(118.4);
-    draft.rows[0].sum = null;
-    draft.rows[0].price = null;
-    expect(computeDraftNetTotal(draft.rows)).toBe(0);
-  });
-
   it("returns no errors for a valid reviewed draft", () => {
     expect(validateDraft(buildDraft())).toEqual([]);
   });
@@ -132,26 +125,71 @@ describe("draft validation", () => {
 
     expect(validateDraft(draft)).toEqual(
       expect.arrayContaining([
-        "Row row-1 is missing a description.",
-        "Row row-1 is missing a purchase account.",
-        "Row row-1 must be reviewed before confirming.",
-        "Row row-1 must select an accounting article.",
+        "Row 1 is missing a description.",
+        "Row 1 is missing a purchase account.",
+        "Row 1 must be reviewed before confirming.",
+        "Row 1 must select an accounting article.",
       ]),
     );
   });
 
-  it("reports missing new-article definitions and header/row mismatches", () => {
+  it("reports mismatched units for existing articles with fixed units", () => {
     const draft = buildDraft();
-    draft.invoice.amountExcludingVat = 99;
+    draft.rows[0].unit = null;
+    draft.rows[0].articleCandidates = [
+      {
+        code: "vv",
+        description: "Väikevahendid kuluks",
+        unit: "tk",
+        purchaseAccountCode: "4004",
+        taxCode: "VAT22",
+        type: "SERVICE",
+        score: 100,
+        reasons: ["Exact article match."],
+        historyMatches: 0,
+        recentInvoiceDate: null,
+      },
+    ];
+
+    expect(validateDraft(draft)).toContain(
+      "Row 1 must use unit tk for article vv.",
+    );
+  });
+
+  it("reports missing new-article definitions", () => {
+    const draft = buildDraft();
     draft.rows[0].articleDecision = "create";
-    draft.rows[0].newArticle.code = "";
+    draft.rows[0].selectedArticleCode = null;
+    draft.rows[0].selectedArticleDescription = null;
+    draft.rows[0].newArticle.code = "FURNITURE";
     draft.rows[0].newArticle.description = "";
 
     expect(validateDraft(draft)).toEqual(
-      expect.arrayContaining([
-        "Invoice header net amount must match the sum of row amounts.",
-        "Row row-1 must define the new accounting article.",
-      ]),
+      expect.arrayContaining(["Row 1 must define the new accounting article."]),
     );
+  });
+
+  it("treats duplicate matches as confirm-time prompts instead of validation errors", () => {
+    const draft = buildDraft();
+    draft.duplicateInvoice = {
+      invoiceId: "invoice-dup",
+      vendorName: "Office Supplies OU",
+      invoiceNumber: "INV-1",
+    };
+
+    expect(draftMatchesDuplicateInvoice(draft)).toBe(true);
+    expect(validateDraft(draft)).toEqual([]);
+  });
+
+  it("ignores duplicate hints after the user changes vendor or invoice values", () => {
+    const draft = buildDraft();
+    draft.duplicateInvoice = {
+      invoiceId: "invoice-dup",
+      vendorName: "Office Supplies OU",
+      invoiceNumber: "INV-1",
+    };
+    draft.invoice.invoiceNumber = "INV-2";
+
+    expect(draftMatchesDuplicateInvoice(draft)).toBe(false);
   });
 });

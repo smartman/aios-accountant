@@ -4,6 +4,7 @@ import {
   cachedValue,
   clearCachedValuesByPrefix,
   clearMeritCachesForTests,
+  getMeritCacheNamespace,
   extractList,
   getAccounts,
   getBanks,
@@ -80,6 +81,18 @@ describe("merit-core date and parsing helpers", () => {
 
     expect(key).toContain(":accounts");
     expect(signature).toMatch(/^[A-Za-z0-9+/=]+$/);
+  });
+
+  it("includes cache scope in namespaces", () => {
+    const scoped = getMeritCacheNamespace({
+      ...buildCredentials("scope"),
+      cacheScope: "user-1",
+    });
+    const global = getMeritCacheNamespace(buildCredentials("scope"));
+
+    expect(scoped).toHaveLength(64);
+    expect(global).toHaveLength(64);
+    expect(scoped).not.toBe(global);
   });
 });
 
