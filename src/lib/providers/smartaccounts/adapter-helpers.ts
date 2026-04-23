@@ -1,5 +1,11 @@
 import type { CreatePurchaseInvoiceParams } from "../../accounting-provider-types";
 import type { ProviderCreateVendorInput } from "../../accounting-provider-activities";
+import {
+  deriveInvoiceRoundingAmount,
+  derivePreciseUnitPrice,
+  isFiniteAmount,
+  roundCurrencyAmount,
+} from "../../invoice-import/amounts";
 import type {
   SmartAccountsAccount,
   SmartAccountsBankAccount,
@@ -24,6 +30,12 @@ export function normalizeNumber(
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
+}
+
+export function normalizeRoundedNumber(
+  value: number | null | undefined,
+): number | undefined {
+  return isFiniteAmount(value) ? roundCurrencyAmount(value) : undefined;
 }
 
 export function firstNonEmpty(
@@ -136,6 +148,7 @@ export function buildInvoicePayload(
   params: CreatePurchaseInvoiceParams,
 ): Record<string, unknown> {
   const currency = params.extraction.invoice.currency ?? "EUR";
+  const roundAmount = deriveInvoiceRoundingAmount(params.extraction.invoice);
   const issueDate = firstNonEmpty(
     params.extraction.invoice.issueDate,
     params.extraction.invoice.entryDate,
@@ -160,17 +173,20 @@ export function buildInvoicePayload(
     referenceNumber: params.extraction.invoice.referenceNumber ?? undefined,
     currency,
     isCalculateVat: true,
-    amount: normalizeNumber(params.extraction.invoice.amountExcludingVat),
-    vatAmount: normalizeNumber(params.extraction.invoice.vatAmount),
-    totalAmount: normalizeNumber(params.extraction.invoice.totalAmount),
+    amount: normalizeRoundedNumber(
+      params.extraction.invoice.amountExcludingVat,
+    ),
+    roundAmount,
+    vatAmount: normalizeRoundedNumber(params.extraction.invoice.vatAmount),
+    totalAmount: normalizeRoundedNumber(params.extraction.invoice.totalAmount),
     comment: params.extraction.invoice.notes ?? undefined,
     rows: params.rows.map((row, index) => ({
       code: row.code,
       description: row.description,
       quantity: row.quantity ?? 1,
       unit: row.unit ?? undefined,
-      price: row.price ?? undefined,
-      sum: row.sum ?? undefined,
+      price: derivePreciseUnitPrice(row),
+      sum: row.quantity === 0 ? normalizeRoundedNumber(row.sum) : undefined,
       vatPc: row.taxCode ?? undefined,
       order: index + 1,
       accountPurchase: row.accountCode,

@@ -240,6 +240,21 @@ function InvoiceAmountFields({
           }
         />
       </label>
+      <label className="flex min-w-0 flex-col gap-2 text-sm">
+        <span className={reviewFieldLabelClass}>Rounding amount</span>
+        <FormattedAmountInput
+          value={draft.invoice.roundingAmount ?? null}
+          onChange={(value) =>
+            setDraft({
+              ...draft,
+              invoice: {
+                ...draft.invoice,
+                roundingAmount: value,
+              },
+            })
+          }
+        />
+      </label>
       <label className="col-span-full flex min-w-0 flex-col gap-2 text-sm">
         <span className={reviewFieldLabelClass}>Notes</span>
         <textarea

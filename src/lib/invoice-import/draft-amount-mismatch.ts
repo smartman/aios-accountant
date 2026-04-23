@@ -2,6 +2,12 @@ import {
   InvoiceImportDraft,
   InvoiceImportDraftRow,
 } from "../invoice-import-types";
+import {
+  deriveInvoiceRoundingAmount,
+  isFiniteAmount,
+  resolveAuthoritativeRowNetAmount,
+  roundCurrencyAmount,
+} from "./amounts";
 
 const amountFormatter = new Intl.NumberFormat("et-EE", {
   maximumFractionDigits: 2,
@@ -9,28 +15,12 @@ const amountFormatter = new Intl.NumberFormat("et-EE", {
   useGrouping: false,
 });
 
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function roundAmount(value: number): number {
-  return Number(value.toFixed(2));
-}
-
 function formatAmount(value: number): string {
   return amountFormatter.format(value);
 }
 
 function resolveRowNetAmount(row: InvoiceImportDraftRow): number {
-  if (isFiniteNumber(row.sum)) {
-    return roundAmount(row.sum);
-  }
-
-  if (isFiniteNumber(row.price)) {
-    return roundAmount(row.price * row.quantity);
-  }
-
-  return 0;
+  return resolveAuthoritativeRowNetAmount(row) ?? 0;
 }
 
 function resolveRowVatRate(
@@ -39,12 +29,12 @@ function resolveRowVatRate(
 ): number {
   if (row.taxCode) {
     const taxRate = taxRateByCode.get(row.taxCode);
-    if (isFiniteNumber(taxRate)) {
+    if (isFiniteAmount(taxRate)) {
       return taxRate;
     }
   }
 
-  return isFiniteNumber(row.vatRate) ? row.vatRate : 0;
+  return isFiniteAmount(row.vatRate) ? row.vatRate : 0;
 }
 
 function compareAmount(
@@ -52,12 +42,12 @@ function compareAmount(
   invoiceAmount: number | null,
   rowAmount: number,
 ): string | null {
-  if (!isFiniteNumber(invoiceAmount)) {
+  if (!isFiniteAmount(invoiceAmount)) {
     return null;
   }
 
-  const normalizedInvoiceAmount = roundAmount(invoiceAmount);
-  const normalizedRowAmount = roundAmount(rowAmount);
+  const normalizedInvoiceAmount = roundCurrencyAmount(invoiceAmount);
+  const normalizedRowAmount = roundCurrencyAmount(rowAmount);
   if (normalizedInvoiceAmount === normalizedRowAmount) {
     return null;
   }
@@ -76,23 +66,27 @@ export function buildDraftAmountMismatchWarnings(params: {
   const taxRateByCode = new Map(
     params.taxCodes
       .filter((taxCode): taxCode is { code: string; rate: number } =>
-        isFiniteNumber(taxCode.rate),
+        isFiniteAmount(taxCode.rate),
       )
       .map((taxCode) => [taxCode.code, taxCode.rate]),
   );
 
-  const rowNetAmount = roundAmount(
+  const rowNetAmount = roundCurrencyAmount(
     params.draft.rows.reduce((sum, row) => sum + resolveRowNetAmount(row), 0),
   );
-  const rowVatAmount = roundAmount(
+  const rowVatAmount = roundCurrencyAmount(
     params.draft.rows.reduce((sum, row) => {
       const rowNet = resolveRowNetAmount(row);
       const rowVatRate = resolveRowVatRate(row, taxRateByCode);
 
-      return sum + roundAmount((rowNet * rowVatRate) / 100);
+      return sum + roundCurrencyAmount((rowNet * rowVatRate) / 100);
     }, 0),
   );
-  const rowTotalAmount = roundAmount(rowNetAmount + rowVatAmount);
+  const rowTotalAmount = roundCurrencyAmount(
+    rowNetAmount +
+      rowVatAmount +
+      deriveInvoiceRoundingAmount(params.draft.invoice),
+  );
 
   const mismatches = [
     compareAmount(

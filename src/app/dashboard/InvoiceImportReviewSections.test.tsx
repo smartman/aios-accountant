@@ -98,7 +98,7 @@ it("updates invoice identity fields", () => {
   expect(updates.at(-1)?.invoice.currency).toBe("USD");
 });
 
-it("updates invoice amount and notes fields", () => {
+it("updates invoice amount, rounding, and notes fields", () => {
   const preview = buildPreview({
     reviewed: true,
   });
@@ -125,6 +125,11 @@ it("updates invoice amount and notes fields", () => {
   });
   expect(updates.at(-1)?.invoice.totalAmount).toBe(244);
 
+  hostProps(findControlByLabel(tree, "Rounding amount", "input")).onChange?.({
+    target: { value: "0,01" },
+  });
+  expect(updates.at(-1)?.invoice.roundingAmount).toBe(0.01);
+
   hostProps(findControlByLabel(tree, "Notes", "textarea")).onChange?.({
     target: { value: "Updated note" },
   });
@@ -138,6 +143,7 @@ it("renders empty invoice optionals and clears amount and note fields back to nu
   preview.draft.invoice.amountExcludingVat = null;
   preview.draft.invoice.vatAmount = null;
   preview.draft.invoice.totalAmount = null;
+  preview.draft.invoice.roundingAmount = null;
   preview.draft.invoice.notes = null;
   const { updates, setDraft } = captureDraftUpdates();
   const tree = <InvoiceSection draft={preview.draft} setDraft={setDraft} />;
@@ -159,6 +165,11 @@ it("renders empty invoice optionals and clears amount and note fields back to nu
     target: { value: "" },
   });
   expect(updates.at(-1)?.invoice.totalAmount).toBeNull();
+
+  hostProps(findControlByLabel(tree, "Rounding amount", "input")).onChange?.({
+    target: { value: "" },
+  });
+  expect(updates.at(-1)?.invoice.roundingAmount).toBeNull();
 
   hostProps(findControlByLabel(tree, "Notes", "textarea")).onChange?.({
     target: { value: "" },

@@ -174,6 +174,52 @@ it("prefers a same-type payment account when only the currency mismatches", asyn
   expect(preview.draft.payment.paymentAccountName).toBe("GBP bank");
 });
 
+it("preserves high-precision row prices in the reviewed draft", async () => {
+  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+    buildExtraction({
+      rows: [
+        {
+          ...buildExtraction().rows[0],
+          quantity: 3,
+          price: 0.3333,
+          sum: null,
+        },
+      ],
+    }) as never,
+  );
+
+  const preview = await previewInvoiceImport({
+    savedConnection: buildConnection(),
+    activities: {
+      loadContext: vi.fn().mockResolvedValue({
+        provider: "merit",
+        referenceData: {
+          accounts: [
+            { code: "4000", type: "EXPENSE", label: "4000 - Services" },
+          ],
+          taxCodes: [],
+          paymentAccounts: [],
+        },
+      }),
+      findVendor: vi.fn().mockResolvedValue(null),
+      findExistingInvoice: vi.fn().mockResolvedValue(null),
+      listArticles: vi.fn().mockResolvedValue([]),
+      getVendorArticleHistory: vi.fn().mockResolvedValue([]),
+    } as never,
+    credentials: {} as never,
+    mimeType: "application/pdf",
+    filename: "invoice.pdf",
+    buffer: Buffer.from("invoice"),
+    fingerprint: "abcdef123456",
+  });
+
+  expect(preview.draft.rows[0]).toMatchObject({
+    quantity: 3,
+    price: 0.3333,
+    sum: null,
+  });
+});
+
 it("fills empty vendor and invoice fields from preview defaults", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));

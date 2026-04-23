@@ -76,11 +76,11 @@ describe("invoice import route support", () => {
       provider: "merit",
       invoice: {
         invoiceNumber: "INV-1",
-        amountExcludingVat: 1.24,
-        vatAmount: 0.44,
+        amountExcludingVat: 1.239,
+        vatAmount: 0.441,
       },
-      payment: { paymentAmount: 1.24 },
-      rows: [{ price: 1.24, sum: 1.24 }],
+      payment: { paymentAmount: 1.239 },
+      rows: [{ price: 1.239, sum: 1.239 }],
     });
     expect(() => parseInvoiceImportDraft(null)).toThrow(
       "Missing reviewed import draft.",

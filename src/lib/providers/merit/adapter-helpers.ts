@@ -7,6 +7,7 @@ import type {
   ProviderPaymentAccount,
 } from "../../accounting-provider-types";
 import type { ProviderCreateVendorInput } from "../../accounting-provider-activities";
+import { resolveAuthoritativeRowNetAmount } from "../../invoice-import/amounts";
 
 export function buildVendorObject(vendorId: string): Record<string, unknown> {
   return {
@@ -22,13 +23,8 @@ export function computeTaxAmountForRow(
     return 0;
   }
 
-  const netAmount =
-    row.sum ??
-    (row.price !== undefined && row.quantity !== undefined
-      ? row.price * row.quantity
-      : undefined);
-
-  if (typeof netAmount !== "number" || !Number.isFinite(netAmount)) {
+  const netAmount = resolveAuthoritativeRowNetAmount(row);
+  if (netAmount === undefined) {
     return 0;
   }
 

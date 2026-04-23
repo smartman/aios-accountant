@@ -33,6 +33,7 @@ import {
   firstNonEmpty,
   maskSecret,
   normalizeNumber,
+  normalizeRoundedNumber,
   toSmartAccountsDate,
 } from "./adapter-helpers";
 
@@ -228,6 +229,13 @@ export const smartAccountsProviderAdapter: AccountingProviderActivities<SmartAcc
         );
       }
 
+      const roundedPaymentAmount = normalizeRoundedNumber(paymentAmount);
+      if (roundedPaymentAmount === undefined) {
+        throw new Error(
+          "The invoice looks paid, but the payment amount could not be determined.",
+        );
+      }
+
       const payment = await createPayment(credentials, {
         date:
           toSmartAccountsDate(
@@ -240,14 +248,14 @@ export const smartAccountsProviderAdapter: AccountingProviderActivities<SmartAcc
         accountType: selectedPaymentAccount.type,
         accountName: selectedPaymentAccount.name,
         currency,
-        amount: paymentAmount,
+        amount: roundedPaymentAmount,
         document: params.extraction.invoice.invoiceNumber ?? undefined,
         rows: [
           {
             description:
               params.extraction.invoice.invoiceNumber ??
               "Imported invoice payment",
-            amount: paymentAmount,
+            amount: roundedPaymentAmount,
             type: "VENDOR_INVOICE",
             id: params.invoiceId,
           },

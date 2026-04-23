@@ -67,6 +67,7 @@ function extractionFromDraft(draft: InvoiceImportDraft): InvoiceExtraction {
       amountExcludingVat: draft.invoice.amountExcludingVat,
       vatAmount: draft.invoice.vatAmount,
       totalAmount: draft.invoice.totalAmount,
+      roundingAmount: draft.invoice.roundingAmount,
       notes: draft.invoice.notes,
     },
     payment: {

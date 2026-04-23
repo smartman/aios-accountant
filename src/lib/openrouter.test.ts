@@ -226,7 +226,7 @@ async function expectImageUploadNormalization() {
   expect(extraction.warnings).toEqual([]);
 }
 
-async function expectAmountRoundingAndVendorWarningFiltering() {
+async function expectExactAmountExtractionAndWarningFiltering() {
   setupEnv();
 
   mockOpenRouterResponse(
@@ -238,6 +238,8 @@ async function expectAmountRoundingAndVendorWarningFiltering() {
           amountExcludingVat: 181.294,
           vatAmount: 39.884,
           totalAmount: 221.178,
+          roundingAmount: 0.01,
+          notes: "Ümardus: 0,01",
         },
         payment: {
           ...buildBaseExtraction().payment,
@@ -252,7 +254,6 @@ async function expectAmountRoundingAndVendorWarningFiltering() {
         ],
         warnings: [
           "Buyer block at top left is labeled 'Maksja', vendor was taken from the separately grouped supplier block.",
-          "Vendor bankAccount selected as Swedbank IBAN shown on the invoice; multiple supplier bank accounts are listed.",
           "Line totals were rounded from the source document.",
         ],
       }),
@@ -261,13 +262,15 @@ async function expectAmountRoundingAndVendorWarningFiltering() {
 
   const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
 
-  expect(extraction.invoice.amountExcludingVat).toBe(181.29);
-  expect(extraction.invoice.vatAmount).toBe(39.88);
-  expect(extraction.invoice.totalAmount).toBe(221.18);
-  expect(extraction.payment.paymentAmount).toBe(221.18);
+  expect(extraction.invoice.amountExcludingVat).toBe(181.294);
+  expect(extraction.invoice.vatAmount).toBe(39.884);
+  expect(extraction.invoice.totalAmount).toBe(221.178);
+  expect(extraction.invoice.roundingAmount).toBe(0.01);
+  expect(extraction.invoice.notes).toBeNull();
+  expect(extraction.payment.paymentAmount).toBe(221.178);
   expect(extraction.rows[0]).toMatchObject({
-    price: 36.21,
-    sum: 181.29,
+    price: 36.2097,
+    sum: 181.294,
   });
   expect(extraction.warnings).toEqual([
     "Line totals were rounded from the source document.",
@@ -384,8 +387,8 @@ describe("extractInvoiceWithOpenRouter", () => {
     expectImageUploadNormalization,
   );
   it(
-    "rounds extracted monetary amounts and removes non-actionable vendor warnings",
-    expectAmountRoundingAndVendorWarningFiltering,
+    "preserves exact extracted amounts and removes non-actionable vendor warnings",
+    expectExactAmountExtractionAndWarningFiltering,
   );
   it(
     "normalizes missing row and warning arrays to empty lists",

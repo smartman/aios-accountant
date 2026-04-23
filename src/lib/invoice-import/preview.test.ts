@@ -380,7 +380,7 @@ it("loads vendor history when the catalog-only description match is low confiden
   });
 });
 
-it("rounds preview amounts and hides non-actionable vendor warnings", async () => {
+it("preserves exact preview amounts and hides non-actionable vendor warnings", async () => {
   vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
     buildExtraction({
       invoice: {
@@ -388,6 +388,7 @@ it("rounds preview amounts and hides non-actionable vendor warnings", async () =
         amountExcludingVat: 181.294,
         vatAmount: 39.884,
         totalAmount: 221.178,
+        notes: "Ümardus: 0,01",
       },
       payment: {
         ...buildExtraction().payment,
@@ -453,14 +454,16 @@ it("rounds preview amounts and hides non-actionable vendor warnings", async () =
   });
 
   expect(preview.draft.invoice).toMatchObject({
-    amountExcludingVat: 181.29,
-    vatAmount: 39.88,
-    totalAmount: 221.18,
+    amountExcludingVat: 181.294,
+    vatAmount: 39.884,
+    totalAmount: 221.178,
+    roundingAmount: 0.01,
+    notes: null,
   });
-  expect(preview.draft.payment.paymentAmount).toBe(221.18);
+  expect(preview.draft.payment.paymentAmount).toBe(221.178);
   expect(preview.draft.rows[0]).toMatchObject({
-    price: 36.21,
-    sum: 181.29,
+    price: 36.2097,
+    sum: 181.294,
   });
   expect(preview.draft.warnings).toEqual([
     "Row totals were rounded from the source document.",

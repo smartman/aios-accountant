@@ -223,6 +223,10 @@ it("maps payment payloads and document uploads through the SmartAccounts helpers
           currency: "USD",
           invoiceNumber: null,
         },
+        payment: {
+          ...buildPaymentParams().extraction.payment,
+          paymentAmount: 122.456,
+        },
       },
     },
     buildContext(),
@@ -244,7 +248,13 @@ it("maps payment payloads and document uploads through the SmartAccounts helpers
     expect.objectContaining({
       accountName: "Main bank",
       currency: "USD",
+      amount: 122.46,
       document: undefined,
+      rows: [
+        expect.objectContaining({
+          amount: 122.46,
+        }),
+      ],
     }),
   );
   expect(payment).toEqual({
