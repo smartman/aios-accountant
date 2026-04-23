@@ -172,6 +172,7 @@ export interface InvoiceImportDraftRow {
   selectedArticleDescription: string | null;
   articleCandidates: InvoiceImportReviewArticleCandidate[];
   suggestionStatus: "clear" | "ambiguous" | "missing";
+  articleSuggestionReason?: string | null;
 }
 
 export interface InvoiceImportDraft {

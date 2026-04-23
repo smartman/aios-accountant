@@ -92,7 +92,7 @@ it("derives precise unit prices for summed, zero-quantity, and price-only rows",
   ).toBe(15.4321);
 });
 
-it("uses explicit invoice rounding amounts and otherwise falls back to zero", () => {
+it("prefers explicit invoice rounding and derives small header deltas", () => {
   expect(
     deriveInvoiceRoundingAmount({
       roundingAmount: 0.01,
@@ -105,6 +105,27 @@ it("uses explicit invoice rounding amounts and otherwise falls back to zero", ()
     deriveInvoiceRoundingAmount({
       amountExcludingVat: 62.92,
       vatAmount: 13.84,
+      totalAmount: 76.77,
+    }),
+  ).toBe(0.01);
+  expect(
+    deriveInvoiceRoundingAmount({
+      amountExcludingVat: 10,
+      vatAmount: 2.25,
+      totalAmount: 12.23,
+    }),
+  ).toBe(-0.02);
+  expect(
+    deriveInvoiceRoundingAmount({
+      amountExcludingVat: 62.92,
+      vatAmount: 13.84,
+      totalAmount: 76.79,
+    }),
+  ).toBe(0);
+  expect(
+    deriveInvoiceRoundingAmount({
+      amountExcludingVat: 62.92,
+      vatAmount: null,
       totalAmount: 76.77,
     }),
   ).toBe(0);

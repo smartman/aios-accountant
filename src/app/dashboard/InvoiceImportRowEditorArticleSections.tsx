@@ -112,6 +112,81 @@ function mergeArticleCandidates(
   );
 }
 
+function formatCandidateLabel(
+  candidate: InvoiceImportDraftRow["articleCandidates"][number],
+) {
+  return candidate.description?.trim()
+    ? `${candidate.code} - ${candidate.description}`
+    : candidate.code;
+}
+
+function stripAiReasonPrefix(reason: string): string {
+  return reason.replace(/^AI article matcher:\s*/u, "").trim();
+}
+
+function buildArticleSuggestionTooltip(
+  row: InvoiceImportDraftRow,
+): string | null {
+  const explicitReason = row.articleSuggestionReason?.trim();
+
+  if (explicitReason) {
+    return explicitReason;
+  }
+
+  const topCandidate = row.articleCandidates[0];
+  const runnerUp = row.articleCandidates[1];
+  const topReason = stripAiReasonPrefix(topCandidate?.reasons[0] ?? "");
+
+  if (row.suggestionStatus === "missing") {
+    return (
+      topReason ||
+      "No existing article matched the row description strongly enough."
+    );
+  }
+
+  if (!topCandidate) {
+    return "No existing article matched the row description strongly enough.";
+  }
+
+  if (!runnerUp) {
+    return (
+      topReason ||
+      "A possible article was found, but the match was too weak to auto-select automatically."
+    );
+  }
+
+  return `${topReason || "More than one article remained plausible."} Competing matches: ${formatCandidateLabel(topCandidate)} and ${formatCandidateLabel(runnerUp)}.`;
+}
+
+function ArticleSuggestionTooltip({ row }: { row: InvoiceImportDraftRow }) {
+  const tooltipId = `row-article-reason-${row.id}`;
+  const tooltipText = buildArticleSuggestionTooltip(row);
+
+  if (!tooltipText || row.suggestionStatus === "clear") {
+    return null;
+  }
+
+  return (
+    <span className="group/tooltip relative inline-flex">
+      <button
+        type="button"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-semibold leading-none text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+        aria-describedby={tooltipId}
+        aria-label={`Why is the article match ${row.suggestionStatus}? ${tooltipText}`}
+      >
+        i
+      </button>
+      <span
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-20 w-64 -translate-x-1/2 rounded-[12px] bg-slate-900 px-3 py-2 text-xs leading-5 text-white opacity-0 shadow-[0_14px_30px_rgba(15,23,42,0.2)] transition duration-150 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 dark:bg-slate-700"
+      >
+        {tooltipText}
+      </span>
+    </span>
+  );
+}
+
 function updateArticleSelection(
   props: RowSectionProps,
   selectedCode: string,
@@ -145,6 +220,15 @@ function updateArticleSelection(
 
 function ArticleStatusCopy({ row }: { row: InvoiceImportDraftRow }) {
   if (row.suggestionStatus === "ambiguous") {
+    if (row.articleCandidates.length <= 1) {
+      return (
+        <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
+          A possible article match was found, but the confidence was too low to
+          auto-select it. Choose the correct article manually.
+        </p>
+      );
+    }
+
     return (
       <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
         Several similar articles were found. Choose the correct article
@@ -257,6 +341,7 @@ export function ArticleMatchSection({
                 {row.suggestionStatus}
               </span>
             ) : null}
+            <ArticleSuggestionTooltip row={row} />
           </div>
           <ArticleStatusCopy row={row} />
         </div>

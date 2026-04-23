@@ -9,11 +9,19 @@ import {
 } from "../provider-import-helpers";
 import { StoredAccountingConnection } from "../user-accounting-connections";
 import {
+  buildArticleSuggestionReason,
   buildArticleCandidates,
   getArticleSuggestionStatus,
 } from "./article-matching";
+import {
+  applyAiArticleMatches,
+  matchArticlesWithOpenRouter,
+} from "./article-matching-ai";
 import { createRowId } from "./preview-helpers";
-import { measureInvoiceImportPhase } from "./observability";
+import {
+  logInvoiceImportEvent,
+  measureInvoiceImportPhase,
+} from "./observability";
 
 function buildFallbackExtraction(): InvoiceExtraction {
   return {
@@ -78,6 +86,7 @@ function buildBaseDraftRow(params: {
     selectedArticleDescription: null,
     articleCandidates: [],
     suggestionStatus: "missing",
+    articleSuggestionReason: null,
   };
 }
 
@@ -115,6 +124,7 @@ function buildDraftRow(params: {
     selectedArticleDescription: defaultCandidate?.description ?? null,
     articleCandidates: candidates,
     suggestionStatus,
+    articleSuggestionReason: buildArticleSuggestionReason(candidates),
   };
 }
 
@@ -170,10 +180,7 @@ async function loadPreviewVendorHistory<TCredentials>(params: {
     ReturnType<AccountingProviderActivities<TCredentials>["findVendor"]>
   >;
 }) {
-  const matchedVendor = params.vendorMatch;
-  if (!matchedVendor) {
-    return [];
-  }
+  const matchedVendor = params.vendorMatch!;
 
   return measureInvoiceImportPhase({
     workflow: "preview",
@@ -189,6 +196,57 @@ async function loadPreviewVendorHistory<TCredentials>(params: {
         params.context,
       ),
   });
+}
+
+async function matchPreviewRowsWithAi(params: {
+  savedConnection: StoredAccountingConnection;
+  rows: InvoiceImportDraftRow[];
+  catalog: Awaited<
+    ReturnType<AccountingProviderActivities<unknown>["listArticles"]>
+  >;
+  history: Awaited<
+    ReturnType<AccountingProviderActivities<unknown>["getVendorArticleHistory"]>
+  >;
+}) {
+  try {
+    const matches = await measureInvoiceImportPhase({
+      workflow: "preview",
+      provider: params.savedConnection.provider,
+      phase: "matchArticles",
+      metadata: {
+        articleCount: params.catalog.length,
+        historyCount: params.history.length,
+        rowCount: params.rows.length,
+      },
+      run: () =>
+        matchArticlesWithOpenRouter({
+          provider: params.savedConnection.provider,
+          rows: params.rows,
+          catalog: params.catalog,
+          history: params.history,
+        }),
+    });
+
+    return matches
+      ? applyAiArticleMatches({
+          rows: params.rows,
+          catalog: params.catalog,
+          matches,
+        })
+      : params.rows;
+  } catch {
+    logInvoiceImportEvent({
+      workflow: "preview",
+      provider: params.savedConnection.provider,
+      phase: "matchArticles.fallback",
+      status: "success",
+      metadata: {
+        fallback: "heuristic",
+      },
+    });
+
+    return params.rows;
+  }
 }
 
 function shouldLoadVendorHistory(rows: InvoiceImportDraftRow[]): boolean {
@@ -225,13 +283,19 @@ export async function resolvePreviewRows<TCredentials>(params: {
     params.vendorMatch && shouldLoadVendorHistory(initialRows)
       ? await loadPreviewVendorHistory(params)
       : [];
+  const heuristicRows = buildDraftRows({
+    sourceRows,
+    resolvedRows,
+    catalog,
+    history,
+  });
 
   return {
     catalog,
     historyLoaded: history.length > 0,
-    rows: buildDraftRows({
-      sourceRows,
-      resolvedRows,
+    rows: await matchPreviewRowsWithAi({
+      savedConnection: params.savedConnection,
+      rows: heuristicRows,
       catalog,
       history,
     }),

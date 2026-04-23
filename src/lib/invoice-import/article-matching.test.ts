@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildArticleSuggestionReason,
   buildArticleCandidates,
   getArticleSuggestionStatus,
 } from "./article-matching";
@@ -60,6 +61,83 @@ describe("article matching description-first ranking", () => {
     );
   });
 
+  it("auto-selects a unique article when the row starts with its description", () => {
+    const candidates = buildArticleCandidates({
+      row: buildRow({
+        sourceArticleCode: null,
+        description: "Elekter öine jaanuar 2025",
+        accountCode: "9999",
+        taxCode: null,
+        unit: null,
+      }),
+      catalog: [
+        { code: "el", description: "Elekter" },
+        {
+          code: "ajal 9%",
+          description: "Ajalehed, ajakirjad, kirjandus 9%",
+        },
+        { code: "24% kaup", description: "Kauba müük 24%" },
+      ],
+      history: [],
+    });
+
+    expect(candidates[0]).toMatchObject({
+      code: "el",
+      historyMatches: 0,
+    });
+    expect(candidates[0]?.score).toBeGreaterThanOrEqual(30);
+    expect(getArticleSuggestionStatus(candidates)).toBe("clear");
+  });
+
+  it("treats a whole catalog phrase inside the row description as a strong match", () => {
+    const candidates = buildArticleCandidates({
+      row: buildRow({
+        sourceArticleCode: null,
+        description: "Teenus: Elekter jaanuar 2025",
+        accountCode: "9999",
+        taxCode: null,
+        unit: null,
+      }),
+      catalog: [{ code: "el", description: "Elekter" }],
+      history: [],
+    });
+
+    expect(candidates[0]?.code).toBe("el");
+    expect(getArticleSuggestionStatus(candidates)).toBe("clear");
+  });
+
+  it("matches compound row labels like Uldelekter back to the base Elekter article", () => {
+    const candidates = buildArticleCandidates({
+      row: buildRow({
+        sourceArticleCode: null,
+        description: "Üldelekter öine jaanuar 2025",
+        accountCode: "4030",
+        taxCode: "VAT22",
+        unit: null,
+      }),
+      catalog: [
+        {
+          code: "el",
+          description: "Elekter",
+          purchaseAccountCode: "4030",
+          taxCode: "VAT22",
+        },
+      ],
+      history: [],
+    });
+
+    expect(candidates[0]?.code).toBe("el");
+    expect(candidates[0]?.reasons).toContain(
+      "Catalog description is embedded in a compound word in the invoice row.",
+    );
+    expect(getArticleSuggestionStatus(candidates)).toBe("clear");
+    expect(buildArticleSuggestionReason(candidates)).toContain(
+      "Catalog description is embedded in a compound word in the invoice row.",
+    );
+  });
+});
+
+describe("article matching description-first edge cases", () => {
   it("ignores blank code and description needles while scoring", () => {
     const candidates = buildArticleCandidates({
       row: buildRow({
@@ -70,6 +148,22 @@ describe("article matching description-first ranking", () => {
         unit: null,
       }),
       catalog: [{ code: "FUEL", description: "Fuel" }],
+      history: [],
+    });
+
+    expect(candidates).toEqual([]);
+  });
+
+  it("ignores catalog rows with blank descriptions when no other signal exists", () => {
+    const candidates = buildArticleCandidates({
+      row: buildRow({
+        sourceArticleCode: null,
+        description: "Elekter öine jaanuar 2025",
+        accountCode: "9999",
+        taxCode: null,
+        unit: null,
+      }),
+      catalog: [{ code: "BLANK", description: "   " }],
       history: [],
     });
 
