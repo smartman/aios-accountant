@@ -124,7 +124,7 @@ describe("draft validation", () => {
     );
   });
 
-  it("reports mismatched units for existing articles with fixed units", () => {
+  it("allows article units to be overridden during review", () => {
     const draft = buildDraft();
     draft.rows[0].unit = null;
     draft.rows[0].articleCandidates = [
@@ -142,9 +142,7 @@ describe("draft validation", () => {
       },
     ];
 
-    expect(validateDraft(draft)).toContain(
-      "Row 1 must use unit tk for article vv.",
-    );
+    expect(validateDraft(draft)).toEqual([]);
   });
 
   it("treats duplicate matches as confirm-time prompts instead of validation errors", () => {

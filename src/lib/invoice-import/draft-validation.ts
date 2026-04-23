@@ -59,20 +59,6 @@ function validateExistingArticleRow(
       `${formatInvoiceImportRowLabel(row.id)} must select an accounting article.`,
     );
   }
-
-  const selectedArticle = row.selectedArticleCode
-    ? (row.articleCandidates.find(
-        (candidate) => candidate.code === row.selectedArticleCode,
-      ) ?? null)
-    : null;
-  const selectedArticleUnit = selectedArticle?.unit?.trim();
-  const rowUnit = row.unit?.trim() ?? "";
-
-  if (selectedArticleUnit && rowUnit !== selectedArticleUnit) {
-    errors.push(
-      `${formatInvoiceImportRowLabel(row.id)} must use unit ${selectedArticleUnit} for article ${row.selectedArticleCode}.`,
-    );
-  }
 }
 
 function validateRow(row: InvoiceImportDraftRow, errors: string[]): void {

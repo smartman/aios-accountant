@@ -237,6 +237,9 @@ export async function previewInvoiceImport<TCredentials>(params: {
           [taxCode.code, taxCode.rate ? `${taxCode.rate}%` : ""]
             .filter(Boolean)
             .join(" - "),
+        ...(typeof taxCode.rate === "number" && Number.isFinite(taxCode.rate)
+          ? { rate: taxCode.rate }
+          : {}),
       })),
       paymentAccounts: context.referenceData.paymentAccounts.map((account) => ({
         name: account.name,

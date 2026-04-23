@@ -105,7 +105,9 @@ it("updates only the targeted row and renders a section title", () => {
 
   expect(updatedDraft.rows[0].description).toBe("Existing row");
   expect(updatedDraft.rows[1].description).toBe("Changed row");
-  expect(renderToStaticMarkup(sectionTitle("Rows"))).toContain(">Rows<");
+  expect(renderToStaticMarkup(sectionTitle("Invoice rows"))).toContain(
+    ">Invoice rows<",
+  );
 });
 
 it("creates monotonic row ids after rows have been deleted", () => {

@@ -12,6 +12,7 @@ import {
   statusChipClass,
   updateRow,
 } from "./InvoiceImportReviewShared";
+import { FormattedAmountInput } from "./FormattedAmountInput";
 import {
   ArticleMatchSection,
   UnitDropdown,
@@ -39,6 +40,7 @@ export function updateDraftRow(
 function buildRowUnitOptions(
   row: InvoiceImportDraftRow,
   preview: InvoiceImportPreviewResult,
+  suggestedUnit: string | null = null,
 ): string[] {
   const units = new Set<string>();
 
@@ -50,6 +52,10 @@ function buildRowUnitOptions(
 
   if (row.unit?.trim()) {
     units.add(row.unit.trim());
+  }
+
+  if (suggestedUnit?.trim()) {
+    units.add(suggestedUnit.trim());
   }
 
   units.add("pcs");
@@ -136,6 +142,7 @@ function DescriptionField({
 
 function NumericField({
   draft,
+  formatAsAmount = false,
   label,
   labelClassName = rowFieldLabelClass,
   row,
@@ -144,6 +151,7 @@ function NumericField({
   onValueChange,
 }: {
   draft: InvoiceImportDraft;
+  formatAsAmount?: boolean;
   label: string;
   labelClassName?: string;
   row: InvoiceImportDraftRow;
@@ -157,31 +165,42 @@ function NumericField({
   return (
     <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
       <span className={labelClassName}>{label}</span>
-      <input
-        type="number"
-        className={fieldClass()}
-        value={value ?? ""}
-        onChange={(event) =>
-          updateDraftRow(draft, row.id, setDraft, (current) =>
-            onValueChange(
-              current,
-              event.target.value ? Number(event.target.value) : null,
-            ),
-          )
-        }
-      />
+      {formatAsAmount ? (
+        <FormattedAmountInput
+          value={value}
+          onChange={(nextValue) =>
+            updateDraftRow(draft, row.id, setDraft, (current) =>
+              onValueChange(current, nextValue),
+            )
+          }
+        />
+      ) : (
+        <input
+          type="number"
+          className={fieldClass()}
+          value={value ?? ""}
+          onChange={(event) =>
+            updateDraftRow(draft, row.id, setDraft, (current) =>
+              onValueChange(
+                current,
+                event.target.value ? Number(event.target.value) : null,
+              ),
+            )
+          }
+        />
+      )}
     </label>
   );
 }
 
 function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
-  const unitOptions = buildRowUnitOptions(row, preview);
   const selectedArticle = row.selectedArticleCode
     ? (row.articleCandidates.find(
         (candidate) => candidate.code === row.selectedArticleCode,
       ) ?? null)
     : null;
-  const lockedArticleUnit = selectedArticle?.unit?.trim() || null;
+  const suggestedArticleUnit = selectedArticle?.unit?.trim() || null;
+  const unitOptions = buildRowUnitOptions(row, preview, suggestedArticleUnit);
   const rowMetricLabelClass =
     "flex min-h-[2.5rem] items-end text-sm leading-5 text-slate-600 whitespace-normal text-pretty dark:text-slate-400";
 
@@ -204,13 +223,12 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
       </div>
       <div className="min-w-0">
         <UnitDropdown
-          allowEmpty={!lockedArticleUnit}
-          disabled={Boolean(lockedArticleUnit)}
+          allowEmpty
           label="Unit"
           labelClassName={rowMetricLabelClass}
-          options={lockedArticleUnit ? [lockedArticleUnit] : unitOptions}
+          options={unitOptions}
           placeholder="No unit"
-          value={lockedArticleUnit ?? row.unit}
+          value={row.unit}
           onChange={(value) =>
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
@@ -222,6 +240,7 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
       <div className="min-w-0">
         <NumericField
           draft={draft}
+          formatAsAmount
           label="Price"
           labelClassName={rowMetricLabelClass}
           row={row}
@@ -236,6 +255,7 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
       <div className="min-w-0">
         <NumericField
           draft={draft}
+          formatAsAmount
           label="Net row amount"
           labelClassName={rowMetricLabelClass}
           row={row}
@@ -257,10 +277,18 @@ function RowAccountingFields({
   preview,
   setDraft,
 }: RowEditorProps) {
-  const purchaseAccountOptions = preview.referenceData.accounts.map((account) => ({
-    label: account.label,
-    searchText: `${account.code} ${account.label}`,
-    value: account.code,
+  const accountReasonTooltipId = `row-account-reason-${row.id}`;
+  const purchaseAccountOptions = preview.referenceData.accounts.map(
+    (account) => ({
+      label: account.label,
+      searchText: `${account.code} ${account.label}`,
+      value: account.code,
+    }),
+  );
+  const vatCodeOptions = preview.referenceData.taxCodes.map((taxCode) => ({
+    label: taxCode.description,
+    searchText: `${taxCode.code} ${taxCode.description}`,
+    value: taxCode.code,
   }));
 
   return (
@@ -268,20 +296,28 @@ function RowAccountingFields({
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
         <span className="flex items-center gap-2">
           <span className={rowFieldLabelClass}>Purchase account</span>
-          <button
-            type="button"
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-semibold leading-none text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
-            aria-label={`Why this account? ${row.accountSelectionReason}`}
-            title={row.accountSelectionReason}
-          >
-            i
-          </button>
+          <span className="group/tooltip relative inline-flex">
+            <button
+              type="button"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-semibold leading-none text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+              aria-describedby={accountReasonTooltipId}
+              aria-label={`Why this account? ${row.accountSelectionReason}`}
+            >
+              i
+            </button>
+            <span
+              id={accountReasonTooltipId}
+              role="tooltip"
+              className="pointer-events-none absolute left-1/2 top-[calc(100%+0.45rem)] z-20 w-60 -translate-x-1/2 rounded-[12px] bg-slate-900 px-3 py-2 text-xs leading-5 text-white opacity-0 shadow-[0_14px_30px_rgba(15,23,42,0.2)] transition duration-150 group-hover/tooltip:opacity-100 group-focus-within/tooltip:opacity-100 dark:bg-slate-700"
+            >
+              {row.accountSelectionReason}
+            </span>
+          </span>
         </span>
         <SearchableSelectField
           options={purchaseAccountOptions}
           placeholder="Select account"
           searchAriaLabel="Search purchase accounts"
-          searchPlaceholder="Type to filter accounts by code or name"
           value={row.accountCode}
           onChange={(value) =>
             updateDraftRow(draft, row.id, setDraft, (current) => ({
@@ -293,23 +329,19 @@ function RowAccountingFields({
       </label>
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
         <span className={rowFieldLabelClass}>VAT code</span>
-        <select
-          className={fieldClass()}
+        <SearchableSelectField
+          emptyStateText="No VAT codes found."
+          options={vatCodeOptions}
+          placeholder="No VAT code"
+          searchAriaLabel="Search VAT codes"
           value={row.taxCode ?? ""}
           onChange={(event) =>
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
-              taxCode: event.target.value || null,
+              taxCode: event || null,
             }))
           }
-        >
-          <option value="">No VAT code</option>
-          {preview.referenceData.taxCodes.map((taxCode) => (
-            <option key={taxCode.code} value={taxCode.code}>
-              {taxCode.description}
-            </option>
-          ))}
-        </select>
+        />
       </label>
     </div>
   );

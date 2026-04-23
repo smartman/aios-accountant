@@ -82,7 +82,9 @@ function toArticleCandidate(article: ArticleOption) {
   };
 }
 
-function toSearchableArticleOption(article: ArticleOption): SearchableSelectOption {
+function toSearchableArticleOption(
+  article: ArticleOption,
+): SearchableSelectOption {
   return {
     label: formatArticleOptionLabel(article),
     searchText: [
@@ -136,7 +138,7 @@ function updateArticleSelection(
     selectedArticleDescription:
       selectedCandidate?.description ?? selectedArticle?.description ?? null,
     articleCandidates: mergedCandidates,
-    unit: selectedUnit ?? current.unit,
+    unit: current.unit?.trim() ? current.unit : (selectedUnit ?? null),
     accountCode: selectedPurchaseAccountCode ?? current.accountCode,
   }));
 }
@@ -180,14 +182,13 @@ function ExistingArticleFields({
   );
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-        <span className={rowArticleLabelClass}>Accounting article/item</span>
+        <span className="sr-only">Accounting article/item</span>
         <SearchableSelectField
           options={searchableOptions}
           placeholder="Select accounting article"
           searchAriaLabel="Search accounting articles"
-          searchPlaceholder="Type to filter articles by code, description, or unit"
           value={row.selectedArticleCode ?? ""}
           onChange={(value) =>
             updateArticleSelection({ draft, row, setDraft }, value, preview)
@@ -246,13 +247,11 @@ export function ArticleMatchSection({
   const showStatusChip = row.suggestionStatus !== "clear";
 
   return (
-    <section className="flex flex-col gap-4 rounded-[16px] border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
+    <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Article match
-            </span>
+            <span className={rowArticleLabelClass}>Article</span>
             {showStatusChip ? (
               <span className={statusChipClass(row.suggestionStatus)}>
                 {row.suggestionStatus}

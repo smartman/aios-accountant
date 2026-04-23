@@ -15,5 +15,5 @@ it("wraps the row editor body in the card container", () => {
   );
 
   expect(markup).toContain("rounded-[18px]");
-  expect(markup).toContain("Article match");
+  expect(markup).toContain(">Article<");
 });
