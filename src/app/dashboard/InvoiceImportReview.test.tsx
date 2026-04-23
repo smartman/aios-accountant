@@ -26,9 +26,17 @@ function renderReview(params?: {
 }) {
   const preview = params?.preview ?? buildValidPreview();
   const draft = params?.draft ?? preview.draft;
+  const file = new File(["invoice"], "invoice.pdf", {
+    type: "application/pdf",
+  });
 
   return (
     <InvoiceImportReview
+      file={file}
+      filePreviewUrl={null}
+      isPreviewLightboxOpen={false}
+      onOpenPreviewLightbox={() => undefined}
+      onClosePreviewLightbox={() => undefined}
       preview={preview}
       draft={draft}
       setDraft={() => undefined}
@@ -65,6 +73,7 @@ it("renders duplicate and warning summaries and blocks confirm when validation f
   expect(markup).toContain("INV-1");
   expect(markup).toContain("Check vendor details.");
   expect(markup).toContain("Vendor name is required.");
+  expect(markup).toContain("cannot be previewed inline");
   expect(hostProps(confirmButton).disabled).toBe(true);
 });
 

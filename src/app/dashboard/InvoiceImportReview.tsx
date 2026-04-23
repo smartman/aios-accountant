@@ -5,15 +5,15 @@ import {
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
 import { validateDraft } from "@/lib/invoice-import/draft-validation";
-import {
-  InvoiceSection,
-  PaymentSection,
-  RowsSection,
-  VendorSection,
-} from "./InvoiceImportReviewSections";
 import { buildDuplicateConfirmationMessage } from "./InvoiceImportDuplicatePrompt";
+import InvoiceImportReviewLayout from "./InvoiceImportReviewLayout";
 
 interface ReviewProps {
+  file: File;
+  filePreviewUrl: string | null;
+  isPreviewLightboxOpen: boolean;
+  onOpenPreviewLightbox: () => void;
+  onClosePreviewLightbox: () => void;
   preview: InvoiceImportPreviewResult;
   draft: InvoiceImportDraft;
   setDraft: (draft: InvoiceImportDraft) => void;
@@ -115,6 +115,11 @@ function ConfirmButton({
 }
 
 export default function InvoiceImportReview({
+  file,
+  filePreviewUrl,
+  isPreviewLightboxOpen,
+  onOpenPreviewLightbox,
+  onClosePreviewLightbox,
   preview,
   draft,
   setDraft,
@@ -124,17 +129,19 @@ export default function InvoiceImportReview({
   const errors = validateDraft(draft);
 
   return (
-    <div className="animate-fade-in rounded-xl border border-slate-200 bg-slate-100 p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900">
+    <div className="animate-fade-in rounded-[30px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(241,245,249,0.92))] p-5 shadow-[0_24px_60px_rgba(15,23,42,0.12)] dark:border-slate-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.94))] sm:p-8">
       <ReviewHeader draft={draft} />
       <WarningPanel warnings={draft.warnings} />
-
-      <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2 items-start">
-        <VendorSection draft={draft} setDraft={setDraft} />
-        <InvoiceSection draft={draft} setDraft={setDraft} />
-      </div>
-
-      <PaymentSection preview={preview} draft={draft} setDraft={setDraft} />
-      <RowsSection preview={preview} draft={draft} setDraft={setDraft} />
+      <InvoiceImportReviewLayout
+        file={file}
+        filePreviewUrl={filePreviewUrl}
+        isPreviewLightboxOpen={isPreviewLightboxOpen}
+        onOpenPreviewLightbox={onOpenPreviewLightbox}
+        onClosePreviewLightbox={onClosePreviewLightbox}
+        preview={preview}
+        draft={draft}
+        setDraft={setDraft}
+      />
       <ErrorPanel errors={errors} />
       <ConfirmButton
         draft={draft}
