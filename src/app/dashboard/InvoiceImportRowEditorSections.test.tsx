@@ -1,3 +1,4 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import type { InvoiceImportDraft } from "@/lib/invoice-import-types";
 import {
@@ -39,12 +40,7 @@ it("updates row units", () => {
   hostProps(unitSelect).onChange?.({
     target: { value: "tk" },
   });
-  expect(updates.at(-1)?.rows[0]).toMatchObject({
-    unit: "tk",
-    newArticle: expect.objectContaining({
-      unit: "tk",
-    }),
-  });
+  expect(updates.at(-1)?.rows[0].unit).toBe("tk");
 
   hostProps(unitSelect).onChange?.({
     target: { value: "" },
@@ -99,32 +95,29 @@ it("updates row numeric values", () => {
   expect(updates.at(-1)?.rows[0].sum).toBeNull();
 });
 
-it("updates accounting fields and keeps new article defaults in sync", () => {
+it("updates accounting fields", () => {
   const preview = buildPreview();
   const updates: InvoiceImportDraft[] = [];
   const tree = renderTree(preview, (draft) => updates.push(draft));
+  const markup = renderToStaticMarkup(tree);
+
+  expect(markup).toContain("Purchase account");
+  expect(markup).toContain(
+    'aria-label="Why this account? Matched machinery and equipment account."',
+  );
+  expect(markup).not.toContain("Why this account?</summary>");
 
   const accountSelect = findControlByLabel(tree, "Purchase account", "select");
   hostProps(accountSelect).onChange?.({
     target: { value: "4000" },
   });
-  expect(updates.at(-1)?.rows[0]).toMatchObject({
-    accountCode: "4000",
-    newArticle: expect.objectContaining({
-      purchaseAccountCode: "4000",
-    }),
-  });
+  expect(updates.at(-1)?.rows[0].accountCode).toBe("4000");
 
   const vatSelect = findControlByLabel(tree, "VAT code", "select");
   hostProps(vatSelect).onChange?.({
     target: { value: "VAT0" },
   });
-  expect(updates.at(-1)?.rows[0]).toMatchObject({
-    taxCode: "VAT0",
-    newArticle: expect.objectContaining({
-      taxCode: "VAT0",
-    }),
-  });
+  expect(updates.at(-1)?.rows[0].taxCode).toBe("VAT0");
 
   hostProps(vatSelect).onChange?.({
     target: { value: "" },

@@ -10,7 +10,6 @@ import {
 import { AccountingProviderActivities } from "../../accounting-provider-activities";
 import {
   choosePaymentAccount,
-  createArticle,
   createPayment,
   createVendor,
   createVendorInvoice,
@@ -172,30 +171,6 @@ export const smartAccountsProviderAdapter: AccountingProviderActivities<SmartAcc
     async getVendorArticleHistory(credentials, params, context) {
       assertProviderContext(context, "smartaccounts");
       return getVendorInvoiceHistory(credentials, params);
-    },
-
-    async createArticle(credentials, input, context) {
-      assertProviderContext(context, "smartaccounts");
-      const created = await createArticle(credentials, {
-        code: input.code,
-        description: input.description,
-        type: input.type ?? "SERVICE",
-        activePurchase: true,
-        activeSales: false,
-        unit: firstNonEmpty(input.unit) ?? undefined,
-        vatPc: input.taxCode ?? undefined,
-        accountPurchase: input.purchaseAccountCode,
-      });
-
-      return {
-        code: created.code,
-        description: input.description,
-        unit: input.unit,
-        purchaseAccountCode: input.purchaseAccountCode,
-        taxCode: input.taxCode,
-        type: input.type,
-        activePurchase: true,
-      };
     },
 
     async createPurchaseInvoice(credentials, params, context) {

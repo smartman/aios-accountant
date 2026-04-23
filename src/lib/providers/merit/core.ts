@@ -31,7 +31,6 @@ const MERIT_ENDPOINT_VERSIONS = {
   getpaymenttypes: "v2",
   getunits: "v1",
   getitems: "v1",
-  senditems: "v2",
   sendvendor: "v2",
   getpurchorders: "v2",
   getpurchorder: "v2",

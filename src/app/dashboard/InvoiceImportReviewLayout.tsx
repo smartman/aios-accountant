@@ -32,16 +32,8 @@ export default function InvoiceImportReviewLayout({
   setDraft: (draft: InvoiceImportDraft) => void;
 }) {
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,0.82fr)]">
-      <InvoiceImportFilePreview
-        file={file}
-        fileUrl={filePreviewUrl}
-        isLightboxOpen={isPreviewLightboxOpen}
-        onOpenLightbox={onOpenPreviewLightbox}
-        onCloseLightbox={onClosePreviewLightbox}
-      />
-
-      <div className="flex min-w-0 flex-col gap-6">
+    <div className="grid items-start gap-6 xl:grid-cols-2">
+      <div className="order-1 flex min-w-0 flex-col gap-6 xl:order-2">
         <div className="grid w-full grid-cols-1 items-start gap-6 2xl:grid-cols-2">
           <VendorSection draft={draft} setDraft={setDraft} />
           <InvoiceSection draft={draft} setDraft={setDraft} />
@@ -49,6 +41,16 @@ export default function InvoiceImportReviewLayout({
 
         <PaymentSection preview={preview} draft={draft} setDraft={setDraft} />
         <RowsSection preview={preview} draft={draft} setDraft={setDraft} />
+      </div>
+
+      <div className="order-2 self-start lg:sticky lg:top-24 xl:order-1">
+        <InvoiceImportFilePreview
+          file={file}
+          fileUrl={filePreviewUrl}
+          isLightboxOpen={isPreviewLightboxOpen}
+          onOpenLightbox={onOpenPreviewLightbox}
+          onCloseLightbox={onClosePreviewLightbox}
+        />
       </div>
     </div>
   );

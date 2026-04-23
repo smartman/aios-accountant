@@ -176,12 +176,6 @@ async function resolveDraftRows<TCredentials>(params: {
   const resolvedRows: ProviderResolvedRow[] = [];
 
   for (const row of params.draft.rows) {
-    if (row.articleDecision === "create") {
-      throw new Error(
-        `${formatInvoiceImportRowLabel(row.id)} must select an accounting article. In-app article creation is no longer supported.`,
-      );
-    }
-
     const articleCode = row.selectedArticleCode;
     const articleDescription = row.selectedArticleDescription;
 

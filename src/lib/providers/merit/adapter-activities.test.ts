@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   meritRequest: vi.fn(),
   namespacedCacheKey: vi.fn(() => "cache:key"),
   validateMeritV2Access: vi.fn(),
-  createItem: vi.fn(),
   createVendor: vi.fn(),
   findExistingPurchaseInvoice: vi.fn(),
   findVendor: vi.fn(),
@@ -39,7 +38,6 @@ vi.mock("./data", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./data")>();
   return {
     ...actual,
-    createItem: mocks.createItem,
     createVendor: mocks.createVendor,
     findExistingPurchaseInvoice: mocks.findExistingPurchaseInvoice,
     findVendor: mocks.findVendor,
@@ -124,10 +122,6 @@ beforeEach(() => {
       articleCode: "FURNITURE",
     },
   ]);
-  mocks.createItem.mockResolvedValue({
-    code: "FURNITURE",
-    description: "Furniture",
-  });
   mocks.getAccounts.mockResolvedValue([]);
   mocks.getTaxes.mockResolvedValue([]);
   mocks.getBanks.mockResolvedValue([]);
@@ -188,7 +182,7 @@ it("returns null when merit vendor lookup does not find an id", async () => {
   ).resolves.toBeNull();
 });
 
-it("exposes merit article activities for the shared workflow", async () => {
+it("exposes merit article lookup activities for the shared workflow", async () => {
   const { meritProviderAdapter } = await import("./adapter");
 
   await expect(
@@ -207,22 +201,4 @@ it("exposes merit article activities for the shared workflow", async () => {
       buildContext(),
     ),
   ).resolves.toHaveLength(1);
-  await expect(
-    meritProviderAdapter.createArticle(
-      { apiId: "id", apiKey: "key" },
-      {
-        code: "FURNITURE",
-        description: "Furniture",
-        purchaseAccountCode: "4000",
-        taxCode: "VAT22",
-        type: "SERVICE",
-      },
-      buildContext(),
-    ),
-  ).resolves.toEqual(
-    expect.objectContaining({
-      code: "FURNITURE",
-      description: "Furniture",
-    }),
-  );
 });

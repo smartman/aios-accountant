@@ -288,14 +288,25 @@ export async function getVendorInvoiceHistory(
   const invoices = await loadPurchaseInvoiceHeaders(credentials, body);
   const invoiceIds = getMatchingPurchaseInvoiceIds(invoices, params.vendorId);
   const detailedInvoices = await Promise.all(
-    invoiceIds.map(async (invoiceId) => ({
-      details: await loadPurchaseInvoiceDetails(credentials, invoiceId),
-      invoice:
+    invoiceIds.map(async (invoiceId) => {
+      const invoice =
         invoices.find(
           (candidate) =>
             toOptionalString(candidate.PIHId ?? candidate.Id) === invoiceId,
-        ) ?? {},
-    })),
+        ) ?? {};
+
+      try {
+        return {
+          details: await loadPurchaseInvoiceDetails(credentials, invoiceId),
+          invoice,
+        };
+      } catch {
+        return {
+          details: null,
+          invoice,
+        };
+      }
+    }),
   );
 
   return detailedInvoices.flatMap((entry) => normalizeHistoryRows(entry));

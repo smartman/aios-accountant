@@ -15,7 +15,6 @@ const hoisted = vi.hoisted(() => ({
     listArticles: vi.fn(),
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
-    createArticle: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -27,7 +26,6 @@ const hoisted = vi.hoisted(() => ({
     listArticles: vi.fn(),
     getVendorArticleHistory: vi.fn(),
     createVendor: vi.fn(),
-    createArticle: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),
@@ -155,10 +153,6 @@ function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> 
       },
     ]),
     getVendorArticleHistory: vi.fn(async () => []),
-    createArticle: vi.fn(async () => ({
-      code: "FURNITURE",
-      description: "Furniture",
-    })),
     findExistingInvoice: vi.fn(async () => null),
     createPurchaseInvoice: vi.fn(async () => ({
       invoiceId: "invoice-1",

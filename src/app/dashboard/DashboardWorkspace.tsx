@@ -62,13 +62,13 @@ export default function DashboardWorkspace({
 
   return (
     <div className="space-y-6">
-      <header className="border-b border-slate-200 pb-5 dark:border-slate-800">
+      <header className="border-b border-slate-200 pb-4 sm:pb-5 dark:border-slate-800">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
               Accounting
             </p>
-            <h2 className="mt-3 text-[clamp(1.7rem,4vw,2.4rem)] font-semibold leading-none text-slate-950 dark:text-slate-50">
+            <h2 className="mt-2 text-[clamp(1.35rem,7vw,2.4rem)] font-semibold leading-none text-slate-950 sm:mt-3 dark:text-slate-50">
               {currentSectionLabel}
             </h2>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">

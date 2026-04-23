@@ -75,10 +75,6 @@ function validateExistingArticleRow(
   }
 }
 
-function shouldCreateArticle(row: InvoiceImportDraftRow): boolean {
-  return row.articleDecision === "create";
-}
-
 function validateRow(row: InvoiceImportDraftRow, errors: string[]): void {
   if (!row.description.trim()) {
     errors.push(
@@ -96,13 +92,6 @@ function validateRow(row: InvoiceImportDraftRow, errors: string[]): void {
     errors.push(
       `${formatInvoiceImportRowLabel(row.id)} must be reviewed before confirming.`,
     );
-  }
-
-  if (shouldCreateArticle(row)) {
-    errors.push(
-      `${formatInvoiceImportRowLabel(row.id)} must select an accounting article. In-app article creation is no longer supported.`,
-    );
-    return;
   }
 
   validateExistingArticleRow(row, errors);

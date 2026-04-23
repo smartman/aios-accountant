@@ -15,10 +15,17 @@ it("renders the minimal existing-article flow and allows article override", () =
   const markup = renderToStaticMarkup(tree);
 
   expect(markup).toContain("Article match");
+  expect(markup).not.toContain(">clear<");
   expect(markup).not.toContain("Source article code");
   expect(markup).not.toContain("Row details");
   expect(markup).not.toContain("Accounting</p>");
   expect(markup).not.toContain("Create new");
+  expect(markup).not.toContain(
+    "Auto-selected the closest existing article. You can change it.",
+  );
+  expect(markup).not.toContain(
+    "Article not detected, choose manually or create new article and refresh the article cache.",
+  );
 
   const articleSelect = findControlByLabel(
     tree,
@@ -30,7 +37,6 @@ it("renders the minimal existing-article flow and allows article override", () =
   });
 
   expect(updates.at(-1)?.rows[0]).toMatchObject({
-    articleDecision: "existing",
     selectedArticleCode: "MONITOR-ALT",
     selectedArticleDescription: "Monitor alt",
     unit: "pcs",
@@ -85,7 +91,6 @@ it("handles ambiguous and missing article states cleanly", () => {
     target: { value: "" },
   });
   expect(updates.at(-1)?.rows[0]).toMatchObject({
-    articleDecision: "existing",
     selectedArticleCode: null,
     selectedArticleDescription: null,
   });

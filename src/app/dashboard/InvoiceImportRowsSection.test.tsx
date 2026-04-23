@@ -31,6 +31,5 @@ it("renders imported rows and adds a new blank row during review", () => {
     id: "row-2",
     description: "",
     accountCode: "10921",
-    articleDecision: "existing",
   });
 });

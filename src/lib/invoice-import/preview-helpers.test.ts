@@ -2,11 +2,9 @@ import { expect, it } from "vitest";
 import {
   buildPreviewDuplicateInvoice,
   buildPreviewArticleOptions,
-  buildPreviewArticleTypeOptions,
   buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
   createRowId,
-  defaultNewArticleCode,
 } from "./preview-helpers";
 
 it("builds stable preview article options from the provider catalog", () => {
@@ -66,21 +64,6 @@ it("builds duplicate invoice metadata only when vendor and invoice info exist", 
   ).toBeNull();
 });
 
-it("builds unique sorted article type options and falls back when missing", () => {
-  expect(
-    buildPreviewArticleTypeOptions([
-      { code: "B", description: "Two", type: "PRODUCT" },
-      { code: "A", description: "One", type: "SERVICE" },
-      { code: "C", description: "Three", type: "SERVICE" },
-      { code: "D", description: "Four" },
-    ]),
-  ).toEqual(["PRODUCT", "SERVICE"]);
-
-  expect(
-    buildPreviewArticleTypeOptions([{ code: "A", description: "One" }]),
-  ).toEqual(["SERVICE"]);
-});
-
 it("builds unit options from provider context, catalog units, and defaults", () => {
   expect(
     buildPreviewUnitOptions({
@@ -127,29 +110,8 @@ it("builds unit options from provider context, catalog units, and defaults", () 
   ).toEqual(["box", "pcs"]);
 });
 
-it("creates row ids and derives new article codes from direct or fallback values", () => {
+it("creates stable row ids", () => {
   expect(createRowId(2)).toBe("row-3");
-  expect(
-    defaultNewArticleCode({
-      sourceArticleCode: "inv-55",
-      description: "Ignored",
-      accountCode: "4000",
-    }),
-  ).toBe("INV-55");
-  expect(
-    defaultNewArticleCode({
-      sourceArticleCode: null,
-      description: "Desk lamp / black",
-      accountCode: "4000",
-    }),
-  ).toBe("DESK_LAMP_BLACK");
-  expect(
-    defaultNewArticleCode({
-      sourceArticleCode: null,
-      description: "!!!",
-      accountCode: "4000",
-    }),
-  ).toBe("4000");
 });
 
 it("chooses the default payment account by preferred type, currency, and fallback order", () => {

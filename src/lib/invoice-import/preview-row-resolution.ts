@@ -12,7 +12,7 @@ import {
   buildArticleCandidates,
   getArticleSuggestionStatus,
 } from "./article-matching";
-import { createRowId, defaultNewArticleCode } from "./preview-helpers";
+import { createRowId } from "./preview-helpers";
 import { measureInvoiceImportPhase } from "./observability";
 
 function buildFallbackExtraction(): InvoiceExtraction {
@@ -73,38 +73,11 @@ function buildBaseDraftRow(params: {
     taxCode: params.resolvedRow.taxCode ?? null,
     accountCode: params.resolvedRow.accountCode,
     accountSelectionReason: params.resolvedRow.accountSelectionReason,
-    articleDecision: "existing",
     reviewed: false,
     selectedArticleCode: null,
     selectedArticleDescription: null,
     articleCandidates: [],
     suggestionStatus: "missing",
-    newArticle: {
-      code: "",
-      description: "",
-      unit: params.resolvedRow.unit ?? "",
-      type: "SERVICE",
-      purchaseAccountCode: params.resolvedRow.accountCode,
-      taxCode: params.resolvedRow.taxCode ?? null,
-    },
-  };
-}
-
-function buildSuggestedNewArticle(params: {
-  sourceArticleCode: string | null;
-  resolvedRow: ReturnType<typeof resolvePurchaseRows>[number];
-}) {
-  return {
-    code: defaultNewArticleCode({
-      sourceArticleCode: params.sourceArticleCode,
-      description: params.resolvedRow.description,
-      accountCode: params.resolvedRow.accountCode,
-    }),
-    description: params.resolvedRow.description,
-    unit: params.resolvedRow.unit ?? "",
-    type: "SERVICE",
-    purchaseAccountCode: params.resolvedRow.accountCode,
-    taxCode: params.resolvedRow.taxCode ?? null,
   };
 }
 
@@ -137,16 +110,11 @@ function buildDraftRow(params: {
 
   return {
     ...baseRow,
-    articleDecision: "existing",
     unit: defaultCandidate?.unit ?? baseRow.unit,
     selectedArticleCode: defaultCandidate?.code ?? null,
     selectedArticleDescription: defaultCandidate?.description ?? null,
     articleCandidates: candidates,
     suggestionStatus,
-    newArticle: buildSuggestedNewArticle({
-      sourceArticleCode,
-      resolvedRow: params.resolvedRow,
-    }),
   };
 }
 

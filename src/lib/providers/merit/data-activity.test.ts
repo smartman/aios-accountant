@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createItem, getVendorInvoiceHistory, listItems } from "./data";
+import { getVendorInvoiceHistory, listItems } from "./data";
 import * as meritCore from "./core";
 import { clearMeritCachesForTests } from "./core";
 
@@ -65,27 +65,25 @@ afterEach(() => {
   clearMeritCachesForTests();
 });
 
-it("lists items and creates items", async () => {
-  vi.spyOn(globalThis, "fetch")
-    .mockResolvedValueOnce(
-      jsonResponse([
-        {
-          ItemId: "item-1",
-          Code: "FURNITURE",
-          Description: "Furniture",
-          UnitofMeasureName: "pcs",
-          Usage: 2,
-          PurchaseAccountCode: "4000",
-          TaxId: "tax-22",
-          Type: 2,
-        },
-        {
-          ItemId: "item-2",
-          Code: "BROKEN",
-        },
-      ]),
-    )
-    .mockResolvedValueOnce(jsonResponse([{ Code: "FURNITURE" }]));
+it("lists items and drops malformed catalog entries", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    jsonResponse([
+      {
+        ItemId: "item-1",
+        Code: "FURNITURE",
+        Description: "Furniture",
+        UnitofMeasureName: "pcs",
+        Usage: 2,
+        PurchaseAccountCode: "4000",
+        TaxId: "tax-22",
+        Type: 2,
+      },
+      {
+        ItemId: "item-2",
+        Code: "BROKEN",
+      },
+    ]),
+  );
 
   await expect(listItems(buildCredentials())).resolves.toEqual([
     expect.objectContaining({
@@ -93,20 +91,6 @@ it("lists items and creates items", async () => {
       description: "Furniture",
     }),
   ]);
-  await expect(
-    createItem(buildCredentials(), {
-      code: "FURNITURE",
-      description: "Furniture",
-      purchaseAccountCode: "4000",
-      taxCode: "tax-22",
-      type: "2",
-    }),
-  ).resolves.toEqual(
-    expect.objectContaining({
-      code: "FURNITURE",
-      description: "Furniture",
-    }),
-  );
 });
 
 it("normalizes merit invoice history rows", async () => {
@@ -187,6 +171,62 @@ it("normalizes merit invoice history rows", async () => {
     Id: "invoice-1",
     SkipAttachment: true,
   });
+});
+
+it("skips purchase invoice details that fail to load", async () => {
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(
+      jsonResponse([
+        {
+          PIHId: "invoice-1",
+          VendorId: "vendor-1",
+          VendorName: "Vendor OÜ",
+          BillNo: "INV-1",
+          DocDate: "20260420",
+        },
+        {
+          PIHId: "invoice-broken",
+          VendorId: "vendor-1",
+          VendorName: "Vendor OÜ",
+          BillNo: "INV-2",
+          DocDate: "20260419",
+        },
+      ]),
+    )
+    .mockResolvedValueOnce(
+      jsonResponse({
+        Header: {
+          PIHId: "invoice-1",
+          VendorId: "vendor-1",
+          VendorName: "Vendor OÜ",
+          BillNo: "INV-1",
+          DocumentDate: "20260420",
+        },
+        Lines: [
+          {
+            ArticleCode: "FURNITURE",
+            Description: "Office chair",
+            TaxId: "tax-22",
+            AccountCode: "4000",
+            UOMName: "pcs",
+          },
+        ],
+      }),
+    )
+    .mockRejectedValueOnce(new Error("Invoice detail unavailable"));
+
+  await expect(
+    getVendorInvoiceHistory(buildCredentials(), {
+      vendorId: "vendor-1",
+      extraction: buildExtraction(),
+    }),
+  ).resolves.toEqual([
+    expect.objectContaining({
+      invoiceId: "invoice-1",
+      articleCode: "FURNITURE",
+      description: "Office chair",
+    }),
+  ]);
 });
 
 it("returns an empty history list when invoice metadata is incomplete", async () => {

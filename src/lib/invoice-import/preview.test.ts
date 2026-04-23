@@ -131,7 +131,6 @@ it("builds a reviewed draft with candidate suggestions and duplicate info", asyn
     invoiceNumber: "INV-1",
   });
   expect(preview.draft.payment.paymentAccountName).toBe("Main bank");
-  expect(preview.articleTypeOptions).toEqual(["SERVICE"]);
   expect(preview.unitOptions).toEqual(["pcs"]);
   expect(preview.articleOptions).toEqual([
     {
@@ -158,9 +157,7 @@ it("builds a reviewed draft with candidate suggestions and duplicate info", asyn
     sourceArticleCode: "CHAIR-01",
     selectedArticleCode: "FURNITURE",
     suggestionStatus: "clear",
-    newArticle: expect.objectContaining({
-      unit: "pcs",
-    }),
+    unit: "pcs",
   });
 });
 
@@ -209,12 +206,8 @@ it("falls back to a summarized row and leaves article selection empty when there
 
   expect(preview.draft.rows).toHaveLength(1);
   expect(preview.draft.rows[0]).toMatchObject({
-    articleDecision: "existing",
     selectedArticleCode: null,
-    newArticle: expect.objectContaining({
-      code: "OFFICE_CHAIR",
-      unit: "",
-    }),
+    unit: null,
     suggestionStatus: "missing",
   });
 });

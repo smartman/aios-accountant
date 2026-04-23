@@ -9,7 +9,6 @@ import { StoredAccountingConnection } from "../user-accounting-connections";
 import {
   buildPreviewDuplicateInvoice,
   buildPreviewArticleOptions,
-  buildPreviewArticleTypeOptions,
   buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
 } from "./preview-helpers";
@@ -220,7 +219,6 @@ export async function previewInvoiceImport<TCredentials>(params: {
     provider: params.savedConnection.provider,
     draft,
     extraction,
-    articleTypeOptions: buildPreviewArticleTypeOptions(catalog),
     unitOptions: buildPreviewUnitOptions({ catalog, context }),
     articleOptions,
     sourceArticleOptions: articleOptions.map((article) => ({

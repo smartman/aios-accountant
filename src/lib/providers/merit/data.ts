@@ -8,7 +8,6 @@ import { ProviderCatalogArticle } from "../../accounting-provider-activities";
 import {
   CACHE_TTLS,
   cachedValue,
-  clearCachedValuesByPrefix,
   extractList,
   getItems,
   meritRequest,
@@ -185,44 +184,6 @@ export async function listItems(
 ): Promise<ProviderCatalogArticle[]> {
   const items = await getItems(credentials);
   return items.map(normalizeItemResponse).filter(isNonNull);
-}
-
-export async function createItem(
-  credentials: MeritCredentials,
-  item: {
-    code: string;
-    description: string;
-    unit?: string;
-    purchaseAccountCode?: string;
-    taxCode?: string;
-    type?: string;
-  },
-): Promise<ProviderCatalogArticle> {
-  const response = await meritRequest<unknown>("senditems", credentials, {
-    Items: [
-      {
-        Type: Number(item.type ?? "2"),
-        Usage: 2,
-        Code: item.code,
-        Description: item.description,
-        UOMName: item.unit || undefined,
-        TaxId: item.taxCode || undefined,
-        PurchaseAccCode: item.purchaseAccountCode || undefined,
-      },
-    ],
-  });
-  clearCachedValuesByPrefix(namespacedCacheKey(credentials, "items"));
-  const created = extractList(response)[0];
-  const code = toOptionalString(created?.Code) ?? item.code;
-  return {
-    code,
-    description: item.description,
-    unit: item.unit,
-    purchaseAccountCode: item.purchaseAccountCode,
-    taxCode: item.taxCode,
-    type: item.type,
-    activePurchase: true,
-  };
 }
 
 export { getVendorInvoiceHistory } from "./purchase-invoice-history";

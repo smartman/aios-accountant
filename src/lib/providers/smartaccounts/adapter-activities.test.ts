@@ -4,7 +4,6 @@ import type { ProviderRuntimeContext } from "../../accounting-provider-types";
 const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
   chooseUnpaidAccount: vi.fn(),
-  createArticle: vi.fn(),
   createPayment: vi.fn(),
   createVendor: vi.fn(),
   createVendorInvoice: vi.fn(),
@@ -96,7 +95,6 @@ beforeEach(() => {
       articleCode: "FURNITURE",
     },
   ]);
-  mocks.createArticle.mockResolvedValue({ code: "FURNITURE" });
   mocks.chooseUnpaidAccount.mockReturnValue({ code: "2000" });
 });
 
@@ -137,7 +135,7 @@ it("returns null when SmartAccounts vendor lookup has no usable search term", as
   ).resolves.toBeNull();
 });
 
-it("exposes SmartAccounts article activities for the shared workflow", async () => {
+it("exposes SmartAccounts article lookup activities for the shared workflow", async () => {
   const { smartAccountsProviderAdapter } = await import("./adapter");
 
   await expect(
@@ -156,28 +154,4 @@ it("exposes SmartAccounts article activities for the shared workflow", async () 
       buildContext(),
     ),
   ).resolves.toHaveLength(1);
-  await expect(
-    smartAccountsProviderAdapter.createArticle(
-      { apiKey: "public", secretKey: "secret" },
-      {
-        code: "FURNITURE",
-        description: "Furniture",
-        purchaseAccountCode: "4000",
-        taxCode: "VAT22",
-        type: "SERVICE",
-      },
-      buildContext(),
-    ),
-  ).resolves.toEqual(
-    expect.objectContaining({
-      code: "FURNITURE",
-      description: "Furniture",
-    }),
-  );
-  expect(mocks.createArticle).toHaveBeenCalledWith(
-    { apiKey: "public", secretKey: "secret" },
-    expect.objectContaining({
-      unit: undefined,
-    }),
-  );
 });

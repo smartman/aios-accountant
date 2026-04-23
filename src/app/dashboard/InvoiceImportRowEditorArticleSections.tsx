@@ -114,30 +114,16 @@ function updateArticleSelection(
 
   updateDraftRow(props.draft, props.row.id, props.setDraft, (current) => ({
     ...current,
-    articleDecision: "existing",
     selectedArticleCode: selectedCode || null,
     selectedArticleDescription:
       selectedCandidate?.description ?? selectedArticle?.description ?? null,
     articleCandidates: mergedCandidates,
     unit: selectedUnit ?? current.unit,
     accountCode: selectedPurchaseAccountCode ?? current.accountCode,
-    newArticle: {
-      ...current.newArticle,
-      purchaseAccountCode:
-        selectedPurchaseAccountCode ?? current.newArticle.purchaseAccountCode,
-    },
   }));
 }
 
 function ArticleStatusCopy({ row }: { row: InvoiceImportDraftRow }) {
-  if (row.suggestionStatus === "clear" && row.selectedArticleCode) {
-    return (
-      <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-        Auto-selected the closest existing article. You can change it.
-      </p>
-    );
-  }
-
   if (row.suggestionStatus === "ambiguous") {
     return (
       <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
@@ -147,12 +133,16 @@ function ArticleStatusCopy({ row }: { row: InvoiceImportDraftRow }) {
     );
   }
 
-  return (
-    <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-      Article not detected, choose manually or create new article and refresh
-      the article cache.
-    </p>
-  );
+  if (row.suggestionStatus === "missing") {
+    return (
+      <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
+        Article not detected, choose manually or create new article and refresh
+        the article cache.
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function ExistingArticleFields({
@@ -208,11 +198,6 @@ function ExistingArticleFields({
           ) : null}
         </select>
       </label>
-      {row.articleCandidates.length ? (
-        <p className="m-0 text-xs text-slate-500 dark:text-slate-400">
-          Suggested matches are listed first for quick override.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -221,6 +206,7 @@ export function UnitDropdown({
   allowEmpty = false,
   disabled = false,
   label,
+  labelClassName = rowArticleLabelClass,
   onChange,
   options,
   placeholder,
@@ -229,6 +215,7 @@ export function UnitDropdown({
   allowEmpty?: boolean;
   disabled?: boolean;
   label: string;
+  labelClassName?: string;
   onChange: (value: string | null) => void;
   options: string[];
   placeholder: string;
@@ -236,7 +223,7 @@ export function UnitDropdown({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-      <span className={rowArticleLabelClass}>{label}</span>
+      <span className={labelClassName}>{label}</span>
       <select
         className={fieldClass()}
         disabled={disabled}
@@ -260,6 +247,8 @@ export function ArticleMatchSection({
   row,
   setDraft,
 }: ArticleSectionProps) {
+  const showStatusChip = row.suggestionStatus !== "clear";
+
   return (
     <section className="flex flex-col gap-4 rounded-[16px] border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -268,9 +257,11 @@ export function ArticleMatchSection({
             <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               Article match
             </span>
-            <span className={statusChipClass(row.suggestionStatus)}>
-              {row.suggestionStatus}
-            </span>
+            {showStatusChip ? (
+              <span className={statusChipClass(row.suggestionStatus)}>
+                {row.suggestionStatus}
+              </span>
+            ) : null}
           </div>
           <ArticleStatusCopy row={row} />
         </div>

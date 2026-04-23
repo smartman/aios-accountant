@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
   chooseRelevantArticle: vi.fn(),
   chooseUnpaidAccount: vi.fn(),
-  createArticle: vi.fn(),
   createPayment: vi.fn(),
   createVendor: vi.fn(),
   createVendorInvoice: vi.fn(),

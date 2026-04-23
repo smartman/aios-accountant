@@ -20,20 +20,11 @@ function buildRow(
     taxCode: "VAT22",
     accountCode: "4000",
     accountSelectionReason: "Matched furniture account.",
-    articleDecision: "existing",
     reviewed: false,
     selectedArticleCode: null,
     selectedArticleDescription: null,
     articleCandidates: [],
     suggestionStatus: "missing",
-    newArticle: {
-      code: "FURNITURE",
-      description: "Furniture",
-      unit: "pcs",
-      type: "SERVICE",
-      purchaseAccountCode: "4000",
-      taxCode: "VAT22",
-    },
     ...overrides,
   };
 }

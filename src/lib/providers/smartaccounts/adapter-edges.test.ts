@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   choosePaymentAccount: vi.fn(),
   chooseRelevantArticle: vi.fn(),
   chooseUnpaidAccount: vi.fn(),
-  createArticle: vi.fn(),
   createPayment: vi.fn(),
   createVendor: vi.fn(),
   createVendorInvoice: vi.fn(),
@@ -136,7 +135,6 @@ beforeEach(() => {
   });
   mocks.chooseRelevantArticle.mockReturnValue(null);
   mocks.chooseUnpaidAccount.mockReturnValue({ code: "2000" });
-  mocks.createArticle.mockResolvedValue({ code: "ROW01" });
   mocks.createPayment.mockResolvedValue({ paymentId: "payment-1" });
   mocks.createVendor.mockResolvedValue({ vendorId: "vendor-1" });
   mocks.createVendorInvoice.mockResolvedValue({ invoiceId: "invoice-1" });
@@ -306,8 +304,6 @@ describe("smartaccounts adapter invoice creation", () => {
       buildInvoiceParams(),
       exactContext,
     );
-    expect(mocks.createArticle).not.toHaveBeenCalled();
-
     await smartAccountsProviderAdapter.createPurchaseInvoice(
       buildCredentials(),
       {
@@ -316,7 +312,6 @@ describe("smartaccounts adapter invoice creation", () => {
       },
       buildContext(),
     );
-    expect(mocks.createArticle).not.toHaveBeenCalled();
     expect(mocks.createVendorInvoice).toHaveBeenLastCalledWith(
       buildCredentials(),
       expect.objectContaining({

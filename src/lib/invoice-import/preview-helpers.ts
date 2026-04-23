@@ -5,25 +5,6 @@ export function createRowId(index: number): string {
   return `row-${index + 1}`;
 }
 
-export function defaultNewArticleCode(row: {
-  sourceArticleCode: string | null | undefined;
-  description: string;
-  accountCode: string;
-}): string {
-  const direct = row.sourceArticleCode?.trim();
-  if (direct) {
-    return direct.slice(0, 20).toUpperCase();
-  }
-
-  const derived =
-    row.description
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 20) || row.accountCode;
-  return derived;
-}
-
 export function chooseDefaultPaymentAccount(
   paymentAccounts: Array<{
     name: string;
@@ -57,18 +38,6 @@ export function buildPreviewArticleOptions(catalog: ProviderCatalogArticle[]) {
       taxCode: article.taxCode ?? null,
       type: article.type ?? null,
     }));
-}
-
-export function buildPreviewArticleTypeOptions(
-  catalog: ProviderCatalogArticle[],
-): string[] {
-  const uniqueTypes = new Set(
-    catalog
-      .map((article) => article.type?.trim())
-      .filter((type): type is string => Boolean(type)),
-  );
-
-  return uniqueTypes.size ? [...uniqueTypes].sort() : ["SERVICE"];
 }
 
 function appendUnitOption(

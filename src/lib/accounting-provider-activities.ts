@@ -57,15 +57,6 @@ export interface ProviderCreateVendorResult {
   vendorName: string;
 }
 
-export interface ProviderCreateArticleInput {
-  code: string;
-  description: string;
-  unit?: string;
-  purchaseAccountCode?: string;
-  taxCode?: string;
-  type?: string;
-}
-
 export interface ProviderConnectionActivity<TCredentials> {
   provider: "smartaccounts" | "merit";
   validateCredentials(
@@ -104,11 +95,6 @@ export interface ProviderArticleCatalogActivity<TCredentials> {
     credentials: TCredentials,
     context: ProviderRuntimeContext,
   ): Promise<ProviderCatalogArticle[]>;
-  createArticle(
-    credentials: TCredentials,
-    input: ProviderCreateArticleInput,
-    context: ProviderRuntimeContext,
-  ): Promise<ProviderCatalogArticle>;
 }
 
 export interface ProviderArticleHistoryActivity<TCredentials> {
