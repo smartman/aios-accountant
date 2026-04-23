@@ -148,11 +148,23 @@ it("loads preview state, confirms imports, and resets state when a new file is s
   await Promise.resolve();
 
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  expect(states[3]).toMatchObject({ provider: "smartaccounts" });
-  expect(states[4]).toMatchObject({ invoice: { invoiceNumber: "INV-1" } });
+  expect(states[4]).toMatchObject({ provider: "smartaccounts" });
+  expect(states[5]).toMatchObject({ invoice: { invoiceNumber: "INV-1" } });
 
   tree = render({ canImport: true, activeProvider: "smartaccounts" });
   expect(renderToStaticMarkup(tree)).toContain("Review before import");
+  expect(renderToStaticMarkup(tree)).toContain("Open full screen");
+  expect(renderToStaticMarkup(tree)).toContain("Preview of invoice.pdf");
+  expect(states[8]).toBe(false);
+
+  hostProps(findButton(tree, "Open full screen")!).onClick?.();
+  expect(states[8]).toBe(true);
+
+  tree = render({ canImport: true, activeProvider: "smartaccounts" });
+  expect(renderToStaticMarkup(tree)).toContain("Close preview");
+
+  hostProps(findButton(tree, "Close preview")!).onClick?.();
+  expect(states[8]).toBe(false);
 
   hostProps(findButton(tree, "Confirm and create invoice")!).onClick?.();
   await flushAsyncWork();
@@ -167,9 +179,10 @@ it("loads preview state, confirms imports, and resets state when a new file is s
   });
 
   expect(states[0]).toBe(replacementFile);
-  expect(states[3]).toBeNull();
   expect(states[4]).toBeNull();
   expect(states[5]).toBeNull();
+  expect(states[6]).toBeNull();
+  expect(states[8]).toBe(false);
 });
 
 it("shows import and confirm errors from failed requests", async () => {

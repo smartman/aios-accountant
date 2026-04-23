@@ -46,6 +46,24 @@ async function confirmInvoice(
   return data as ImportedInvoiceResult;
 }
 
+function createFilePreviewUrl(file: File): string | null {
+  return typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+    ? URL.createObjectURL(file)
+    : null;
+}
+
+function revokeFilePreviewUrl(filePreviewUrl: string | null): void {
+  if (
+    !filePreviewUrl ||
+    typeof URL === "undefined" ||
+    typeof URL.revokeObjectURL !== "function"
+  ) {
+    return;
+  }
+
+  URL.revokeObjectURL(filePreviewUrl);
+}
+
 function getProviderMessage(
   canImport: boolean,
   activeProvider: "smartaccounts" | "merit" | null,
@@ -140,6 +158,7 @@ export default function InvoiceUpload({
   activeProvider: "smartaccounts" | "merit" | null;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [preview, setPreview] = useState<InvoiceImportPreviewResult | null>(
@@ -148,12 +167,14 @@ export default function InvoiceUpload({
   const [draft, setDraft] = useState<InvoiceImportDraft | null>(null);
   const [result, setResult] = useState<ImportedInvoiceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isPreviewLightboxOpen, setPreviewLightboxOpen] = useState(false);
 
   async function handleImport() {
     if (!file || !canImport) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setPreviewLightboxOpen(false);
     setPreview(null);
     setDraft(null);
 
@@ -176,6 +197,7 @@ export default function InvoiceUpload({
     if (!file || !draft) return;
     setConfirming(true);
     setError(null);
+    setPreviewLightboxOpen(false);
 
     try {
       const imported = await confirmInvoice(file, draft);
@@ -205,18 +227,27 @@ export default function InvoiceUpload({
         confirming={confirming}
         onImport={handleImport}
         onFileChange={(nextFile) => {
+          revokeFilePreviewUrl(filePreviewUrl);
+
           setFile(nextFile);
+          setFilePreviewUrl(nextFile ? createFilePreviewUrl(nextFile) : null);
           setPreview(null);
           setDraft(null);
           setResult(null);
+          setPreviewLightboxOpen(false);
         }}
         providerMessage={providerMessage}
       />
 
       {error ? <ImportError error={error} /> : null}
 
-      {preview && draft ? (
+      {preview && draft && file ? (
         <InvoiceImportReview
+          file={file}
+          filePreviewUrl={filePreviewUrl}
+          isPreviewLightboxOpen={isPreviewLightboxOpen}
+          onOpenPreviewLightbox={() => setPreviewLightboxOpen(true)}
+          onClosePreviewLightbox={() => setPreviewLightboxOpen(false)}
           preview={preview}
           draft={draft}
           setDraft={setDraft}
