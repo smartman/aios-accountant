@@ -244,6 +244,7 @@ describe("merit adapter pure invoice unit matching", () => {
             amountExcludingVat: 62.92,
             vatAmount: 13.84,
             totalAmount: 76.77,
+            roundingAmount: 0.01,
           },
         },
         rows: [

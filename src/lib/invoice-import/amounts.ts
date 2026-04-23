@@ -18,7 +18,8 @@ export function isFiniteAmount(
 }
 
 export function roundCurrencyAmount(value: number): number {
-  return Number(value.toFixed(2));
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
 }
 
 function roundAmountToScale(value: number, maxFractionDigits: number): number {
@@ -75,16 +76,5 @@ export function deriveInvoiceRoundingAmount(
   if (isFiniteAmount(invoice.roundingAmount)) {
     return roundCurrencyAmount(invoice.roundingAmount);
   }
-
-  if (
-    !isFiniteAmount(invoice.amountExcludingVat) ||
-    !isFiniteAmount(invoice.vatAmount) ||
-    !isFiniteAmount(invoice.totalAmount)
-  ) {
-    return 0;
-  }
-
-  return roundCurrencyAmount(
-    invoice.totalAmount - invoice.amountExcludingVat - invoice.vatAmount,
-  );
+  return 0;
 }

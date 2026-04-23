@@ -215,6 +215,7 @@ describe("smartaccounts adapter pure invoice rounding", () => {
           amountExcludingVat: 62.92,
           vatAmount: 13.84,
           totalAmount: 76.77,
+          roundingAmount: 0.01,
         },
       },
       rows: [
@@ -261,5 +262,27 @@ describe("smartaccounts adapter pure invoice rounding", () => {
         totalAmount: 221.18,
       }),
     );
+  });
+
+  it("keeps authoritative row sums for zero-quantity SmartAccounts rows", () => {
+    const payload = __test__.buildInvoicePayload({
+      ...buildInvoiceParams(),
+      rows: [
+        {
+          ...buildInvoiceParams().rows[0],
+          quantity: 0,
+          price: undefined,
+          sum: 9.876,
+        },
+      ],
+    });
+
+    expect(payload.rows).toEqual([
+      expect.objectContaining({
+        quantity: 0,
+        price: 9.876,
+        sum: 9.88,
+      }),
+    ]);
   });
 });

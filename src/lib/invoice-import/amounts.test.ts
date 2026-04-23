@@ -12,6 +12,8 @@ it("identifies finite amounts and rounds currency values", () => {
   expect(isFiniteAmount(Number.NaN)).toBe(false);
   expect(isFiniteAmount(null)).toBe(false);
   expect(roundCurrencyAmount(13.845)).toBe(13.85);
+  expect(roundCurrencyAmount(1.005)).toBe(1.01);
+  expect(Object.is(roundCurrencyAmount(-0.001), 0)).toBe(true);
 });
 
 it("resolves authoritative row net amounts from sums and derived totals", () => {
@@ -29,6 +31,13 @@ it("resolves authoritative row net amounts from sums and derived totals", () => 
       sum: null,
     }),
   ).toBe(100);
+  expect(
+    resolveAuthoritativeRowNetAmount({
+      quantity: null,
+      price: 9.876,
+      sum: null,
+    }),
+  ).toBe(9.88);
   expect(
     resolveAuthoritativeRowNetAmount({
       quantity: null,
@@ -74,11 +83,19 @@ it("derives precise unit prices for summed, zero-quantity, and price-only rows",
       sum: null,
     }),
   ).toBe(15.4321);
+  expect(
+    derivePreciseUnitPrice({
+      quantity: null,
+      price: 15.4321,
+      sum: null,
+    }),
+  ).toBe(15.4321);
 });
 
-it("derives invoice rounding amounts only when all header amounts are present", () => {
+it("uses explicit invoice rounding amounts and otherwise falls back to zero", () => {
   expect(
     deriveInvoiceRoundingAmount({
+      roundingAmount: 0.01,
       amountExcludingVat: 62.92,
       vatAmount: 13.84,
       totalAmount: 76.77,
@@ -87,7 +104,7 @@ it("derives invoice rounding amounts only when all header amounts are present", 
   expect(
     deriveInvoiceRoundingAmount({
       amountExcludingVat: 62.92,
-      vatAmount: null,
+      vatAmount: 13.84,
       totalAmount: 76.77,
     }),
   ).toBe(0);

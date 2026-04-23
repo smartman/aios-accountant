@@ -186,6 +186,7 @@ export function buildInvoicePayload(
       quantity: row.quantity ?? 1,
       unit: row.unit ?? undefined,
       price: derivePreciseUnitPrice(row),
+      sum: row.quantity === 0 ? normalizeRoundedNumber(row.sum) : undefined,
       vatPc: row.taxCode ?? undefined,
       order: index + 1,
       accountPurchase: row.accountCode,
