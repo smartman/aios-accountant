@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[960px] px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-[1380px] px-4 py-8 sm:px-6">
         <DashboardWorkspace
           currentConnection={savedConnection?.summary ?? null}
         />
