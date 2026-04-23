@@ -11,6 +11,8 @@ interface InvoiceAmountLike {
   roundingAmount?: number | null;
 }
 
+const MAX_DERIVED_INVOICE_ROUNDING_AMOUNT = 0.02;
+
 export function isFiniteAmount(
   value: number | null | undefined,
 ): value is number {
@@ -76,5 +78,24 @@ export function deriveInvoiceRoundingAmount(
   if (isFiniteAmount(invoice.roundingAmount)) {
     return roundCurrencyAmount(invoice.roundingAmount);
   }
-  return 0;
+
+  if (
+    !isFiniteAmount(invoice.amountExcludingVat) ||
+    !isFiniteAmount(invoice.vatAmount) ||
+    !isFiniteAmount(invoice.totalAmount)
+  ) {
+    return 0;
+  }
+
+  const derivedRoundingAmount = roundCurrencyAmount(
+    invoice.totalAmount - invoice.amountExcludingVat - invoice.vatAmount,
+  );
+
+  // Estonian cash rounding changes only the final payable amount and by at most
+  // two cents; anything larger should stay visible as an invoice mismatch.
+  if (Math.abs(derivedRoundingAmount) > MAX_DERIVED_INVOICE_ROUNDING_AMOUNT) {
+    return 0;
+  }
+
+  return derivedRoundingAmount;
 }

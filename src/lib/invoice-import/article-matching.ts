@@ -2,6 +2,7 @@ import {
   ProviderCatalogArticle,
   ProviderHistoricalInvoiceRow,
 } from "../accounting-provider-activities";
+import { buildArticleSuggestionReason } from "./article-matching-reasons";
 import {
   InvoiceImportDraftRow,
   InvoiceImportReviewArticleCandidate,
@@ -20,6 +21,75 @@ function tokenize(value: string | null | undefined): string[] {
   return normalizeText(value)
     .split(/[^\p{L}\p{N}]+/u)
     .filter((token) => token.length > 1);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPrimaryDescriptionPhrase(
+  value: string | null | undefined,
+): string {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.split(/\s*(?:,|;|\/|\|)\s*/u)[0]?.trim() ?? normalized;
+}
+
+function buildDescriptionPhrases(value: string | null | undefined): string[] {
+  const normalized = normalizeText(value);
+  const primaryPhrase = extractPrimaryDescriptionPhrase(value);
+
+  return [...new Set([normalized, primaryPhrase].filter((phrase) => phrase))];
+}
+
+function startsWithWholePhrase(haystack: string, phrase: string): boolean {
+  return new RegExp(`^${escapeRegExp(phrase)}($|[^\\p{L}\\p{N}])`, "u").test(
+    haystack,
+  );
+}
+
+function containsWholePhrase(haystack: string, phrase: string): boolean {
+  return new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escapeRegExp(phrase)}($|[^\\p{L}\\p{N}])`,
+    "u",
+  ).test(haystack);
+}
+
+function scorePhraseMatch(haystack: string, needles: string[]): number {
+  const descriptionPhrases = buildDescriptionPhrases(haystack).filter(
+    (phrase) => phrase.length >= 4,
+  );
+  let score = 0;
+
+  for (const phrase of descriptionPhrases) {
+    for (const needle of needles) {
+      const normalizedNeedle = normalizeText(needle);
+
+      if (!normalizedNeedle) {
+        continue;
+      }
+
+      if (normalizedNeedle === phrase) {
+        score = Math.max(score, Math.max(40, phrase.length * 4));
+        continue;
+      }
+
+      if (startsWithWholePhrase(normalizedNeedle, phrase)) {
+        score = Math.max(score, Math.max(32, phrase.length * 4));
+        continue;
+      }
+
+      if (containsWholePhrase(normalizedNeedle, phrase)) {
+        score = Math.max(score, Math.max(24, phrase.length * 3));
+      }
+    }
+  }
+
+  return score;
 }
 
 function scoreOverlap(haystack: string, needles: string[]): number {
@@ -47,6 +117,31 @@ function scoreTokenOverlap(haystack: string, needles: string[]): number {
     for (const token of tokenize(needle)) {
       if (haystackTokens.has(token)) {
         score += token.length;
+      }
+    }
+  }
+
+  return score;
+}
+
+function scoreCompoundTokenMatch(haystack: string, needles: string[]): number {
+  const haystackTokens = tokenize(haystack).filter(
+    (token) => token.length >= 5,
+  );
+  let score = 0;
+
+  for (const articleToken of haystackTokens) {
+    for (const needle of needles) {
+      for (const needleToken of tokenize(needle)) {
+        const embedsArticleToken =
+          needleToken !== articleToken &&
+          needleToken.length > articleToken.length &&
+          (needleToken.startsWith(articleToken) ||
+            needleToken.endsWith(articleToken));
+
+        if (embedsArticleToken) {
+          score = Math.max(score, Math.max(18, articleToken.length * 2 + 2));
+        }
       }
     }
   }
@@ -84,6 +179,112 @@ interface CandidateRanking {
   historyMatch: number;
   sourceCodeMatch: number;
   metadataMatch: number;
+}
+
+function hasExactSourceCodeMatch(params: {
+  articleCode: string;
+  sourceArticleCode: string | null;
+}): boolean {
+  return Boolean(
+    params.sourceArticleCode &&
+    normalizeText(params.articleCode) ===
+      normalizeText(params.sourceArticleCode),
+  );
+}
+
+function buildDescriptionMatch(params: {
+  articleDescription: string | null | undefined;
+  rowNeedles: string[];
+  reasons: string[];
+}): number {
+  const phraseMatchScore = scorePhraseMatch(
+    params.articleDescription ?? "",
+    params.rowNeedles,
+  );
+  const overlapScore = scoreOverlap(
+    params.articleDescription ?? "",
+    params.rowNeedles,
+  );
+  const tokenOverlapScore = scoreTokenOverlap(
+    params.articleDescription ?? "",
+    params.rowNeedles,
+  );
+  const compoundTokenScore = scoreCompoundTokenMatch(
+    params.articleDescription ?? "",
+    params.rowNeedles,
+  );
+  const descriptionMatch =
+    overlapScore + tokenOverlapScore + phraseMatchScore + compoundTokenScore;
+
+  if (descriptionMatch) {
+    params.reasons.push(
+      phraseMatchScore || overlapScore || tokenOverlapScore
+        ? "Catalog description matches the invoice row."
+        : "Catalog description is embedded in a compound word in the invoice row.",
+    );
+  }
+
+  return descriptionMatch;
+}
+
+function buildMetadataMatch(params: {
+  article: ProviderCatalogArticle;
+  row: InvoiceImportDraftRow;
+  reasons: string[];
+}): number {
+  let metadataMatch = 0;
+
+  if (
+    params.article.purchaseAccountCode &&
+    params.article.purchaseAccountCode === params.row.accountCode
+  ) {
+    metadataMatch += 20;
+    params.reasons.push("Purchase account matches.");
+  }
+
+  if (params.article.taxCode && params.article.taxCode === params.row.taxCode) {
+    metadataMatch += 8;
+    params.reasons.push("VAT code matches.");
+  }
+
+  if (params.article.unit && params.article.unit === params.row.unit) {
+    metadataMatch += 5;
+    params.reasons.push("Unit matches.");
+  }
+
+  return metadataMatch;
+}
+
+function buildHistoryMatch(params: {
+  articleCode: string;
+  historyByArticle: Map<
+    string,
+    { matches: number; recentInvoiceDate?: string; scoreBoost: number }
+  >;
+  reasons: string[];
+}): {
+  historyMatch:
+    | { matches: number; recentInvoiceDate?: string; scoreBoost: number }
+    | undefined;
+  historyMatchScore: number;
+} {
+  const historyMatch = params.historyByArticle.get(params.articleCode);
+
+  if (!historyMatch) {
+    return {
+      historyMatch: undefined,
+      historyMatchScore: 0,
+    };
+  }
+
+  params.reasons.push(
+    "Previous invoices from the same vendor used this article.",
+  );
+
+  return {
+    historyMatch,
+    historyMatchScore: historyMatch.scoreBoost + historyMatch.matches * 3,
+  };
 }
 
 function buildRowNeedles(row: InvoiceImportDraftRow): string[] {
@@ -176,52 +377,32 @@ function scoreCatalogArticle(params: {
   ranking: CandidateRanking;
 } {
   const reasons: string[] = [];
-  let sourceCodeMatch = 0;
-  let descriptionMatch = 0;
-  let historyMatchScore = 0;
-  let metadataMatch = 0;
-  const articleDescription = params.article.description;
+  const sourceCodeMatch = hasExactSourceCodeMatch({
+    articleCode: params.article.code,
+    sourceArticleCode: params.row.sourceArticleCode,
+  })
+    ? 1
+    : 0;
 
-  const hasExactSourceCodeMatch =
-    params.row.sourceArticleCode &&
-    normalizeText(params.article.code) ===
-      normalizeText(params.row.sourceArticleCode);
-  if (hasExactSourceCodeMatch) {
-    sourceCodeMatch = 1;
+  if (sourceCodeMatch) {
     reasons.push("Exact source article code match.");
   }
 
-  const codeAndDescriptionScore =
-    scoreOverlap(articleDescription, params.rowNeedles) +
-    scoreTokenOverlap(articleDescription, params.rowNeedles);
-  if (codeAndDescriptionScore) {
-    descriptionMatch = codeAndDescriptionScore;
-    reasons.push("Catalog description matches the invoice row.");
-  }
-
-  if (
-    params.article.purchaseAccountCode &&
-    params.article.purchaseAccountCode === params.row.accountCode
-  ) {
-    metadataMatch += 20;
-    reasons.push("Purchase account matches.");
-  }
-
-  if (params.article.taxCode && params.article.taxCode === params.row.taxCode) {
-    metadataMatch += 8;
-    reasons.push("VAT code matches.");
-  }
-
-  if (params.article.unit && params.article.unit === params.row.unit) {
-    metadataMatch += 5;
-    reasons.push("Unit matches.");
-  }
-
-  const historyMatch = params.historyByArticle.get(params.article.code);
-  if (historyMatch) {
-    historyMatchScore = historyMatch.scoreBoost + historyMatch.matches * 3;
-    reasons.push("Previous invoices from the same vendor used this article.");
-  }
+  const descriptionMatch = buildDescriptionMatch({
+    articleDescription: params.article.description,
+    rowNeedles: params.rowNeedles,
+    reasons,
+  });
+  const metadataMatch = buildMetadataMatch({
+    article: params.article,
+    row: params.row,
+    reasons,
+  });
+  const { historyMatch, historyMatchScore } = buildHistoryMatch({
+    articleCode: params.article.code,
+    historyByArticle: params.historyByArticle,
+    reasons,
+  });
 
   return {
     candidate: makeCandidate({
@@ -314,3 +495,5 @@ export function getArticleSuggestionStatus(
 
   return "ambiguous";
 }
+
+export { buildArticleSuggestionReason };

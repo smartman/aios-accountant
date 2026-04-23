@@ -56,6 +56,25 @@ it("handles ambiguous and missing article states cleanly", () => {
     "Several similar articles were found. Choose the correct article manually.",
   );
 
+  const lowConfidencePreview = buildPreview({
+    suggestionStatus: "ambiguous",
+    selectedArticleCode: null,
+    selectedArticleDescription: null,
+    articleCandidates: [buildPreview().draft.rows[0].articleCandidates[0]],
+    articleSuggestionReason:
+      "Catalog description is embedded in a compound word in the invoice row.",
+  });
+  const lowConfidenceMarkup = renderToStaticMarkup(
+    renderTree(lowConfidencePreview),
+  );
+  expect(lowConfidenceMarkup).toContain(
+    "A possible article match was found, but the confidence was too low to auto-select it. Choose the correct article manually.",
+  );
+  expect(lowConfidenceMarkup).toContain(
+    "Catalog description is embedded in a compound word in the invoice row.",
+  );
+  expect(lowConfidenceMarkup).toContain("Why is the article match ambiguous?");
+
   const missingPreview = buildPreview({
     sourceArticleCode: null,
     unit: null,

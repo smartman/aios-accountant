@@ -145,7 +145,7 @@ it("allows a total mismatch that is explained by header rounding", () => {
   ).toEqual([]);
 });
 
-it("keeps reporting total mismatches when no explicit rounding amount is present", () => {
+it("accepts a derived header rounding amount when no explicit value is present", () => {
   const draft = buildDraft();
   draft.invoice.amountExcludingVat = 62.92;
   draft.invoice.vatAmount = 13.84;
@@ -206,8 +206,72 @@ it("keeps reporting total mismatches when no explicit rounding amount is present
       draft,
       taxCodes: [{ code: "VAT22", rate: 22 }],
     }),
+  ).toEqual([]);
+});
+
+it("keeps reporting header deltas that exceed allowed invoice rounding", () => {
+  const draft = buildDraft();
+  draft.invoice.amountExcludingVat = 62.92;
+  draft.invoice.vatAmount = 13.84;
+  draft.invoice.totalAmount = 76.79;
+  draft.rows = [
+    {
+      ...draft.rows[0],
+      quantity: 37,
+      price: 0.16,
+      sum: 6.06,
+      vatRate: 22,
+      taxCode: "VAT22",
+    },
+    {
+      ...draft.rows[0],
+      id: "row-2",
+      description: "Elekter paevane jaanuar 2025",
+      quantity: 36,
+      price: 0.18,
+      sum: 6.49,
+      vatRate: 22,
+      taxCode: "VAT22",
+    },
+    {
+      ...draft.rows[0],
+      id: "row-3",
+      description: "Uldelekter oine jaanuar 2025",
+      quantity: 183.1,
+      price: 0.16,
+      sum: 30.02,
+      vatRate: 22,
+      taxCode: "VAT22",
+    },
+    {
+      ...draft.rows[0],
+      id: "row-4",
+      description: "Vesi jaanuar 2025",
+      quantity: 0.6,
+      price: 2.08,
+      sum: 1.25,
+      vatRate: 22,
+      taxCode: "VAT22",
+    },
+    {
+      ...draft.rows[0],
+      id: "row-5",
+      description: "Lume lukkamine jaanuar 2025",
+      quantity: 1,
+      price: 19.1,
+      sum: 19.1,
+      vatRate: 22,
+      taxCode: "VAT22",
+    },
+  ];
+
+  expect(
+    buildDraftAmountMismatchWarnings({
+      draft,
+      taxCodes: [{ code: "VAT22", rate: 22 }],
+    }),
   ).toEqual([
-    "Invoice header amounts do not match the invoice rows: Total amount 76,77 vs rows 76,76.",
+    "Invoice header amounts do not match the invoice rows: Total amount 76,79 vs rows 76,76.",
   ]);
 });
 

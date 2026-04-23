@@ -296,6 +296,47 @@ async function expectArrayFallbackNormalization() {
   expect(extraction.warnings).toEqual([]);
 }
 
+async function expectInvoiceNullFallbackNormalization() {
+  setupEnv();
+
+  mockOpenRouterResponse(
+    buildResponse(
+      JSON.stringify({
+        ...buildBaseExtraction(),
+        invoice: {
+          documentType: null,
+          invoiceNumber: null,
+          referenceNumber: null,
+          currency: null,
+          issueDate: null,
+          dueDate: null,
+          entryDate: null,
+          amountExcludingVat: null,
+          vatAmount: null,
+          totalAmount: null,
+          notes: null,
+        },
+      }),
+    ),
+  );
+
+  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+
+  expect(extraction.invoice).toMatchObject({
+    documentType: null,
+    invoiceNumber: null,
+    referenceNumber: null,
+    currency: "EUR",
+    issueDate: null,
+    dueDate: null,
+    entryDate: null,
+    amountExcludingVat: null,
+    vatAmount: null,
+    totalAmount: null,
+    notes: null,
+  });
+}
+
 async function expectMissingEnvFailure() {
   await expect(
     extractInvoiceWithOpenRouter(buildImportParams()),
@@ -393,6 +434,10 @@ describe("extractInvoiceWithOpenRouter", () => {
   it(
     "normalizes missing row and warning arrays to empty lists",
     expectArrayFallbackNormalization,
+  );
+  it(
+    "normalizes null invoice fields without inventing values",
+    expectInvoiceNullFallbackNormalization,
   );
   it(
     "throws when required environment variables are missing",

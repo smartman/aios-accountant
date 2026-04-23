@@ -66,6 +66,7 @@ WORKOS_COOKIE_PASSWORD=change-me-use-openssl-rand-base64-32
 # AI extraction
 OPENROUTER_API_KEY=sk-or-v1-example
 OPENROUTER_MODEL=openai/gpt-4.1-mini
+OPENROUTER_ARTICLE_MATCH_MODEL=openai/gpt-5.4-mini
 OPENROUTER_APP_TITLE=AI Accountant
 ```
 
@@ -105,6 +106,23 @@ npm run dev
 ```
 
 Users sign in with WorkOS, then configure either their own SmartAccounts credentials or their own Merit API credentials from the dashboard. Credentials are validated before they are saved and stored encrypted in Postgres.
+
+## Article Detection
+
+When the importer suggests an existing accounting article for an invoice row, it applies these rules in order:
+
+1. Only active purchase articles are considered.
+2. The primary matcher is AI. For each invoice row, the app sends the row description, source article code, resolved account/VAT/unit, the active article catalog, and a vendor-history summary to OpenRouter.
+3. The AI must return one of three outcomes for each row:
+   - `clear`: one existing article is clearly the best match
+   - `ambiguous`: more than one existing article is still plausible
+   - `missing`: none of the existing articles fit well enough
+4. The AI is instructed to use row-description meaning first, with vendor history and accounting metadata as supporting evidence.
+5. The row stays on manual review unless the AI returns a `clear` match.
+6. A deterministic matcher still ranks candidate articles underneath the AI decision so the UI can show review options and so the app has a fallback if the AI matcher is unavailable.
+7. Set `OPENROUTER_ARTICLE_MATCH_MODEL` to override the article-matcher model. If it is unset, the matcher defaults to `openai/gpt-5.4-mini`.
+
+Example: `Kontori internet märts 2025` should match an article such as `net - Internet`, because `märts 2025` is billing-period detail and `Kontori` is just extra context around the core service name.
 
 ## Notes
 

@@ -232,8 +232,10 @@ describe("merit adapter pure invoice unit matching", () => {
     ).toBe("km");
     expect(__test__.selectMeritUnitName([], "pcs")).toBeNull();
   });
+});
 
-  it("derives precise unit prices and carries invoice rounding", () => {
+describe("merit adapter pure invoice rounding", () => {
+  it("derives precise unit prices and infers missing invoice rounding", () => {
     const invoiceBody = __test__.buildPurchaseInvoiceBody(
       {
         ...buildInvoiceParams(),
@@ -244,7 +246,6 @@ describe("merit adapter pure invoice unit matching", () => {
             amountExcludingVat: 62.92,
             vatAmount: 13.84,
             totalAmount: 76.77,
-            roundingAmount: 0.01,
           },
         },
         rows: [
@@ -268,6 +269,35 @@ describe("merit adapter pure invoice unit matching", () => {
         Price: 0.1637838,
       }),
     ]);
+  });
+
+  it("does not turn larger invoice header deltas into rounding", () => {
+    const invoiceBody = __test__.buildPurchaseInvoiceBody(
+      {
+        ...buildInvoiceParams(),
+        extraction: {
+          ...buildInvoiceParams().extraction,
+          invoice: {
+            ...buildInvoiceParams().extraction.invoice,
+            amountExcludingVat: 62.92,
+            vatAmount: 13.84,
+            totalAmount: 76.79,
+          },
+        },
+        rows: [
+          {
+            ...buildInvoiceParams().rows[0],
+            quantity: 37,
+            price: 0.16,
+            sum: 6.06,
+            taxCode: "tax-22",
+          },
+        ],
+      },
+      [{ code: "tk", name: "tk" }],
+    );
+
+    expect(invoiceBody.RoundingAmount).toBe(0);
   });
 });
 

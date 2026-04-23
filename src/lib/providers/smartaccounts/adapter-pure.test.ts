@@ -205,7 +205,7 @@ describe("smartaccounts adapter pure payload builders", () => {
 });
 
 describe("smartaccounts adapter pure invoice rounding", () => {
-  it("derives row prices from authoritative net sums and always sends rounding", () => {
+  it("derives row prices from authoritative net sums and infers rounding", () => {
     const payload = __test__.buildInvoicePayload({
       ...buildInvoiceParams(),
       extraction: {
@@ -215,7 +215,6 @@ describe("smartaccounts adapter pure invoice rounding", () => {
           amountExcludingVat: 62.92,
           vatAmount: 13.84,
           totalAmount: 76.77,
-          roundingAmount: 0.01,
         },
       },
       rows: [
@@ -239,6 +238,27 @@ describe("smartaccounts adapter pure invoice rounding", () => {
         price: 0.1637838,
       }),
     ]);
+  });
+
+  it("keeps larger header deltas out of SmartAccounts rounding", () => {
+    const payload = __test__.buildInvoicePayload({
+      ...buildInvoiceParams(),
+      extraction: {
+        ...buildInvoiceParams().extraction,
+        invoice: {
+          ...buildInvoiceParams().extraction.invoice,
+          amountExcludingVat: 62.92,
+          vatAmount: 13.84,
+          totalAmount: 76.79,
+        },
+      },
+    });
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        roundAmount: 0,
+      }),
+    );
   });
 
   it("rounds invoice header amounts only when building the SmartAccounts payload", () => {
