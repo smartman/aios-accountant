@@ -103,14 +103,16 @@ function ImportInvoiceCard({
   providerMessage: string;
 }) {
   return (
-    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-100 p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900">
-      <h2 className="mb-4 m-0 text-xl font-semibold">Import invoice</h2>
+    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-100 p-4 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] sm:p-8 dark:border-slate-700 dark:bg-slate-900">
+      <h2 className="m-0 mb-4 text-lg font-semibold sm:text-xl">
+        Import invoice
+      </h2>
       <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
         {providerMessage}
       </p>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[220px] flex-1">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-0 flex-1">
           <label
             htmlFor="invoice-file"
             className="mb-2 block text-sm text-slate-500 dark:text-slate-400"
@@ -119,7 +121,7 @@ function ImportInvoiceCard({
           </label>
           <label
             htmlFor="invoice-file"
-            className="flex min-h-[56px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm transition hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
+            className="flex min-h-[56px] w-full cursor-pointer items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm transition hover:border-slate-400 sm:px-4 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
           >
             <span className="inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-lg bg-slate-100 px-4 text-sm font-semibold text-slate-900 dark:bg-slate-800 dark:text-slate-100">
               Choose file
@@ -139,7 +141,7 @@ function ImportInvoiceCard({
         </div>
 
         <button
-          className="inline-flex min-h-[56px] items-center justify-center whitespace-nowrap rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-[56px] w-full items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           onClick={onImport}
           disabled={!hasSelectedFile || loading || confirming || !canImport}
         >

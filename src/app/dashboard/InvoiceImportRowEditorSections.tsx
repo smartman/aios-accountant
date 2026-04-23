@@ -51,10 +51,6 @@ function buildRowUnitOptions(
     units.add(row.unit.trim());
   }
 
-  if (row.newArticle.unit.trim()) {
-    units.add(row.newArticle.unit.trim());
-  }
-
   units.add("pcs");
 
   return [...units].sort((left, right) => left.localeCompare(right));
@@ -62,6 +58,7 @@ function buildRowUnitOptions(
 
 function RowHeader({ draft, row, setDraft }: Omit<RowEditorProps, "preview">) {
   const canRemoveRow = draft.rows.length > 1;
+  const showStatusChip = row.suggestionStatus !== "clear";
 
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -69,9 +66,11 @@ function RowHeader({ draft, row, setDraft }: Omit<RowEditorProps, "preview">) {
         <strong className="text-base text-slate-900 dark:text-slate-100">
           {formatInvoiceImportRowLabel(row.id)}
         </strong>
-        <span className={statusChipClass(row.suggestionStatus)}>
-          {row.suggestionStatus}
-        </span>
+        {showStatusChip ? (
+          <span className={statusChipClass(row.suggestionStatus)}>
+            {row.suggestionStatus}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -118,7 +117,7 @@ function DescriptionField({
   setDraft,
 }: Omit<RowEditorProps, "preview">) {
   return (
-    <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm md:col-span-12">
+    <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm sm:col-span-2 xl:col-span-4">
       <span className={rowFieldLabelClass}>Description</span>
       <input
         className={fieldClass()}
@@ -137,6 +136,7 @@ function DescriptionField({
 function NumericField({
   draft,
   label,
+  labelClassName = rowFieldLabelClass,
   row,
   setDraft,
   value,
@@ -144,6 +144,7 @@ function NumericField({
 }: {
   draft: InvoiceImportDraft;
   label: string;
+  labelClassName?: string;
   row: InvoiceImportDraftRow;
   setDraft: (draft: InvoiceImportDraft) => void;
   value: number | null;
@@ -154,7 +155,7 @@ function NumericField({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-      <span className={rowFieldLabelClass}>{label}</span>
+      <span className={labelClassName}>{label}</span>
       <input
         type="number"
         className={fieldClass()}
@@ -180,14 +181,17 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
       ) ?? null)
     : null;
   const lockedArticleUnit = selectedArticle?.unit?.trim() || null;
+  const rowMetricLabelClass =
+    "flex min-h-[2.5rem] items-end text-sm leading-5 text-slate-600 whitespace-normal text-pretty dark:text-slate-400";
 
   return (
-    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-12">
+    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <DescriptionField draft={draft} row={row} setDraft={setDraft} />
-      <div className="md:col-span-3">
+      <div className="min-w-0">
         <NumericField
           draft={draft}
           label="Quantity"
+          labelClassName={rowMetricLabelClass}
           row={row}
           setDraft={setDraft}
           value={row.quantity}
@@ -197,13 +201,12 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
           })}
         />
       </div>
-      <div className="md:col-span-3">
+      <div className="min-w-0">
         <UnitDropdown
           allowEmpty={!lockedArticleUnit}
-          disabled={Boolean(
-            row.articleDecision === "existing" && lockedArticleUnit,
-          )}
+          disabled={Boolean(lockedArticleUnit)}
           label="Unit"
+          labelClassName={rowMetricLabelClass}
           options={lockedArticleUnit ? [lockedArticleUnit] : unitOptions}
           placeholder="No unit"
           value={lockedArticleUnit ?? row.unit}
@@ -211,18 +214,15 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
               unit: value,
-              newArticle: {
-                ...current.newArticle,
-                unit: value ?? current.newArticle.unit,
-              },
             }))
           }
         />
       </div>
-      <div className="md:col-span-3">
+      <div className="min-w-0">
         <NumericField
           draft={draft}
           label="Price"
+          labelClassName={rowMetricLabelClass}
           row={row}
           setDraft={setDraft}
           value={row.price}
@@ -232,10 +232,11 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
           })}
         />
       </div>
-      <div className="md:col-span-3">
+      <div className="min-w-0">
         <NumericField
           draft={draft}
           label="Net row amount"
+          labelClassName={rowMetricLabelClass}
           row={row}
           setDraft={setDraft}
           value={row.sum}
@@ -258,7 +259,17 @@ function RowAccountingFields({
   return (
     <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-        <span className={rowFieldLabelClass}>Purchase account</span>
+        <span className="flex items-center gap-2">
+          <span className={rowFieldLabelClass}>Purchase account</span>
+          <button
+            type="button"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-[11px] font-semibold leading-none text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100"
+            aria-label={`Why this account? ${row.accountSelectionReason}`}
+            title={row.accountSelectionReason}
+          >
+            i
+          </button>
+        </span>
         <select
           className={fieldClass()}
           value={row.accountCode}
@@ -266,10 +277,6 @@ function RowAccountingFields({
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
               accountCode: event.target.value,
-              newArticle: {
-                ...current.newArticle,
-                purchaseAccountCode: event.target.value,
-              },
             }))
           }
         >
@@ -290,10 +297,6 @@ function RowAccountingFields({
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
               taxCode: event.target.value || null,
-              newArticle: {
-                ...current.newArticle,
-                taxCode: event.target.value || null,
-              },
             }))
           }
         >
@@ -306,17 +309,6 @@ function RowAccountingFields({
         </select>
       </label>
     </div>
-  );
-}
-
-function AccountReason({ reason }: { reason: string }) {
-  return (
-    <details className="rounded-[14px] border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
-      <summary className="cursor-pointer list-none font-medium">
-        Why this account?
-      </summary>
-      <p className="mt-2 m-0 leading-6">{reason}</p>
-    </details>
   );
 }
 
@@ -341,7 +333,6 @@ function RowBasics(props: RowEditorProps) {
         preview={props.preview}
         setDraft={props.setDraft}
       />
-      <AccountReason reason={props.row.accountSelectionReason} />
     </div>
   );
 }

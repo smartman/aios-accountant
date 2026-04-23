@@ -4,7 +4,6 @@ import {
   choosePaymentAccount,
   chooseRelevantArticle,
   chooseUnpaidAccount,
-  createArticle,
   createPayment,
   createVendor,
   createVendorInvoice,
@@ -189,7 +188,7 @@ describe("smartaccounts-data vendor and article operations", () => {
     });
   });
 
-  it("reuses cached articles, falls back to remote lookup, and validates created article ids", async () => {
+  it("reuses cached articles and falls back to remote lookup", async () => {
     const credentials = buildCredentials("article");
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -202,8 +201,6 @@ describe("smartaccounts-data vendor and article operations", () => {
           articles: [{ code: "ROW02", description: "Remote article" }],
         }),
       )
-      .mockResolvedValueOnce(jsonResponse({}))
-      .mockResolvedValueOnce(jsonResponse({ code: "ROW03" }))
       .mockResolvedValueOnce(jsonResponse({ articles: [] }));
 
     await expect(
@@ -212,12 +209,6 @@ describe("smartaccounts-data vendor and article operations", () => {
     await expect(
       findArticleByCode(credentials, "ROW02"),
     ).resolves.toMatchObject({ code: "ROW02" });
-    await expect(
-      createArticle(credentials, { description: "Missing code" }),
-    ).rejects.toThrow("SmartAccounts did not return an article code.");
-    await expect(
-      createArticle(credentials, { description: "Created" }),
-    ).resolves.toEqual({ code: "ROW03" });
     await expect(findArticleByCode(credentials, "MISSING")).resolves.toBeNull();
   });
 

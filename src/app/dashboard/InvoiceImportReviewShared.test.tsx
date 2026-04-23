@@ -69,20 +69,11 @@ function buildDraft(): InvoiceImportDraft {
         taxCode: "VAT22",
         accountCode: "4000",
         accountSelectionReason: "Matched.",
-        articleDecision: "existing",
         reviewed: true,
         selectedArticleCode: "ARTICLE-1",
         selectedArticleDescription: "Article",
         articleCandidates: [],
         suggestionStatus: "clear",
-        newArticle: {
-          code: "",
-          description: "Article",
-          unit: "pcs",
-          type: "SERVICE",
-          purchaseAccountCode: "4000",
-          taxCode: "VAT22",
-        },
       },
     ],
     warnings: [],
@@ -122,8 +113,6 @@ it("creates monotonic row ids after rows have been deleted", () => {
 
   expect(newRow.id).toBe("row-3");
   expect(newRow.unit).toBeNull();
-  expect(newRow.newArticle.code).toBe("");
-  expect(newRow.newArticle.unit).toBe("");
 });
 
 it("handles drafts whose existing rows do not follow the row-N pattern", () => {
@@ -157,7 +146,6 @@ it("falls back to blank account defaults when no rows exist", () => {
   const newRow = createBlankRow(draft);
 
   expect(newRow.accountCode).toBe("");
-  expect(newRow.newArticle.purchaseAccountCode).toBe("");
 });
 
 it("renders import result badges and invoice fallbacks", () => {

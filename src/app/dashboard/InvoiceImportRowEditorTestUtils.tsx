@@ -23,7 +23,6 @@ export function buildRow(
     taxCode: "VAT24",
     accountCode: "10921",
     accountSelectionReason: "Matched machinery and equipment account.",
-    articleDecision: "existing",
     reviewed: false,
     selectedArticleCode: "MSIMAG2701",
     selectedArticleDescription: "MSI MAG 275QF E20",
@@ -54,14 +53,6 @@ export function buildRow(
       },
     ],
     suggestionStatus: "clear",
-    newArticle: {
-      code: "MAG_275QF_E20",
-      description: "MSI MAG 275QF E20",
-      unit: "pcs",
-      type: "PRODUCT",
-      purchaseAccountCode: "10921",
-      taxCode: "VAT24",
-    },
     ...overrides,
   };
 }
@@ -165,7 +156,6 @@ export function buildPreview(
     provider: "smartaccounts",
     draft: buildDraft(row),
     extraction: buildExtraction(),
-    articleTypeOptions: ["PRODUCT", "SERVICE"],
     unitOptions: ["pcs", "tk"],
     articleOptions: [
       {

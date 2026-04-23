@@ -217,28 +217,6 @@ export async function findArticleByCode(
   return match;
 }
 
-export async function createArticle(
-  credentials: SmartAccountsCredentials,
-  body: Record<string, unknown>,
-): Promise<{ code: string }> {
-  const response = await smartAccountsRequest<Record<string, unknown>>(
-    "/purchasesales/articles",
-    "add",
-    credentials,
-    {
-      httpMethod: "POST",
-      body,
-    },
-  );
-
-  const code = toOptionalString(response.code);
-  if (!code) {
-    throw new Error("SmartAccounts did not return an article code.");
-  }
-
-  return { code };
-}
-
 export async function findExistingVendorInvoice(
   credentials: SmartAccountsCredentials,
   vendorId: string,

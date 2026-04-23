@@ -176,35 +176,8 @@ async function resolveDraftRows<TCredentials>(params: {
   const resolvedRows: ProviderResolvedRow[] = [];
 
   for (const row of params.draft.rows) {
-    let articleCode = row.selectedArticleCode;
-    let articleDescription = row.selectedArticleDescription;
-    const shouldCreateArticle = row.articleDecision === "create";
-
-    if (shouldCreateArticle) {
-      const created = await measureInvoiceImportPhase({
-        workflow: "confirm",
-        provider: params.savedConnection.provider,
-        phase: "createArticle",
-        metadata: {
-          rowId: row.id,
-        },
-        run: () =>
-          params.activities.createArticle(
-            params.credentials,
-            {
-              code: row.newArticle.code,
-              description: row.newArticle.description,
-              unit: row.newArticle.unit,
-              purchaseAccountCode: row.newArticle.purchaseAccountCode,
-              taxCode: row.newArticle.taxCode ?? undefined,
-              type: row.newArticle.type,
-            },
-            params.context,
-          ),
-      });
-      articleCode = created.code;
-      articleDescription = created.description;
-    }
+    const articleCode = row.selectedArticleCode;
+    const articleDescription = row.selectedArticleDescription;
 
     if (!articleCode || !articleDescription) {
       throw new Error(

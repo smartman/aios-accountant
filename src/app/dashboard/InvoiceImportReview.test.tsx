@@ -4,12 +4,16 @@ import type {
   InvoiceImportDraft,
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
-import InvoiceImportReview from "./InvoiceImportReview";
 import {
   buildPreview,
   findButton,
   hostProps,
 } from "./InvoiceImportRowEditorTestUtils";
+
+vi.mock("./actions", () => ({
+  clearAccountingConnectionCache: vi.fn(async (state: unknown) => state),
+  clearAccountingConnectionCacheFromForm: vi.fn(async () => undefined),
+}));
 
 function buildValidPreview(): InvoiceImportPreviewResult {
   const preview = buildPreview({
@@ -19,39 +23,77 @@ function buildValidPreview(): InvoiceImportPreviewResult {
   return preview;
 }
 
-function renderReview(params?: {
-  draft?: InvoiceImportDraft;
-  onConfirm?: () => void;
-  preview?: InvoiceImportPreviewResult;
-}) {
-  const preview = params?.preview ?? buildValidPreview();
-  const draft = params?.draft ?? preview.draft;
-  const file = new File(["invoice"], "invoice.pdf", {
-    type: "application/pdf",
+async function loadReviewHarness() {
+  vi.resetModules();
+
+  const states: unknown[] = [];
+  let hookIndex = 0;
+  const useStateMock = vi.fn((initialState: unknown) => {
+    const currentIndex = hookIndex++;
+    if (!(currentIndex in states)) {
+      states[currentIndex] =
+        typeof initialState === "function"
+          ? (initialState as () => unknown)()
+          : initialState;
+    }
+
+    const setState = (nextState: unknown) => {
+      states[currentIndex] =
+        typeof nextState === "function"
+          ? (nextState as (previous: unknown) => unknown)(states[currentIndex])
+          : nextState;
+    };
+
+    return [states[currentIndex], setState] as const;
   });
 
-  return (
-    <InvoiceImportReview
-      file={file}
-      filePreviewUrl={null}
-      isPreviewLightboxOpen={false}
-      onOpenPreviewLightbox={() => undefined}
-      onClosePreviewLightbox={() => undefined}
-      preview={preview}
-      draft={draft}
-      setDraft={() => undefined}
-      confirming={false}
-      onConfirm={params?.onConfirm ?? (() => undefined)}
-    />
-  );
+  vi.doMock("react", async () => {
+    const actual = await vi.importActual<typeof import("react")>("react");
+    return {
+      ...actual,
+      useState: useStateMock,
+    };
+  });
+
+  const reviewModule = await import("./InvoiceImportReview");
+
+  return {
+    states,
+    render(params?: {
+      draft?: InvoiceImportDraft;
+      onConfirm?: () => void;
+      preview?: InvoiceImportPreviewResult;
+    }) {
+      hookIndex = 0;
+      const preview = params?.preview ?? buildValidPreview();
+      const draft = params?.draft ?? preview.draft;
+      const file = new File(["invoice"], "invoice.pdf", {
+        type: "application/pdf",
+      });
+
+      return reviewModule.default({
+        file,
+        filePreviewUrl: null,
+        isPreviewLightboxOpen: false,
+        onOpenPreviewLightbox: () => undefined,
+        onClosePreviewLightbox: () => undefined,
+        preview,
+        draft,
+        setDraft: () => undefined,
+        confirming: false,
+        onConfirm: params?.onConfirm ?? (() => undefined),
+      });
+    },
+  };
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
-  Reflect.deleteProperty(globalThis, "window");
+  vi.doUnmock("react");
 });
 
-it("renders duplicate and warning summaries and blocks confirm when validation fails", () => {
+it("renders duplicate and warning summaries and blocks confirm when validation fails", async () => {
+  const { render } = await loadReviewHarness();
   const preview = buildValidPreview();
   preview.draft.warnings = ["Check vendor details."];
   preview.draft.duplicateInvoice = {
@@ -61,7 +103,7 @@ it("renders duplicate and warning summaries and blocks confirm when validation f
   };
   preview.draft.vendor.name = "";
 
-  const tree = renderReview({ preview });
+  const tree = render({ preview });
   const markup = renderToStaticMarkup(tree);
   const confirmButton = findButton(tree, "Confirm and create invoice");
 
@@ -77,7 +119,23 @@ it("renders duplicate and warning summaries and blocks confirm when validation f
   expect(hostProps(confirmButton).disabled).toBe(true);
 });
 
-it("prompts before confirming duplicates and respects the user's choice", () => {
+it("shows the missing-article warning and cache-clear action for unresolved rows", async () => {
+  const { render } = await loadReviewHarness();
+  const preview = buildValidPreview();
+  preview.draft.rows[0].suggestionStatus = "missing";
+  preview.draft.rows[0].selectedArticleCode = null;
+  preview.draft.rows[0].selectedArticleDescription = null;
+
+  const markup = renderToStaticMarkup(render({ preview }));
+
+  expect(markup).toContain(
+    "Article not detected, choose manually or create new article and refresh the article cache.",
+  );
+  expect(markup).toContain("Clear article cache");
+});
+
+it("opens a duplicate confirmation dialog before proceeding", async () => {
+  const { render, states } = await loadReviewHarness();
   const preview = buildValidPreview();
   preview.draft.duplicateInvoice = {
     invoiceId: "invoice-dup",
@@ -85,15 +143,7 @@ it("prompts before confirming duplicates and respects the user's choice", () => 
     invoiceNumber: "INV-1",
   };
   const confirmSpy = vi.fn();
-  const windowConfirm = vi
-    .fn()
-    .mockReturnValueOnce(false)
-    .mockReturnValueOnce(true);
-  Object.assign(globalThis, {
-    window: { confirm: windowConfirm },
-  });
-
-  const tree = renderReview({
+  let tree = render({
     preview,
     onConfirm: confirmSpy,
   });
@@ -104,8 +154,21 @@ it("prompts before confirming duplicates and respects the user's choice", () => 
   }
 
   hostProps(confirmButton).onClick?.();
-  hostProps(confirmButton).onClick?.();
+  expect(states[0]).toBe(true);
+  expect(confirmSpy).not.toHaveBeenCalled();
 
-  expect(windowConfirm).toHaveBeenCalledTimes(2);
+  tree = render({
+    preview,
+    onConfirm: confirmSpy,
+  });
+  expect(renderToStaticMarkup(tree)).toContain("Possible duplicate invoice");
+
+  const proceedButton = findButton(tree, "Create anyway");
+  if (!proceedButton) {
+    throw new Error("Expected duplicate confirmation button.");
+  }
+
+  hostProps(proceedButton).onClick?.();
   expect(confirmSpy).toHaveBeenCalledTimes(1);
+  expect(states[0]).toBe(false);
 });

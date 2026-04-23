@@ -105,7 +105,6 @@ export async function getVendorInvoiceHistory(
           issueDate: toOptionalString(invoice.date ?? invoice.entryDate),
           vendorId,
           vendorName,
-          sourceArticleCode: articleCode,
           description,
           articleCode,
           articleDescription: description,

@@ -38,7 +38,6 @@ import {
   pickMeritBank,
 } from "./adapter-helpers";
 import {
-  createItem,
   createVendor,
   findExistingPurchaseInvoice,
   findVendor,
@@ -261,11 +260,6 @@ export const meritProviderAdapter: AccountingProviderActivities<MeritCredentials
     async getVendorArticleHistory(credentials, params, context) {
       assertProviderContext(context, "merit");
       return getVendorInvoiceHistory(credentials, params);
-    },
-
-    async createArticle(credentials, input, context) {
-      assertProviderContext(context, "merit");
-      return createItem(credentials, input);
     },
 
     async createPurchaseInvoice(credentials, params, context) {

@@ -101,3 +101,12 @@ export async function clearAccountingConnectionCache(
     };
   }
 }
+
+export async function clearAccountingConnectionCacheFromForm(
+  formData: FormData,
+): Promise<void> {
+  void formData;
+  await clearAccountingConnectionCache({
+    status: "idle",
+  });
+}

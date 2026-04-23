@@ -34,7 +34,7 @@ export function fieldStyle(): CSSProperties {
 
 export function fieldClass(extraClass = "") {
   const base =
-    "w-full min-h-[48px] rounded-xl border border-slate-300 bg-white px-4 py-3 text-[0.95rem] leading-[1.35] text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+    "w-full min-h-[48px] rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-[0.9rem] leading-[1.35] text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 sm:px-4 sm:py-3 sm:text-[0.95rem] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
   return `${base} ${extraClass}`.trim();
 }
 
@@ -106,20 +106,11 @@ export function createBlankRow(
     taxCode: null,
     accountCode: draft.rows[0]?.accountCode ?? "",
     accountSelectionReason: "Added manually during review.",
-    articleDecision: "existing",
     reviewed: false,
     selectedArticleCode: null,
     selectedArticleDescription: null,
     articleCandidates: [],
     suggestionStatus: "missing",
-    newArticle: {
-      code: "",
-      description: "",
-      unit: "",
-      type: "SERVICE",
-      purchaseAccountCode: draft.rows[0]?.accountCode ?? "",
-      taxCode: null,
-    },
   };
 }
 

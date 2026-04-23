@@ -40,7 +40,6 @@ it("falls back to an existing vendor when createVendor reports a duplicate", asy
     }),
     createVendor: vi.fn().mockRejectedValue(new Error("Vendor already exists")),
     findExistingInvoice: vi.fn().mockResolvedValue(null),
-    createArticle: vi.fn(),
     createPurchaseInvoice: vi.fn().mockResolvedValue({
       invoiceId: "invoice-1",
       attachedFile: true,
@@ -91,7 +90,6 @@ it("returns an existing invoice result when a duplicate is found", async () => {
     findExistingInvoice: vi
       .fn()
       .mockResolvedValue({ invoiceId: "invoice-existing" }),
-    createArticle: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPayment: vi.fn(),
     attachDocument: vi.fn(),

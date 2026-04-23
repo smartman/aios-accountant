@@ -62,20 +62,11 @@ function buildDraft(): InvoiceImportDraft {
         taxCode: "VAT22",
         accountCode: "4004",
         accountSelectionReason: "Matched low-value asset account.",
-        articleDecision: "existing" as const,
         reviewed: true,
         selectedArticleCode: "vv",
         selectedArticleDescription: "Väikevahendid kuluks",
         articleCandidates: [],
         suggestionStatus: "clear" as const,
-        newArticle: {
-          code: "",
-          description: "Väikevahendid kuluks",
-          unit: "pcs",
-          type: "SERVICE",
-          purchaseAccountCode: "4004",
-          taxCode: "VAT22",
-        },
       },
     ],
     warnings: [],
@@ -153,19 +144,6 @@ describe("draft validation", () => {
 
     expect(validateDraft(draft)).toContain(
       "Row 1 must use unit tk for article vv.",
-    );
-  });
-
-  it("reports missing new-article definitions", () => {
-    const draft = buildDraft();
-    draft.rows[0].articleDecision = "create";
-    draft.rows[0].selectedArticleCode = null;
-    draft.rows[0].selectedArticleDescription = null;
-    draft.rows[0].newArticle.code = "FURNITURE";
-    draft.rows[0].newArticle.description = "";
-
-    expect(validateDraft(draft)).toEqual(
-      expect.arrayContaining(["Row 1 must define the new accounting article."]),
     );
   });
 

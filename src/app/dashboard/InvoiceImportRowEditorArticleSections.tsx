@@ -63,37 +63,6 @@ function buildRemainingArticleOptions(
   return articleOptions.filter((article) => !suggestedCodes.has(article.code));
 }
 
-function buildUnitOptions(
-  row: InvoiceImportDraftRow,
-  preview: InvoiceImportPreviewResult,
-): string[] {
-  const units = new Set<string>();
-
-  for (const unit of preview.unitOptions ?? []) {
-    if (unit.trim()) {
-      units.add(unit.trim());
-    }
-  }
-
-  for (const article of preview.articleOptions ?? []) {
-    if (article.unit?.trim()) {
-      units.add(article.unit.trim());
-    }
-  }
-
-  if (row.unit?.trim()) {
-    units.add(row.unit.trim());
-  }
-
-  if (row.newArticle.unit.trim()) {
-    units.add(row.newArticle.unit.trim());
-  }
-
-  units.add("pcs");
-
-  return [...units].sort((left, right) => left.localeCompare(right));
-}
-
 function toArticleCandidate(article: ArticleOption) {
   return {
     code: article.code,
@@ -145,80 +114,35 @@ function updateArticleSelection(
 
   updateDraftRow(props.draft, props.row.id, props.setDraft, (current) => ({
     ...current,
-    articleDecision: "existing",
     selectedArticleCode: selectedCode || null,
     selectedArticleDescription:
       selectedCandidate?.description ?? selectedArticle?.description ?? null,
     articleCandidates: mergedCandidates,
     unit: selectedUnit ?? current.unit,
     accountCode: selectedPurchaseAccountCode ?? current.accountCode,
-    newArticle: {
-      ...current.newArticle,
-      purchaseAccountCode:
-        selectedPurchaseAccountCode ?? current.newArticle.purchaseAccountCode,
-    },
   }));
 }
 
-function ArticleModeToggle({
-  activeMode,
-  onChange,
-}: {
-  activeMode: InvoiceImportDraftRow["articleDecision"];
-  onChange: (mode: InvoiceImportDraftRow["articleDecision"]) => void;
-}) {
-  const modeButtonClass = (mode: InvoiceImportDraftRow["articleDecision"]) =>
-    [
-      "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-      activeMode === mode
-        ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100",
-    ].join(" ");
-
-  return (
-    <div className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
-      <button
-        className={modeButtonClass("existing")}
-        type="button"
-        onClick={() => onChange("existing")}
-      >
-        Use existing
-      </button>
-      <button
-        className={modeButtonClass("create")}
-        type="button"
-        onClick={() => onChange("create")}
-      >
-        Create new
-      </button>
-    </div>
-  );
-}
-
 function ArticleStatusCopy({ row }: { row: InvoiceImportDraftRow }) {
-  if (row.suggestionStatus === "clear" && row.selectedArticleCode) {
-    return (
-      <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-        Auto-selected the closest existing article. You can change it.
-      </p>
-    );
-  }
-
   if (row.suggestionStatus === "ambiguous") {
     return (
       <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-        Several similar articles were found. Pick one manually or create a new
-        article.
+        Several similar articles were found. Choose the correct article
+        manually.
       </p>
     );
   }
 
-  return (
-    <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-      No reliable article match was found. Choose an existing article or create
-      a new one.
-    </p>
-  );
+  if (row.suggestionStatus === "missing") {
+    return (
+      <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
+        Article not detected, choose manually or create new article and refresh
+        the article cache.
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function ExistingArticleFields({
@@ -274,11 +198,6 @@ function ExistingArticleFields({
           ) : null}
         </select>
       </label>
-      {row.articleCandidates.length ? (
-        <p className="m-0 text-xs text-slate-500 dark:text-slate-400">
-          Suggested matches are listed first for quick override.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -287,6 +206,7 @@ export function UnitDropdown({
   allowEmpty = false,
   disabled = false,
   label,
+  labelClassName = rowArticleLabelClass,
   onChange,
   options,
   placeholder,
@@ -295,6 +215,7 @@ export function UnitDropdown({
   allowEmpty?: boolean;
   disabled?: boolean;
   label: string;
+  labelClassName?: string;
   onChange: (value: string | null) => void;
   options: string[];
   placeholder: string;
@@ -302,7 +223,7 @@ export function UnitDropdown({
 }) {
   return (
     <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-      <span className={rowArticleLabelClass}>{label}</span>
+      <span className={labelClassName}>{label}</span>
       <select
         className={fieldClass()}
         disabled={disabled}
@@ -320,108 +241,14 @@ export function UnitDropdown({
   );
 }
 
-function NewArticleFields({
-  draft,
-  preview,
-  row,
-  setDraft,
-}: ArticleSectionProps) {
-  const articleTypeOptions = Array.from(
-    new Set(
-      [
-        ...(preview.articleTypeOptions ?? ["SERVICE"]),
-        row.newArticle.type,
-      ].filter(Boolean),
-    ),
-  );
-  const unitOptions = buildUnitOptions(row, preview);
-
-  return (
-    <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-4">
-      <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-        <span className={rowArticleLabelClass}>New article code</span>
-        <input
-          className={fieldClass()}
-          value={row.newArticle.code}
-          onChange={(event) =>
-            updateDraftRow(draft, row.id, setDraft, (current) => ({
-              ...current,
-              articleDecision: "create",
-              newArticle: {
-                ...current.newArticle,
-                code: event.target.value,
-              },
-            }))
-          }
-        />
-      </label>
-      <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm lg:col-span-2">
-        <span className={rowArticleLabelClass}>New article description</span>
-        <input
-          className={fieldClass()}
-          value={row.newArticle.description}
-          onChange={(event) =>
-            updateDraftRow(draft, row.id, setDraft, (current) => ({
-              ...current,
-              articleDecision: "create",
-              newArticle: {
-                ...current.newArticle,
-                description: event.target.value,
-              },
-            }))
-          }
-        />
-      </label>
-      <UnitDropdown
-        allowEmpty
-        label="New article unit"
-        options={unitOptions}
-        placeholder="No unit"
-        value={row.newArticle.unit}
-        onChange={(value) =>
-          updateDraftRow(draft, row.id, setDraft, (current) => ({
-            ...current,
-            articleDecision: "create",
-            newArticle: {
-              ...current.newArticle,
-              unit: value ?? "",
-            },
-          }))
-        }
-      />
-      <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
-        <span className={rowArticleLabelClass}>New article type</span>
-        <select
-          className={fieldClass()}
-          value={row.newArticle.type}
-          onChange={(event) =>
-            updateDraftRow(draft, row.id, setDraft, (current) => ({
-              ...current,
-              articleDecision: "create",
-              newArticle: {
-                ...current.newArticle,
-                type: event.target.value,
-              },
-            }))
-          }
-        >
-          {articleTypeOptions.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
-  );
-}
-
 export function ArticleMatchSection({
   draft,
   preview,
   row,
   setDraft,
 }: ArticleSectionProps) {
+  const showStatusChip = row.suggestionStatus !== "clear";
+
   return (
     <section className="flex flex-col gap-4 rounded-[16px] border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/40">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -430,9 +257,11 @@ export function ArticleMatchSection({
             <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               Article match
             </span>
-            <span className={statusChipClass(row.suggestionStatus)}>
-              {row.suggestionStatus}
-            </span>
+            {showStatusChip ? (
+              <span className={statusChipClass(row.suggestionStatus)}>
+                {row.suggestionStatus}
+              </span>
+            ) : null}
           </div>
           <ArticleStatusCopy row={row} />
         </div>
@@ -442,32 +271,12 @@ export function ArticleMatchSection({
           </span>
         ) : null}
       </div>
-
-      <ArticleModeToggle
-        activeMode={row.articleDecision}
-        onChange={(mode) =>
-          updateDraftRow(draft, row.id, setDraft, (current) => ({
-            ...current,
-            articleDecision: mode,
-          }))
-        }
+      <ExistingArticleFields
+        draft={draft}
+        preview={preview}
+        row={row}
+        setDraft={setDraft}
       />
-
-      {row.articleDecision === "create" ? (
-        <NewArticleFields
-          draft={draft}
-          preview={preview}
-          row={row}
-          setDraft={setDraft}
-        />
-      ) : (
-        <ExistingArticleFields
-          draft={draft}
-          preview={preview}
-          row={row}
-          setDraft={setDraft}
-        />
-      )}
     </section>
   );
 }

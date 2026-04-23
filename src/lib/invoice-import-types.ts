@@ -166,20 +166,11 @@ export interface InvoiceImportDraftRow {
   taxCode: string | null;
   accountCode: string;
   accountSelectionReason: string;
-  articleDecision: "existing" | "create";
   reviewed: boolean;
   selectedArticleCode: string | null;
   selectedArticleDescription: string | null;
   articleCandidates: InvoiceImportReviewArticleCandidate[];
   suggestionStatus: "clear" | "ambiguous" | "missing";
-  newArticle: {
-    code: string;
-    description: string;
-    unit: string;
-    type: string;
-    purchaseAccountCode: string;
-    taxCode: string | null;
-  };
 }
 
 export interface InvoiceImportDraft {
@@ -238,7 +229,6 @@ export interface InvoiceImportPreviewResult {
   provider: "smartaccounts" | "merit";
   draft: InvoiceImportDraft;
   extraction: InvoiceExtraction;
-  articleTypeOptions?: string[];
   unitOptions?: string[];
   articleOptions?: Array<{
     code: string;

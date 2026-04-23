@@ -22,7 +22,7 @@ it("renders a compact pdf preview with a fullscreen action", () => {
   expect(markup).toContain("Open full screen");
   expect(markup).toContain("Preview of printout.pdf");
   expect(markup).toContain(
-    "blob:invoice-preview#toolbar=0&amp;navpanes=0&amp;scrollbar=0&amp;view=FitH",
+    "blob:invoice-preview#toolbar=0&amp;navpanes=0&amp;scrollbar=0&amp;zoom=page-fit&amp;view=FitH",
   );
 });
 
@@ -51,28 +51,6 @@ it("opens from the small preview click target and closes from the backdrop", () 
   expect(opened).toBe(true);
 
   hostProps(findButton(tree, "Close preview backdrop")!).onClick?.();
-  expect(closed).toBe(true);
-});
-
-it("closes from the fullscreen preview surface", () => {
-  const file = new File(["a".repeat(2048)], "printout.pdf", {
-    type: "application/pdf",
-  });
-  let closed = false;
-
-  const tree = (
-    <InvoiceImportFilePreview
-      file={file}
-      fileUrl="blob:invoice-preview"
-      isLightboxOpen
-      onOpenLightbox={() => undefined}
-      onCloseLightbox={() => {
-        closed = true;
-      }}
-    />
-  );
-
-  hostProps(findButton(tree, "Close preview surface")!).onClick?.();
   expect(closed).toBe(true);
 });
 

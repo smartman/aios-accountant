@@ -10,11 +10,11 @@ import {
 } from "./InvoiceImportReviewShared";
 
 const reviewSectionClass =
-  "flex flex-col gap-5 rounded-[18px] border border-slate-300/25 bg-white/40 p-[1.35rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.32),_0_10px_24px_rgba(15,23,42,0.06)] dark:border-slate-700/30 dark:bg-slate-900/20";
+  "flex flex-col gap-4 rounded-[16px] border border-slate-300/25 bg-white/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.32),_0_10px_24px_rgba(15,23,42,0.06)] sm:gap-5 sm:rounded-[18px] sm:p-[1.35rem] dark:border-slate-700/30 dark:bg-slate-900/20";
 const reviewSectionHeaderClass =
   "flex flex-wrap items-start justify-between gap-4";
 const reviewSectionCopyClass =
-  "mt-[0.35rem] max-w-[42ch] text-sm leading-6 text-slate-500 dark:text-slate-400";
+  "mt-[0.35rem] max-w-[42ch] text-sm leading-5 sm:leading-6 text-slate-500 dark:text-slate-400";
 const reviewInlineNoteClass =
   "rounded-[14px] border border-slate-300/25 bg-white/20 p-[0.9rem_1rem] text-sm text-slate-500 dark:border-slate-600/40 dark:bg-slate-900/30 dark:text-slate-200";
 const reviewInlineNoteMatchedClass =
@@ -22,7 +22,7 @@ const reviewInlineNoteMatchedClass =
 const reviewFieldLabelClass = stackedFieldLabelClass;
 const fieldGridClass = "grid w-full grid-cols-1 gap-4 sm:grid-cols-2";
 const paymentFieldsClass =
-  "mt-4 grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 items-end";
+  "mt-4 grid w-full grid-cols-1 items-end gap-4 sm:grid-cols-2 xl:grid-cols-4";
 const checkboxLineClass = "inline-flex flex-row items-center gap-2.5";
 const paymentFieldLabelClass = compactFieldLabelClass;
 export { RowsSection } from "./InvoiceImportRowsSection";
@@ -304,7 +304,7 @@ export function PaymentSection({
   setDraft: (draft: InvoiceImportDraft) => void;
 }) {
   return (
-    <section className={`${reviewSectionClass} mt-8`}>
+    <section className={`${reviewSectionClass} mt-6 sm:mt-8`}>
       <div className={reviewSectionHeaderClass}>
         <div>{sectionTitle("Payment")}</div>
       </div>

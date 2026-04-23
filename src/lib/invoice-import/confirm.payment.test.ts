@@ -24,7 +24,6 @@ it("passes the reviewed payment account selection into payment creation", async 
       vendorName: "Office Supplies OU",
     }),
     findExistingInvoice: vi.fn().mockResolvedValue(null),
-    createArticle: vi.fn(),
     createPurchaseInvoice: vi.fn().mockResolvedValue({
       invoiceId: "invoice-1",
       attachedFile: true,
@@ -83,21 +82,15 @@ it("rejects confirmation when all invoice rows have been removed", async () => {
   expect(activities.loadContext).not.toHaveBeenCalled();
 });
 
-it("creates a new article before invoice creation when the row requires it", async () => {
+it("maps null optional row fields to undefined for existing articles", async () => {
   const draft = buildDraft();
   draft.invoice.amountExcludingVat = 0;
   draft.invoice.vatAmount = 0;
   draft.invoice.totalAmount = 0;
-  draft.rows[0].articleDecision = "create";
-  draft.rows[0].selectedArticleCode = null;
-  draft.rows[0].selectedArticleDescription = null;
   draft.rows[0].unit = null;
   draft.rows[0].price = null;
   draft.rows[0].sum = null;
   draft.rows[0].taxCode = null;
-  draft.rows[0].newArticle.code = "FURNITURE";
-  draft.rows[0].newArticle.description = "Furniture";
-  draft.rows[0].newArticle.taxCode = null;
 
   const activities = {
     loadContext: vi.fn().mockResolvedValue({
@@ -112,14 +105,10 @@ it("creates a new article before invoice creation when the row requires it", asy
       vendorId: "vendor-existing",
       vendorName: "Office Supplies OU",
     }),
-    createVendor: vi.fn().mockRejectedValue(new Error("Vendor already exists")),
+    createVendor: vi.fn(),
     findExistingInvoice: vi.fn().mockResolvedValue(null),
-    createArticle: vi.fn().mockResolvedValue({
-      code: "FURNITURE",
-      description: "Furniture",
-    }),
     createPurchaseInvoice: vi.fn().mockResolvedValue({
-      invoiceId: "invoice-2",
+      invoiceId: "invoice-3",
       attachedFile: true,
     }),
     createPayment: vi.fn(),
@@ -136,19 +125,12 @@ it("creates a new article before invoice creation when the row requires it", asy
     draft,
   });
 
-  expect(activities.createArticle).toHaveBeenCalledWith(
-    expect.anything(),
-    expect.objectContaining({
-      taxCode: undefined,
-    }),
-    expect.anything(),
-  );
   expect(activities.createPurchaseInvoice).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({
       rows: [
         expect.objectContaining({
-          code: "FURNITURE",
+          code: "vv",
           unit: undefined,
           price: undefined,
           sum: undefined,
@@ -158,5 +140,5 @@ it("creates a new article before invoice creation when the row requires it", asy
     }),
     expect.anything(),
   );
-  expect(result.invoiceId).toBe("invoice-2");
+  expect(result.invoiceId).toBe("invoice-3");
 });
