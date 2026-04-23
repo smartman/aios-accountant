@@ -104,6 +104,11 @@ it("updates invoice amount and notes fields", () => {
   });
   const { updates, setDraft } = captureDraftUpdates();
   const tree = <InvoiceSection draft={preview.draft} setDraft={setDraft} />;
+  const markup = renderToStaticMarkup(tree);
+
+  expect(markup).toContain('value="145,08"');
+  expect(markup).toContain('value="34,82"');
+  expect(markup).toContain('value="179,90"');
 
   hostProps(findControlByLabel(tree, "Net amount", "input")).onChange?.({
     target: { value: "200" },

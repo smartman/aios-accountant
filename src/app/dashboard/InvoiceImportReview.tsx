@@ -6,6 +6,7 @@ import {
   InvoiceImportDraft,
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
+import { buildDraftAmountMismatchWarnings } from "@/lib/invoice-import/draft-amount-mismatch";
 import { validateDraft } from "@/lib/invoice-import/draft-validation";
 import { buildDuplicateConfirmationMessage } from "./InvoiceImportDuplicatePrompt";
 import InvoiceImportReviewLayout from "./InvoiceImportReviewLayout";
@@ -209,6 +210,13 @@ export default function InvoiceImportReview({
   onConfirm,
 }: ReviewProps) {
   const errors = validateDraft(draft);
+  const warnings = [
+    ...draft.warnings,
+    ...buildDraftAmountMismatchWarnings({
+      draft,
+      taxCodes: preview.referenceData.taxCodes,
+    }),
+  ];
   const [isDuplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
   const duplicateMessage = buildDuplicateConfirmationMessage(draft);
 
@@ -230,7 +238,7 @@ export default function InvoiceImportReview({
     <>
       <div className="animate-fade-in rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(241,245,249,0.92))] p-3 shadow-[0_24px_60px_rgba(15,23,42,0.12)] sm:rounded-[30px] sm:p-8 dark:border-slate-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.94))]">
         <ReviewHeader draft={draft} />
-        <WarningPanel warnings={draft.warnings} />
+        <WarningPanel warnings={warnings} />
         <MissingArticleWarningPanel draft={draft} />
         <InvoiceImportReviewLayout
           file={file}

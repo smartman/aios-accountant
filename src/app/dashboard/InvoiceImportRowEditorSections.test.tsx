@@ -48,18 +48,27 @@ it("updates row units", () => {
   expect(updates.at(-1)?.rows[0].unit).toBeNull();
 });
 
-it("locks the row unit to the selected existing article unit", () => {
+it("keeps the row unit editable even when the selected article has a unit", () => {
   const preview = buildPreview();
-  const tree = renderTree(preview);
+  const updates: InvoiceImportDraft[] = [];
+  const tree = renderTree(preview, (draft) => updates.push(draft));
 
   const unitSelect = findControlByLabel(tree, "Unit", "select");
-  expect(hostProps(unitSelect).disabled).toBe(true);
+  expect(hostProps(unitSelect).disabled).not.toBe(true);
+
+  hostProps(unitSelect).onChange?.({
+    target: { value: "tk" },
+  });
+  expect(updates.at(-1)?.rows[0].unit).toBe("tk");
 });
 
 it("updates row numeric values", () => {
   const preview = buildPreview();
   const updates: InvoiceImportDraft[] = [];
   const tree = renderTree(preview, (draft) => updates.push(draft));
+  const markup = renderToStaticMarkup(tree);
+
+  expect(markup).toContain('value="145,08"');
 
   const quantityInput = findControlByLabel(tree, "Quantity", "input");
   hostProps(quantityInput).onChange?.({
@@ -102,6 +111,8 @@ it("updates accounting fields", () => {
   const markup = renderToStaticMarkup(tree);
 
   expect(markup).toContain("Purchase account");
+  expect(markup).toContain("Search purchase accounts");
+  expect(markup).toContain("Search VAT codes");
   expect(markup).toContain(
     'aria-label="Why this account? Matched machinery and equipment account."',
   );
@@ -150,6 +161,7 @@ it("falls back cleanly when optional row values are missing", () => {
 
   const vatSelect = findControlByLabel(tree, "VAT code", "select");
   expect(hostProps(vatSelect).children).toBeDefined();
+  expect(renderToStaticMarkup(tree)).toContain("Search VAT codes");
 });
 
 it("removes rows only when another row still exists", () => {

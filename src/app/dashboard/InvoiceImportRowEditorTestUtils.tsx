@@ -1,10 +1,21 @@
-import { isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  isValidElement,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import type {
   InvoiceImportDraft,
   InvoiceImportDraftRow,
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
+import {
+  FormattedAmountInput,
+  formatAmountInputValue,
+  parseAmountInputValue,
+} from "./FormattedAmountInput";
 import { InvoiceImportRowEditorBody } from "./InvoiceImportRowEditorSections";
+import { SearchableSelectField } from "./SearchableSelectField";
 
 type HostElement = ReactElement<Record<string, unknown>>;
 
@@ -84,9 +95,9 @@ function buildDraft(row: InvoiceImportDraftRow): InvoiceImportDraft {
       issueDate: "2026-04-20",
       dueDate: null,
       entryDate: "2026-04-20",
-      amountExcludingVat: 120,
-      vatAmount: 26.4,
-      totalAmount: 146.4,
+      amountExcludingVat: 145.08,
+      vatAmount: 34.82,
+      totalAmount: 179.9,
       notes: null,
     },
     payment: {
@@ -130,9 +141,9 @@ function buildExtraction(): InvoiceImportPreviewResult["extraction"] {
       issueDate: "2026-04-20",
       dueDate: null,
       entryDate: "2026-04-20",
-      amountExcludingVat: 120,
-      vatAmount: 26.4,
-      totalAmount: 146.4,
+      amountExcludingVat: 145.08,
+      vatAmount: 34.82,
+      totalAmount: 179.9,
       notes: null,
     },
     payment: {
@@ -187,8 +198,8 @@ export function buildPreview(
         { code: "4000", label: "4000 - Services" },
       ],
       taxCodes: [
-        { code: "VAT24", description: "24%" },
-        { code: "VAT0", description: "0%" },
+        { code: "VAT24", description: "24%", rate: 24 },
+        { code: "VAT0", description: "0%", rate: 0 },
       ],
       paymentAccounts: [],
     },
@@ -209,7 +220,82 @@ export function renderTree(
   );
 }
 
+function renderSearchableSelectField(
+  props: ComponentProps<typeof SearchableSelectField>,
+): ReactNode {
+  const selectedLabel =
+    props.value === ""
+      ? props.placeholder
+      : (props.options.find((option) => option.value === props.value)?.label ??
+        "");
+
+  return (
+    <div className="min-w-0">
+      <select
+        aria-hidden="true"
+        className="sr-only"
+        disabled={props.disabled}
+        tabIndex={-1}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+      >
+        <option value="">{props.placeholder}</option>
+        {props.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <div className="relative min-w-0">
+        <input
+          aria-label={props.searchAriaLabel}
+          disabled={props.disabled}
+          readOnly
+          value={selectedLabel}
+        />
+        <button
+          aria-label={`Open ${props.searchAriaLabel.toLowerCase()}`}
+          disabled={props.disabled}
+          type="button"
+        >
+          ▾
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function renderFormattedAmountInput(
+  props: ComponentProps<typeof FormattedAmountInput>,
+): ReactNode {
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={props.className}
+      disabled={props.disabled}
+      placeholder={props.placeholder}
+      value={formatAmountInputValue(props.value)}
+      onChange={(event) =>
+        props.onChange(parseAmountInputValue(event.target.value))
+      }
+    />
+  );
+}
+
 function renderFunctionElement(element: ReactElement): ReactNode {
+  if (element.type === SearchableSelectField) {
+    return renderSearchableSelectField(
+      element.props as ComponentProps<typeof SearchableSelectField>,
+    );
+  }
+
+  if (element.type === FormattedAmountInput) {
+    return renderFormattedAmountInput(
+      element.props as ComponentProps<typeof FormattedAmountInput>,
+    );
+  }
+
   return (element.type as (props: Record<string, unknown>) => ReactNode)(
     element.props as Record<string, unknown>,
   );

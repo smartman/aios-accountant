@@ -134,6 +134,20 @@ it("shows the missing-article warning and cache-clear action for unresolved rows
   expect(markup).toContain("Clear article cache");
 });
 
+it("shows a derived warning when invoice header amounts do not match the rows", async () => {
+  const { render } = await loadReviewHarness();
+  const preview = buildValidPreview();
+  preview.draft.invoice.amountExcludingVat = 120;
+  preview.draft.invoice.vatAmount = 26.4;
+  preview.draft.invoice.totalAmount = 146.4;
+
+  const markup = renderToStaticMarkup(render({ preview }));
+
+  expect(markup).toContain(
+    "Invoice header amounts do not match the invoice rows: Net amount 120,00 vs rows 145,08; VAT amount 26,40 vs rows 34,82; Total amount 146,40 vs rows 179,90.",
+  );
+});
+
 it("opens a duplicate confirmation dialog before proceeding", async () => {
   const { render, states } = await loadReviewHarness();
   const preview = buildValidPreview();
