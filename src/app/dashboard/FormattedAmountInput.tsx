@@ -29,8 +29,14 @@ export function parseAmountInputValue(value: string): number | null {
   return Number.isFinite(parsedValue) ? parsedValue : null;
 }
 
-function roundAmount(value: number): number {
-  return Number(value.toFixed(2));
+function formatEditableAmountInputValue(
+  value: number | null | undefined,
+): string {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "";
+  }
+
+  return value.toString().replace(".", ",");
 }
 
 interface FormattedAmountInputProps {
@@ -81,9 +87,7 @@ export function FormattedAmountInput({
       return;
     }
 
-    const roundedValue = roundAmount(parsedValue);
-    setDraftValue(formatAmountInputValue(roundedValue));
-    onChange(roundedValue);
+    setDraftValue(formatAmountInputValue(parsedValue));
   }
 
   return (
@@ -97,7 +101,7 @@ export function FormattedAmountInput({
       onBlur={handleBlur}
       onChange={(event) => handleChange(event.target.value)}
       onFocus={() => {
-        setDraftValue(formatAmountInputValue(value));
+        setDraftValue(formatEditableAmountInputValue(value));
         setIsEditing(true);
       }}
     />

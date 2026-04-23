@@ -45,6 +45,13 @@ import {
   listItems,
 } from "./data";
 import {
+  deriveInvoiceRoundingAmount,
+  derivePreciseUnitPrice,
+  isFiniteAmount,
+  resolveAuthoritativeRowNetAmount,
+  roundCurrencyAmount,
+} from "../../invoice-import/amounts";
+import {
   meritUnitAliases,
   normalizeMeritUnitLabel,
   selectMeritUnitName,
@@ -145,25 +152,27 @@ function buildTaxAmounts(
 function buildMeritRowNetTotal(
   rows: CreatePurchaseInvoiceParams["rows"],
 ): number | undefined {
-  const total = rows.reduce((sum, row) => {
-    const rowTotal =
-      row.sum ??
-      (row.price !== undefined && row.quantity !== undefined
-        ? row.price * row.quantity
-        : undefined);
+  const total = rows.reduce(
+    (sum, row) => sum + (resolveAuthoritativeRowNetAmount(row) ?? 0),
+    0,
+  );
 
-    return typeof rowTotal === "number" && Number.isFinite(rowTotal)
-      ? sum + rowTotal
-      : sum;
-  }, 0);
-
-  return total > 0 ? Number(total.toFixed(2)) : undefined;
+  return total > 0 ? roundCurrencyAmount(total) : undefined;
 }
 
 function buildPurchaseInvoiceBody(
   params: CreatePurchaseInvoiceParams,
   units: MeritUnit[],
 ): Record<string, unknown> {
+  const roundingAmount = deriveInvoiceRoundingAmount(params.extraction.invoice);
+  const fallbackTotalAmount = isFiniteAmount(
+    params.extraction.invoice.amountExcludingVat,
+  )
+    ? roundCurrencyAmount(params.extraction.invoice.amountExcludingVat)
+    : isFiniteAmount(params.extraction.invoice.totalAmount)
+      ? roundCurrencyAmount(params.extraction.invoice.totalAmount)
+      : undefined;
+
   return {
     Vendor: buildVendorObject(params.vendorId),
     ExpenseClaim: false,
@@ -186,16 +195,13 @@ function buildPurchaseInvoiceBody(
         UOMName: selectMeritUnitName(units, row.unit),
       },
       Quantity: row.quantity ?? 1,
-      Price: row.price ?? row.sum ?? undefined,
+      Price: derivePreciseUnitPrice(row),
       TaxId: row.taxCode ?? undefined,
       GLAccountCode: row.accountCode,
       Description: row.description,
     })),
-    TotalAmount:
-      buildMeritRowNetTotal(params.rows) ??
-      params.extraction.invoice.amountExcludingVat ??
-      params.extraction.invoice.totalAmount ??
-      undefined,
+    RoundingAmount: roundingAmount,
+    TotalAmount: buildMeritRowNetTotal(params.rows) ?? fallbackTotalAmount,
   };
 }
 
@@ -338,7 +344,12 @@ export const meritProviderAdapter: AccountingProviderActivities<MeritCredentials
       const response = await meritRequest<Record<string, unknown>>(
         "sendPaymentV",
         credentials,
-        buildPaymentBody(params, paymentAccount, paymentAmount, meritDateTime),
+        buildPaymentBody(
+          params,
+          paymentAccount,
+          roundCurrencyAmount(paymentAmount),
+          meritDateTime,
+        ),
       );
 
       return {

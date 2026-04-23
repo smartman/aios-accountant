@@ -115,14 +115,15 @@ it("returns an existing invoice result when a duplicate is found", async () => {
   });
 });
 
-it("rounds invoice, payment, and row amounts before confirmation", async () => {
+it("preserves exact extraction amounts before provider payload creation", async () => {
   const draft = buildDraft();
   draft.invoice.amountExcludingVat = 120.444;
   draft.invoice.vatAmount = 26.445;
   draft.invoice.totalAmount = 146.889;
   draft.payment.paymentAmount = 146.889;
-  draft.rows[0].price = 120.444;
-  draft.rows[0].sum = 120.444;
+  draft.rows[0].quantity = 3;
+  draft.rows[0].price = 0.3333;
+  draft.rows[0].sum = null;
 
   const activities = {
     loadContext: vi.fn().mockResolvedValue({
@@ -165,12 +166,12 @@ it("rounds invoice, payment, and row amounts before confirmation", async () => {
     expect.objectContaining({
       extraction: expect.objectContaining({
         invoice: expect.objectContaining({
-          amountExcludingVat: 120.44,
-          vatAmount: 26.45,
-          totalAmount: 146.89,
+          amountExcludingVat: 120.444,
+          vatAmount: 26.445,
+          totalAmount: 146.889,
         }),
         payment: expect.objectContaining({
-          paymentAmount: 146.89,
+          paymentAmount: 146.889,
         }),
       }),
     }),
@@ -181,8 +182,9 @@ it("rounds invoice, payment, and row amounts before confirmation", async () => {
     expect.objectContaining({
       rows: [
         expect.objectContaining({
-          price: 120.44,
-          sum: 120.44,
+          quantity: 3,
+          price: 0.3333,
+          sum: undefined,
         }),
       ],
     }),

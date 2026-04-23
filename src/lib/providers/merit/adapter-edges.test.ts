@@ -313,6 +313,7 @@ describe("merit adapter invoice creation", () => {
       "sendpurchinvoice",
       buildCredentials(),
       expect.objectContaining({
+        RoundingAmount: 0,
         InvoiceRow: [
           expect.objectContaining({
             Item: expect.objectContaining({ UOMName: "tk" }),
@@ -420,6 +421,10 @@ describe("merit adapter payment and attachment flows", () => {
             ...buildPaymentParams().extraction.invoice,
             currency: "USD",
           },
+          payment: {
+            ...buildPaymentParams().extraction.payment,
+            paymentAmount: 122.456,
+          },
         },
       },
       buildContext(),
@@ -429,7 +434,7 @@ describe("merit adapter payment and attachment flows", () => {
     expect(mocks.meritRequest).toHaveBeenCalledWith(
       "sendPaymentV",
       buildCredentials(),
-      expect.objectContaining({ CurrencyCode: "USD" }),
+      expect.objectContaining({ Amount: 122.46, CurrencyCode: "USD" }),
     );
 
     mocks.meritRequest.mockResolvedValueOnce({ Id: "payment-id" });

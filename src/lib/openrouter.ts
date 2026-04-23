@@ -58,6 +58,7 @@ const INVOICE_PROPERTIES = {
   amountExcludingVat: { type: ["number", "null"] },
   vatAmount: { type: ["number", "null"] },
   totalAmount: { type: ["number", "null"] },
+  roundingAmount: { type: ["number", "null"] },
   notes: { type: ["string", "null"] },
 } as const;
 
@@ -183,11 +184,13 @@ function buildUserPrompt(
     "Use inventory or goods-for-resale accounts only when the document clearly indicates the purchase is for resale or stock.",
     "Use one of the provided tax codes when you can determine it from the document. If unclear, return null.",
     "Set payment.isPaid = true only when the document clearly shows it is already paid or is a receipt-like fully paid document.",
-    "payment.paymentChannelHint should be BANK for transfers/cards and CASH for cash receipts when reasonably clear; otherwise null.",
-    "Focus payment guessing on the customer's own payment channel only, not on supplier bank-account ambiguity.",
+    "Infer payment.paymentChannelHint only from the customer's payment method shown on the document: BANK for transfers/cards, CASH for cash receipts, otherwise null.",
     "If the invoice has multiple meaningful rows, return them. If not, return one summarized row.",
+    "When a row shows quantity, a rounded unit price, and a separate row total, copy the exact row total into sum and do not recompute it from price times quantity.",
+    "If the invoice total includes an explicit rounding amount, return it in invoice.roundingAmount, keep amountExcludingVat and vatAmount as stated, and set totalAmount to the final payable amount after rounding.",
     "If a supplier-specific product or article code is shown on a row, return it as sourceArticleCode. This is source evidence only, not the accounting item code.",
-    "Round all monetary amounts to 2 decimals.",
+    "Return monetary amounts exactly as shown in the document. Do not round or normalize them.",
+    "Do not put rounding information into invoice.notes when it belongs in invoice.roundingAmount.",
     "If something is unclear, keep fields null and add a warning.",
     `Available purchase accounts: ${JSON.stringify(simplifiedAccounts)}`,
     `Available tax codes: ${JSON.stringify(simplifiedTaxCodes)}`,
@@ -287,6 +290,7 @@ function normalizeInvoice(
     amountExcludingVat: data.invoice.amountExcludingVat ?? null,
     vatAmount: data.invoice.vatAmount ?? null,
     totalAmount: data.invoice.totalAmount ?? null,
+    roundingAmount: data.invoice.roundingAmount ?? null,
     notes: data.invoice.notes ?? null,
   };
 }

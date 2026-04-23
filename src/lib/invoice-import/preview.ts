@@ -12,6 +12,7 @@ import {
   buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
 } from "./preview-helpers";
+import { deriveInvoiceRoundingAmount } from "./amounts";
 import { normalizeInvoiceImportDraft } from "./normalization";
 import {
   logInvoiceImportEvent,
@@ -128,6 +129,7 @@ function buildPreviewDraft(params: {
       amountExcludingVat: params.extraction.invoice.amountExcludingVat,
       vatAmount: params.extraction.invoice.vatAmount,
       totalAmount: params.extraction.invoice.totalAmount,
+      roundingAmount: deriveInvoiceRoundingAmount(params.extraction.invoice),
       notes: params.extraction.invoice.notes,
     },
     payment: {

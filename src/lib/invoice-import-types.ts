@@ -104,6 +104,7 @@ export interface InvoiceExtraction {
     amountExcludingVat: number | null;
     vatAmount: number | null;
     totalAmount: number | null;
+    roundingAmount?: number | null;
     notes: string | null;
   };
   payment: {
@@ -202,6 +203,7 @@ export interface InvoiceImportDraft {
     amountExcludingVat: number | null;
     vatAmount: number | null;
     totalAmount: number | null;
+    roundingAmount?: number | null;
     notes: string | null;
   };
   payment: {

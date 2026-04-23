@@ -179,7 +179,6 @@ describe("smartaccounts adapter pure payload builders", () => {
       expect.objectContaining({
         unit: undefined,
         price: undefined,
-        sum: undefined,
         vatPc: undefined,
       }),
     ]);
@@ -195,6 +194,72 @@ describe("smartaccounts adapter pure payload builders", () => {
           },
         },
       }),
-    ).toEqual(expect.objectContaining({ currency: "EUR", date: "14.04.2026" }));
+    ).toEqual(
+      expect.objectContaining({
+        currency: "EUR",
+        date: "14.04.2026",
+        roundAmount: 0,
+      }),
+    );
+  });
+});
+
+describe("smartaccounts adapter pure invoice rounding", () => {
+  it("derives row prices from authoritative net sums and always sends rounding", () => {
+    const payload = __test__.buildInvoicePayload({
+      ...buildInvoiceParams(),
+      extraction: {
+        ...buildInvoiceParams().extraction,
+        invoice: {
+          ...buildInvoiceParams().extraction.invoice,
+          amountExcludingVat: 62.92,
+          vatAmount: 13.84,
+          totalAmount: 76.77,
+        },
+      },
+      rows: [
+        {
+          ...buildInvoiceParams().rows[0],
+          quantity: 37,
+          price: 0.16,
+          sum: 6.06,
+        },
+      ],
+    });
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        roundAmount: 0.01,
+      }),
+    );
+    expect(payload.rows).toEqual([
+      expect.objectContaining({
+        quantity: 37,
+        price: 0.1637838,
+      }),
+    ]);
+  });
+
+  it("rounds invoice header amounts only when building the SmartAccounts payload", () => {
+    const payload = __test__.buildInvoicePayload({
+      ...buildInvoiceParams(),
+      extraction: {
+        ...buildInvoiceParams().extraction,
+        invoice: {
+          ...buildInvoiceParams().extraction.invoice,
+          amountExcludingVat: 181.294,
+          vatAmount: 39.884,
+          totalAmount: 221.178,
+        },
+      },
+    });
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        amount: 181.29,
+        vatAmount: 39.88,
+        totalAmount: 221.18,
+      }),
+    );
   });
 });

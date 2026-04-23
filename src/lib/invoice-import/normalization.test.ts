@@ -144,7 +144,6 @@ it("suppresses non-actionable vendor warnings and keeps actionable ones", () => 
   extraction.warnings = [
     "  ",
     "Buyer block at top left is labeled 'Maksja', vendor was taken from the separately grouped supplier block.",
-    "Vendor bankAccount selected as Swedbank IBAN shown on the invoice; multiple supplier bank accounts are listed.",
     "Vendor extraction is unclear because the supplier block is cut off.",
     "Vendor extraction relied on the supplier block.",
     "Vendor extraction relied on the supplier block.",
@@ -185,6 +184,43 @@ it("normalizes extraction amounts and coerces missing numeric values to null", (
   });
 });
 
+it("preserves exact extraction amounts while normalizing nulls", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 181.294;
+  extraction.invoice.vatAmount = 39.884;
+  extraction.invoice.totalAmount = 221.178;
+  extraction.payment.paymentAmount = 221.178;
+  extraction.rows[0].price = 0.3333;
+  extraction.rows[0].sum = 1.239;
+
+  expect(normalizeInvoiceExtraction(extraction)).toMatchObject({
+    invoice: {
+      amountExcludingVat: 181.294,
+      vatAmount: 39.884,
+      totalAmount: 221.178,
+    },
+    payment: {
+      paymentAmount: 221.178,
+    },
+    rows: [
+      {
+        price: 0.3333,
+        sum: 1.239,
+      },
+    ],
+  });
+});
+
+it("moves standalone rounding notes into the rounding amount field", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.notes = "Ümardus: 0,01";
+
+  expect(normalizeInvoiceExtraction(extraction).invoice).toMatchObject({
+    roundingAmount: 0.01,
+    notes: null,
+  });
+});
+
 it("normalizes draft amounts and coerces missing numeric values to null", () => {
   const draft = buildDraft();
   draft.invoice.amountExcludingVat = undefined as unknown as number | null;
@@ -204,5 +240,42 @@ it("normalizes draft amounts and coerces missing numeric values to null", () => 
       paymentAmount: null,
     },
     rows: [{ price: null, sum: null }],
+  });
+});
+
+it("preserves exact draft amounts while normalizing nulls", () => {
+  const draft = buildDraft();
+  draft.invoice.amountExcludingVat = 181.294;
+  draft.invoice.vatAmount = 39.884;
+  draft.invoice.totalAmount = 221.178;
+  draft.payment.paymentAmount = 221.178;
+  draft.rows[0].price = 0.3333;
+  draft.rows[0].sum = 1.239;
+
+  expect(normalizeInvoiceImportDraft(draft)).toMatchObject({
+    invoice: {
+      amountExcludingVat: 181.294,
+      vatAmount: 39.884,
+      totalAmount: 221.178,
+    },
+    payment: {
+      paymentAmount: 221.178,
+    },
+    rows: [
+      {
+        price: 0.3333,
+        sum: 1.239,
+      },
+    ],
+  });
+});
+
+it("moves draft rounding notes into the separate rounding amount field", () => {
+  const draft = buildDraft();
+  draft.invoice.notes = "Rounding amount: 0.01";
+
+  expect(normalizeInvoiceImportDraft(draft).invoice).toMatchObject({
+    roundingAmount: 0.01,
+    notes: null,
   });
 });

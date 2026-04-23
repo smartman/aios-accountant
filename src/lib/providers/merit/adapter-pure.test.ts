@@ -206,6 +206,7 @@ describe("merit adapter pure invoice unit matching", () => {
     );
 
     expect(invoiceBody.DueDate).toBe("20260414");
+    expect(invoiceBody.RoundingAmount).toBe(0);
     expect(invoiceBody.TotalAmount).toBe(100);
     expect(invoiceBody.InvoiceRow).toEqual([
       expect.objectContaining({
@@ -230,6 +231,42 @@ describe("merit adapter pure invoice unit matching", () => {
       __test__.selectMeritUnitName([{ code: "km", name: "km" }], "km"),
     ).toBe("km");
     expect(__test__.selectMeritUnitName([], "pcs")).toBeNull();
+  });
+
+  it("derives precise unit prices and carries invoice rounding", () => {
+    const invoiceBody = __test__.buildPurchaseInvoiceBody(
+      {
+        ...buildInvoiceParams(),
+        extraction: {
+          ...buildInvoiceParams().extraction,
+          invoice: {
+            ...buildInvoiceParams().extraction.invoice,
+            amountExcludingVat: 62.92,
+            vatAmount: 13.84,
+            totalAmount: 76.77,
+          },
+        },
+        rows: [
+          {
+            ...buildInvoiceParams().rows[0],
+            quantity: 37,
+            price: 0.16,
+            sum: 6.06,
+            taxCode: "tax-22",
+          },
+        ],
+      },
+      [{ code: "tk", name: "tk" }],
+    );
+
+    expect(invoiceBody.RoundingAmount).toBe(0.01);
+    expect(invoiceBody.TotalAmount).toBe(6.06);
+    expect(invoiceBody.InvoiceRow).toEqual([
+      expect.objectContaining({
+        Quantity: 37,
+        Price: 0.1637838,
+      }),
+    ]);
   });
 });
 
@@ -287,6 +324,23 @@ describe("merit adapter pure invoice total fallbacks", () => {
               ...buildInvoiceParams().extraction.invoice,
               amountExcludingVat: 181.29,
               totalAmount: 224.8,
+            },
+          },
+        },
+        [],
+      ).TotalAmount,
+    ).toBe(181.29);
+    expect(
+      __test__.buildPurchaseInvoiceBody(
+        {
+          ...buildInvoiceParams(),
+          rows: [],
+          extraction: {
+            ...buildInvoiceParams().extraction,
+            invoice: {
+              ...buildInvoiceParams().extraction.invoice,
+              amountExcludingVat: 181.294,
+              totalAmount: 224.804,
             },
           },
         },

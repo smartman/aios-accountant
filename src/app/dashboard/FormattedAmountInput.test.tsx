@@ -49,7 +49,7 @@ it("parses dot and comma decimal inputs", () => {
   expect(parseAmountInputValue("")).toBeNull();
 });
 
-it("rounds edited values to two decimals on blur", () => {
+it("preserves exact edited values in state and only rounds the rendered text on blur", () => {
   const onChange = vi.fn();
 
   render(<ControlledFormattedAmountInput onChange={onChange} />);
@@ -67,7 +67,19 @@ it("rounds edited values to two decimals on blur", () => {
   fireEvent.blur(input);
 
   expect(input.value).toBe("145,09");
-  expect(onChange).toHaveBeenLastCalledWith(145.09);
+  expect(onChange).toHaveBeenLastCalledWith(145.087);
+});
+
+it("shows the exact stored value while editing", () => {
+  render(<ControlledFormattedAmountInput initialValue={181.294} />);
+
+  const input = screen.getByPlaceholderText("Amount") as HTMLInputElement;
+
+  expect(input.value).toBe("181,29");
+
+  fireEvent.focus(input);
+
+  expect(input.value).toBe("181,294");
 });
 
 it("clears the value when the field is emptied", () => {

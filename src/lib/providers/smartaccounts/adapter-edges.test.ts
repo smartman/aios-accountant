@@ -315,6 +315,7 @@ describe("smartaccounts adapter invoice creation", () => {
     expect(mocks.createVendorInvoice).toHaveBeenLastCalledWith(
       buildCredentials(),
       expect.objectContaining({
+        roundAmount: 0,
         rows: [
           expect.objectContaining({
             code: "CREATE01",
