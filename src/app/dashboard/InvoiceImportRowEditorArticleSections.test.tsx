@@ -14,7 +14,8 @@ it("renders the minimal existing-article flow and allows article override", () =
   const tree = renderTree(preview, (draft) => updates.push(draft));
   const markup = renderToStaticMarkup(tree);
 
-  expect(markup).toContain("Article match");
+  expect(markup).toContain("Article");
+  expect(markup).not.toContain("Article match");
   expect(markup).not.toContain(">clear<");
   expect(markup).not.toContain("Source article code");
   expect(markup).not.toContain("Row details");
@@ -26,6 +27,7 @@ it("renders the minimal existing-article flow and allows article override", () =
   expect(markup).not.toContain(
     "Article not detected, choose manually or create new article and refresh the article cache.",
   );
+  expect(markup).toContain("Search accounting articles");
 
   const articleSelect = findControlByLabel(
     tree,
@@ -80,18 +82,17 @@ it("handles ambiguous and missing article states cleanly", () => {
     "Article not detected, choose manually or create new article and refresh the article cache.",
   );
   expect(markup).toContain("No description");
-  expect(markup).toContain("Available articles");
-
+  expect(markup).toContain("Search accounting articles");
   const articleSelect = findControlByLabel(
     tree,
     "Accounting article/item",
     "select",
   );
   hostProps(articleSelect).onChange?.({
-    target: { value: "" },
+    target: { value: "BLANK-DESC" },
   });
   expect(updates.at(-1)?.rows[0]).toMatchObject({
-    selectedArticleCode: null,
+    selectedArticleCode: "BLANK-DESC",
     selectedArticleDescription: null,
   });
 });
@@ -159,6 +160,30 @@ it("uses preview article metadata when the manual selection is outside suggestio
   expect(updates.at(-1)?.rows[0]).toMatchObject({
     selectedArticleCode: "MONITOR-ALT",
     selectedArticleDescription: "Monitor alt",
+  });
+});
+
+it("does not overwrite an existing custom unit when selecting an article", () => {
+  const preview = buildPreview({
+    unit: "tk",
+    selectedArticleCode: null,
+    selectedArticleDescription: null,
+  });
+  const updates: InvoiceImportDraft[] = [];
+  const tree = renderTree(preview, (draft) => updates.push(draft));
+
+  const articleSelect = findControlByLabel(
+    tree,
+    "Accounting article/item",
+    "select",
+  );
+  hostProps(articleSelect).onChange?.({
+    target: { value: "MONITOR-ALT" },
+  });
+
+  expect(updates.at(-1)?.rows[0]).toMatchObject({
+    selectedArticleCode: "MONITOR-ALT",
+    unit: "tk",
   });
 });
 

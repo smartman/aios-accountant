@@ -8,6 +8,7 @@ import {
   fieldClass,
   sectionTitle,
 } from "./InvoiceImportReviewShared";
+import { FormattedAmountInput } from "./FormattedAmountInput";
 
 const reviewSectionClass =
   "flex flex-col gap-4 rounded-[16px] border border-slate-300/25 bg-white/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.32),_0_10px_24px_rgba(15,23,42,0.06)] sm:gap-5 sm:rounded-[18px] sm:p-[1.35rem] dark:border-slate-700/30 dark:bg-slate-900/20";
@@ -196,18 +197,14 @@ function InvoiceAmountFields({
     <>
       <label className="flex min-w-0 flex-col gap-2 text-sm">
         <span className={reviewFieldLabelClass}>Net amount</span>
-        <input
-          type="number"
-          className={fieldClass()}
-          value={draft.invoice.amountExcludingVat ?? ""}
-          onChange={(event) =>
+        <FormattedAmountInput
+          value={draft.invoice.amountExcludingVat}
+          onChange={(value) =>
             setDraft({
               ...draft,
               invoice: {
                 ...draft.invoice,
-                amountExcludingVat: event.target.value
-                  ? Number(event.target.value)
-                  : null,
+                amountExcludingVat: value,
               },
             })
           }
@@ -215,18 +212,14 @@ function InvoiceAmountFields({
       </label>
       <label className="flex min-w-0 flex-col gap-2 text-sm">
         <span className={reviewFieldLabelClass}>VAT amount</span>
-        <input
-          type="number"
-          className={fieldClass()}
-          value={draft.invoice.vatAmount ?? ""}
-          onChange={(event) =>
+        <FormattedAmountInput
+          value={draft.invoice.vatAmount}
+          onChange={(value) =>
             setDraft({
               ...draft,
               invoice: {
                 ...draft.invoice,
-                vatAmount: event.target.value
-                  ? Number(event.target.value)
-                  : null,
+                vatAmount: value,
               },
             })
           }
@@ -234,18 +227,14 @@ function InvoiceAmountFields({
       </label>
       <label className="flex min-w-0 flex-col gap-2 text-sm">
         <span className={reviewFieldLabelClass}>Total amount</span>
-        <input
-          type="number"
-          className={fieldClass()}
-          value={draft.invoice.totalAmount ?? ""}
-          onChange={(event) =>
+        <FormattedAmountInput
+          value={draft.invoice.totalAmount}
+          onChange={(value) =>
             setDraft({
               ...draft,
               invoice: {
                 ...draft.invoice,
-                totalAmount: event.target.value
-                  ? Number(event.target.value)
-                  : null,
+                totalAmount: value,
               },
             })
           }
@@ -280,12 +269,7 @@ export function InvoiceSection({
   return (
     <section className={reviewSectionClass}>
       <div className={reviewSectionHeaderClass}>
-        <div>
-          {sectionTitle("Invoice")}
-          <p className={reviewSectionCopyClass}>
-            Review the document details and totals that will be imported.
-          </p>
-        </div>
+        <div>{sectionTitle("Invoice")}</div>
       </div>
       <div className={fieldGridClass}>
         <InvoiceIdentityFields draft={draft} setDraft={setDraft} />
@@ -378,18 +362,14 @@ function PaymentFields({
       </label>
       <label className="flex min-w-0 flex-col gap-2 text-sm">
         <span className={paymentFieldLabelClass}>Payment amount</span>
-        <input
-          type="number"
-          className={fieldClass()}
-          value={draft.payment.paymentAmount ?? ""}
-          onChange={(event) =>
+        <FormattedAmountInput
+          value={draft.payment.paymentAmount}
+          onChange={(value) =>
             setDraft({
               ...draft,
               payment: {
                 ...draft.payment,
-                paymentAmount: event.target.value
-                  ? Number(event.target.value)
-                  : null,
+                paymentAmount: value,
               },
             })
           }

@@ -122,7 +122,7 @@ it("falls back to the first payment account and derives tax/article labels", asy
   expect(preview.draft.payment.paymentAccountName).toBe("Fallback bank");
   expect(preview.referenceData.taxCodes).toEqual([
     { code: "VAT0", description: "VAT0" },
-    { code: "VAT22", description: "VAT22 - 22%" },
+    { code: "VAT22", description: "VAT22 - 22%", rate: 22 },
   ]);
   expect(preview.draft.rows[0]).toMatchObject({
     selectedArticleCode: null,

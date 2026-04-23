@@ -244,7 +244,11 @@ export interface InvoiceImportPreviewResult {
   }>;
   referenceData: {
     accounts: Array<{ code: string; label: string }>;
-    taxCodes: Array<{ code: string; description: string }>;
+    taxCodes: Array<{
+      code: string;
+      description: string;
+      rate?: number | null;
+    }>;
     paymentAccounts: Array<{ name: string; type: "BANK" | "CASH" }>;
   };
 }
