@@ -1,5 +1,6 @@
 "use client";
 
+import { clearAccountingConnectionCacheFromForm } from "./actions";
 import {
   InvoiceImportDraft,
   InvoiceImportPreviewResult,
@@ -65,6 +66,36 @@ function WarningPanel({ warnings }: { warnings: string[] }) {
   );
 }
 
+function MissingArticleWarningPanel({ draft }: { draft: InvoiceImportDraft }) {
+  const hasUnresolvedMissingArticle = draft.rows.some(
+    (row) => row.suggestionStatus === "missing" && !row.selectedArticleCode,
+  );
+
+  if (!hasUnresolvedMissingArticle) {
+    return null;
+  }
+
+  return (
+    <form
+      action={clearAccountingConnectionCacheFromForm}
+      className="mb-6 rounded-xl border border-amber-400 bg-amber-100/60 px-5 py-4 dark:border-amber-800 dark:bg-amber-950/40"
+    >
+      <p className="m-0 text-sm font-medium text-amber-900 dark:text-amber-100">
+        Article not detected, choose manually or create new article and refresh
+        the article cache.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center rounded-lg border border-amber-500 bg-white px-4 py-2 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/40"
+        >
+          Clear article cache
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function ErrorPanel({ errors }: { errors: string[] }) {
   if (!errors.length) {
     return null;
@@ -127,6 +158,7 @@ export default function InvoiceImportReview({
     <div className="animate-fade-in rounded-xl border border-slate-200 bg-slate-100 p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900">
       <ReviewHeader draft={draft} />
       <WarningPanel warnings={draft.warnings} />
+      <MissingArticleWarningPanel draft={draft} />
 
       <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2 items-start">
         <VendorSection draft={draft} setDraft={setDraft} />

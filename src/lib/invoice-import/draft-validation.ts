@@ -75,17 +75,6 @@ function validateExistingArticleRow(
   }
 }
 
-function validateNewArticleRow(
-  row: InvoiceImportDraftRow,
-  errors: string[],
-): void {
-  if (!row.newArticle.code.trim() || !row.newArticle.description.trim()) {
-    errors.push(
-      `${formatInvoiceImportRowLabel(row.id)} must define the new accounting article.`,
-    );
-  }
-}
-
 function shouldCreateArticle(row: InvoiceImportDraftRow): boolean {
   return row.articleDecision === "create";
 }
@@ -110,10 +99,13 @@ function validateRow(row: InvoiceImportDraftRow, errors: string[]): void {
   }
 
   if (shouldCreateArticle(row)) {
-    validateNewArticleRow(row, errors);
-  } else {
-    validateExistingArticleRow(row, errors);
+    errors.push(
+      `${formatInvoiceImportRowLabel(row.id)} must select an accounting article. In-app article creation is no longer supported.`,
+    );
+    return;
   }
+
+  validateExistingArticleRow(row, errors);
 }
 
 function validatePayment(draft: InvoiceImportDraft, errors: string[]): void {

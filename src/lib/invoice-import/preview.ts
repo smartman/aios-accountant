@@ -5,10 +5,6 @@ import {
   InvoiceImportDraftRow,
   InvoiceImportPreviewResult,
 } from "../invoice-import-types";
-import {
-  fallbackRowFromInvoice,
-  resolvePurchaseRows,
-} from "../provider-import-helpers";
 import { StoredAccountingConnection } from "../user-accounting-connections";
 import {
   buildPreviewDuplicateInvoice,
@@ -16,176 +12,13 @@ import {
   buildPreviewArticleTypeOptions,
   buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
-  createRowId,
-  defaultNewArticleCode,
 } from "./preview-helpers";
-import {
-  buildArticleCandidates,
-  getArticleSuggestionStatus,
-} from "./article-matching";
 import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
 } from "./observability";
+import { resolvePreviewRows } from "./preview-row-resolution";
 import { assertReferenceAccounts, extractInvoiceData } from "./workflow-utils";
-
-function buildFallbackExtraction(): InvoiceExtraction {
-  return {
-    vendor: {
-      name: null,
-      regCode: null,
-      vatNumber: null,
-      bankAccount: null,
-      email: null,
-      phone: null,
-      countryCode: null,
-      city: null,
-      postalCode: null,
-      addressLine1: null,
-      addressLine2: null,
-    },
-    invoice: {
-      documentType: null,
-      invoiceNumber: null,
-      referenceNumber: null,
-      currency: null,
-      issueDate: null,
-      dueDate: null,
-      entryDate: null,
-      amountExcludingVat: null,
-      vatAmount: null,
-      totalAmount: null,
-      notes: null,
-    },
-    payment: {
-      isPaid: false,
-      paymentDate: null,
-      paymentAmount: null,
-      paymentChannelHint: null,
-      reason: null,
-    },
-    rows: [],
-    warnings: [],
-  };
-}
-
-function buildDraftRow(params: {
-  resolvedRow: ReturnType<typeof resolvePurchaseRows>[number];
-  sourceRow: InvoiceExtraction["rows"][number];
-  catalog: Awaited<
-    ReturnType<AccountingProviderActivities<unknown>["listArticles"]>
-  >;
-  history: Awaited<
-    ReturnType<AccountingProviderActivities<unknown>["getVendorArticleHistory"]>
-  >;
-  index: number;
-}): InvoiceImportDraftRow {
-  const sourceArticleCode = params.sourceRow.sourceArticleCode ?? null;
-  const baseRow = buildBaseDraftRow({
-    index: params.index,
-    sourceArticleCode,
-    sourceRow: params.sourceRow,
-    resolvedRow: params.resolvedRow,
-  });
-  const candidates = buildArticleCandidates({
-    row: baseRow,
-    catalog: params.catalog,
-    history: params.history,
-  });
-  const suggestionStatus = getArticleSuggestionStatus(candidates);
-  const defaultCandidate =
-    suggestionStatus === "clear" ? (candidates[0] ?? null) : null;
-
-  return {
-    ...baseRow,
-    articleDecision: "existing",
-    unit: defaultCandidate?.unit ?? baseRow.unit,
-    selectedArticleCode: defaultCandidate?.code ?? null,
-    selectedArticleDescription: defaultCandidate?.description ?? null,
-    articleCandidates: candidates,
-    suggestionStatus,
-    newArticle: buildSuggestedNewArticle({
-      sourceArticleCode,
-      resolvedRow: params.resolvedRow,
-    }),
-  };
-}
-
-function buildBaseDraftRow(params: {
-  index: number;
-  sourceArticleCode: string | null;
-  sourceRow: InvoiceExtraction["rows"][number];
-  resolvedRow: ReturnType<typeof resolvePurchaseRows>[number];
-}): InvoiceImportDraftRow {
-  return {
-    id: createRowId(params.index),
-    sourceArticleCode: params.sourceArticleCode,
-    description: params.resolvedRow.description,
-    quantity: params.resolvedRow.quantity ?? 1,
-    unit: params.resolvedRow.unit ?? null,
-    price: params.resolvedRow.price ?? null,
-    sum: params.resolvedRow.sum ?? null,
-    vatRate: params.sourceRow.vatRate ?? null,
-    taxCode: params.resolvedRow.taxCode ?? null,
-    accountCode: params.resolvedRow.accountCode,
-    accountSelectionReason: params.resolvedRow.accountSelectionReason,
-    articleDecision: "existing",
-    reviewed: false,
-    selectedArticleCode: null,
-    selectedArticleDescription: null,
-    articleCandidates: [],
-    suggestionStatus: "missing",
-    newArticle: {
-      code: "",
-      description: "",
-      unit: params.resolvedRow.unit ?? "",
-      type: "SERVICE",
-      purchaseAccountCode: params.resolvedRow.accountCode,
-      taxCode: params.resolvedRow.taxCode ?? null,
-    },
-  };
-}
-
-function buildSuggestedNewArticle(params: {
-  sourceArticleCode: string | null;
-  resolvedRow: ReturnType<typeof resolvePurchaseRows>[number];
-}) {
-  return {
-    code: defaultNewArticleCode({
-      sourceArticleCode: params.sourceArticleCode,
-      description: params.resolvedRow.description,
-      accountCode: params.resolvedRow.accountCode,
-    }),
-    description: params.resolvedRow.description,
-    unit: params.resolvedRow.unit ?? "",
-    type: "SERVICE",
-    purchaseAccountCode: params.resolvedRow.accountCode,
-    taxCode: params.resolvedRow.taxCode ?? null,
-  };
-}
-
-function buildDraftRows(params: {
-  sourceRows: InvoiceExtraction["rows"];
-  resolvedRows: ReturnType<typeof resolvePurchaseRows>;
-  catalog: Awaited<
-    ReturnType<AccountingProviderActivities<unknown>["listArticles"]>
-  >;
-  history: Awaited<
-    ReturnType<AccountingProviderActivities<unknown>["getVendorArticleHistory"]>
-  >;
-}): InvoiceImportDraftRow[] {
-  return params.resolvedRows.map((resolvedRow, index) =>
-    buildDraftRow({
-      resolvedRow,
-      sourceRow:
-        params.sourceRows[index] ??
-        fallbackRowFromInvoice(buildFallbackExtraction()),
-      catalog: params.catalog,
-      history: params.history,
-      index,
-    }),
-  );
-}
 
 async function findPreviewVendor<TCredentials>(params: {
   savedConnection: StoredAccountingConnection;
@@ -252,46 +85,6 @@ async function findPreviewDuplicate<TCredentials>(params: {
         params.context,
       ),
   });
-}
-
-async function loadPreviewCatalogAndHistory<TCredentials>(params: {
-  savedConnection: StoredAccountingConnection;
-  activities: AccountingProviderActivities<TCredentials>;
-  credentials: TCredentials;
-  extraction: InvoiceExtraction;
-  context: Awaited<
-    ReturnType<AccountingProviderActivities<TCredentials>["loadContext"]>
-  >;
-  vendorMatch: Awaited<
-    ReturnType<AccountingProviderActivities<TCredentials>["findVendor"]>
-  >;
-}) {
-  const catalog = await measureInvoiceImportPhase({
-    workflow: "preview",
-    provider: params.savedConnection.provider,
-    phase: "listArticles",
-    run: () =>
-      params.activities.listArticles(params.credentials, params.context),
-  });
-  const matchedVendor = params.vendorMatch;
-  const history = matchedVendor
-    ? await measureInvoiceImportPhase({
-        workflow: "preview",
-        provider: params.savedConnection.provider,
-        phase: "getVendorArticleHistory",
-        run: () =>
-          params.activities.getVendorArticleHistory(
-            params.credentials,
-            {
-              vendorId: matchedVendor.vendorId,
-              extraction: params.extraction,
-            },
-            params.context,
-          ),
-      })
-    : [];
-
-  return { catalog, history };
 }
 
 function buildPreviewDraft(params: {
@@ -406,7 +199,7 @@ export async function previewInvoiceImport<TCredentials>(params: {
     context,
     vendorMatch,
   });
-  const { catalog, history } = await loadPreviewCatalogAndHistory({
+  const { catalog, historyLoaded, rows } = await resolvePreviewRows({
     savedConnection: params.savedConnection,
     activities: params.activities,
     credentials: params.credentials,
@@ -420,17 +213,7 @@ export async function previewInvoiceImport<TCredentials>(params: {
     paymentAccounts: context.referenceData.paymentAccounts,
     vendorMatch,
     duplicateInvoiceId: duplicate?.invoiceId ?? null,
-    rows: buildDraftRows({
-      sourceRows: extraction.rows.length
-        ? extraction.rows
-        : [fallbackRowFromInvoice(extraction)],
-      resolvedRows: resolvePurchaseRows({
-        extraction,
-        referenceData: context.referenceData,
-      }),
-      catalog,
-      history,
-    }),
+    rows,
   });
   const articleOptions = buildPreviewArticleOptions(catalog);
   const preview = {
@@ -471,6 +254,7 @@ export async function previewInvoiceImport<TCredentials>(params: {
     status: "success",
     metadata: {
       duplicateFound: Boolean(duplicate),
+      historyLoaded,
       vendorMatched: Boolean(vendorMatch),
       rowCount: draft.rows.length,
       warningCount: extraction.warnings.length,

@@ -11,6 +11,11 @@ import {
   hostProps,
 } from "./InvoiceImportRowEditorTestUtils";
 
+vi.mock("./actions", () => ({
+  clearAccountingConnectionCache: vi.fn(async (state: unknown) => state),
+  clearAccountingConnectionCacheFromForm: vi.fn(async () => undefined),
+}));
+
 interface HookHarness {
   render: (props: {
     canImport: boolean;

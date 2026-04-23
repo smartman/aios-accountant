@@ -34,6 +34,7 @@ const MERIT_ENDPOINT_VERSIONS = {
   senditems: "v2",
   sendvendor: "v2",
   getpurchorders: "v2",
+  getpurchorder: "v2",
   sendpurchinvoice: "v2",
   sendPaymentV: "v2",
 } as const satisfies Record<string, "v1" | "v2">;
@@ -496,5 +497,4 @@ export async function validateMeritV2Access(
     }),
   ]);
 }
-
 export { clearMeritCachesForTests } from "./core-cache";

@@ -79,12 +79,15 @@ function makeCandidate(params: {
   };
 }
 
+interface CandidateRanking {
+  descriptionMatch: number;
+  historyMatch: number;
+  sourceCodeMatch: number;
+  metadataMatch: number;
+}
+
 function buildRowNeedles(row: InvoiceImportDraftRow): string[] {
-  return [
-    row.sourceArticleCode,
-    row.description,
-    `${row.description} ${row.sourceArticleCode ?? ""}`,
-  ].filter((value): value is string => Boolean(value));
+  return [row.description].filter((value): value is string => Boolean(value));
 }
 
 function computeHistoryScoreBoost(params: {
@@ -168,59 +171,77 @@ function scoreCatalogArticle(params: {
     string,
     { matches: number; recentInvoiceDate?: string; scoreBoost: number }
   >;
-}): InvoiceImportReviewArticleCandidate {
+}): {
+  candidate: InvoiceImportReviewArticleCandidate;
+  ranking: CandidateRanking;
+} {
   const reasons: string[] = [];
-  let score = 0;
-  const combined = `${params.article.code} ${params.article.description}`;
+  let sourceCodeMatch = 0;
+  let descriptionMatch = 0;
+  let historyMatchScore = 0;
+  let metadataMatch = 0;
+  const articleDescription = params.article.description;
 
-  const sourceCodeMatch =
+  const hasExactSourceCodeMatch =
     params.row.sourceArticleCode &&
     normalizeText(params.article.code) ===
       normalizeText(params.row.sourceArticleCode);
-  if (sourceCodeMatch) {
-    score += 45;
+  if (hasExactSourceCodeMatch) {
+    sourceCodeMatch = 1;
     reasons.push("Exact source article code match.");
   }
 
   const codeAndDescriptionScore =
-    scoreOverlap(combined, params.rowNeedles) +
-    scoreTokenOverlap(combined, params.rowNeedles);
+    scoreOverlap(articleDescription, params.rowNeedles) +
+    scoreTokenOverlap(articleDescription, params.rowNeedles);
   if (codeAndDescriptionScore) {
-    score += codeAndDescriptionScore;
-    reasons.push("Catalog code/description matches the invoice row.");
+    descriptionMatch = codeAndDescriptionScore;
+    reasons.push("Catalog description matches the invoice row.");
   }
 
   if (
     params.article.purchaseAccountCode &&
     params.article.purchaseAccountCode === params.row.accountCode
   ) {
-    score += 20;
+    metadataMatch += 20;
     reasons.push("Purchase account matches.");
   }
 
   if (params.article.taxCode && params.article.taxCode === params.row.taxCode) {
-    score += 8;
+    metadataMatch += 8;
     reasons.push("VAT code matches.");
   }
 
   if (params.article.unit && params.article.unit === params.row.unit) {
-    score += 5;
+    metadataMatch += 5;
     reasons.push("Unit matches.");
   }
 
   const historyMatch = params.historyByArticle.get(params.article.code);
   if (historyMatch) {
-    score += historyMatch.scoreBoost + historyMatch.matches * 3;
+    historyMatchScore = historyMatch.scoreBoost + historyMatch.matches * 3;
     reasons.push("Previous invoices from the same vendor used this article.");
   }
 
-  return makeCandidate({
-    article: params.article,
-    score,
-    reasons,
-    historyMatches: historyMatch?.matches ?? 0,
-    recentInvoiceDate: historyMatch?.recentInvoiceDate,
-  });
+  return {
+    candidate: makeCandidate({
+      article: params.article,
+      score:
+        sourceCodeMatch * 45 +
+        descriptionMatch +
+        historyMatchScore +
+        metadataMatch,
+      reasons,
+      historyMatches: historyMatch?.matches ?? 0,
+      recentInvoiceDate: historyMatch?.recentInvoiceDate,
+    }),
+    ranking: {
+      descriptionMatch,
+      historyMatch: historyMatchScore,
+      sourceCodeMatch,
+      metadataMatch,
+    },
+  };
 }
 
 export function buildArticleCandidates(params: {
@@ -245,8 +266,33 @@ export function buildArticleCandidates(params: {
         historyByArticle,
       }),
     )
-    .filter((candidate) => candidate.score > 0)
-    .sort((left, right) => right.score - left.score)
+    .filter(
+      ({ ranking }) =>
+        ranking.descriptionMatch > 0 ||
+        ranking.historyMatch > 0 ||
+        ranking.sourceCodeMatch > 0 ||
+        ranking.metadataMatch > 0,
+    )
+    .sort((left, right) => {
+      if (right.ranking.descriptionMatch !== left.ranking.descriptionMatch) {
+        return right.ranking.descriptionMatch - left.ranking.descriptionMatch;
+      }
+
+      if (right.ranking.historyMatch !== left.ranking.historyMatch) {
+        return right.ranking.historyMatch - left.ranking.historyMatch;
+      }
+
+      if (right.ranking.sourceCodeMatch !== left.ranking.sourceCodeMatch) {
+        return right.ranking.sourceCodeMatch - left.ranking.sourceCodeMatch;
+      }
+
+      if (right.ranking.metadataMatch !== left.ranking.metadataMatch) {
+        return right.ranking.metadataMatch - left.ranking.metadataMatch;
+      }
+
+      return right.candidate.score - left.candidate.score;
+    })
+    .map(({ candidate }) => candidate)
     .slice(0, 8);
 
   return ranked;

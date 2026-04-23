@@ -156,16 +156,16 @@ describe("draft validation", () => {
     );
   });
 
-  it("reports missing new-article definitions", () => {
+  it("rejects create-mode rows", () => {
     const draft = buildDraft();
     draft.rows[0].articleDecision = "create";
     draft.rows[0].selectedArticleCode = null;
     draft.rows[0].selectedArticleDescription = null;
-    draft.rows[0].newArticle.code = "FURNITURE";
-    draft.rows[0].newArticle.description = "";
 
     expect(validateDraft(draft)).toEqual(
-      expect.arrayContaining(["Row 1 must define the new accounting article."]),
+      expect.arrayContaining([
+        "Row 1 must select an accounting article. In-app article creation is no longer supported.",
+      ]),
     );
   });
 

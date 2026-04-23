@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredAccountingConnection } from "@/lib/user-accounting-connections";
 import {
   clearAccountingConnectionCache,
+  clearAccountingConnectionCacheFromForm,
   saveAccountingConnection,
 } from "./actions";
 import { getUser } from "@/lib/workos";
@@ -317,7 +318,7 @@ describe("saveAccountingConnection failure cases", () => {
   });
 });
 
-describe("clearAccountingConnectionCache", () => {
+describe("clearAccountingConnectionCache errors", () => {
   it("returns an auth error when no user is signed in", async () => {
     vi.mocked(getUser).mockResolvedValue({ user: null });
 
@@ -427,5 +428,28 @@ describe("clearAccountingConnectionCache", () => {
       status: "error",
       message: "Could not clear cached values.",
     });
+  });
+});
+
+describe("clearAccountingConnectionCache success paths", () => {
+  it("supports form actions by delegating to the cache clear workflow", async () => {
+    vi.mocked(getUser).mockResolvedValue({ user: TEST_USER });
+    const [{ getStoredAccountingConnection }, { clearStoredConnectionCache }] =
+      await Promise.all([
+        import("@/lib/user-accounting-connections"),
+        import("@/lib/accounting-provider-cache"),
+      ]);
+
+    vi.mocked(getStoredAccountingConnection).mockResolvedValue(
+      makeConnection("smartaccounts", {
+        apiKey: "public",
+        secretKey: "secret",
+      }),
+    );
+
+    await expect(
+      clearAccountingConnectionCacheFromForm(new FormData()),
+    ).resolves.toBeUndefined();
+    expect(clearStoredConnectionCache).toHaveBeenCalledOnce();
   });
 });

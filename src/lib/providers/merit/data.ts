@@ -4,23 +4,23 @@ import {
   MeritItem,
   MeritVendor,
 } from "../../accounting-provider-types";
-import {
-  ProviderCatalogArticle,
-  ProviderHistoricalInvoiceRow,
-} from "../../accounting-provider-activities";
+import { ProviderCatalogArticle } from "../../accounting-provider-activities";
 import {
   CACHE_TTLS,
   cachedValue,
   clearCachedValuesByPrefix,
   extractList,
   getItems,
-  meritDate,
   meritRequest,
   namespacedCacheKey,
   setCachedValue,
   toOptionalString,
   isNonNull,
 } from "./core";
+import {
+  invoiceWindowForExtraction,
+  loadPurchaseInvoiceHeaders,
+} from "./purchase-invoice-history";
 
 function normalizeVendor(record: Record<string, unknown>): MeritVendor | null {
   const id = toOptionalString(record.VendorId);
@@ -225,135 +225,14 @@ export async function createItem(
   };
 }
 
-const MAX_MERIT_LOOKBACK_DAYS = 89;
-
-function invoiceWindowForExtraction(
-  extraction: FindExistingInvoiceParams["extraction"],
-) {
-  const baseDate =
-    extraction.invoice.issueDate ??
-    extraction.invoice.entryDate ??
-    new Date().toISOString().slice(0, 10);
-  const parsedBaseDate = new Date(baseDate);
-  const start = Number.isNaN(parsedBaseDate.getTime())
-    ? new Date()
-    : new Date(
-        parsedBaseDate.getTime() -
-          MAX_MERIT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
-      );
-  const end = Number.isNaN(parsedBaseDate.getTime())
-    ? new Date()
-    : new Date(parsedBaseDate.getTime());
-
-  return {
-    PeriodStart: meritDate(start.toISOString()),
-    PeriodEnd: meritDate(end.toISOString()),
-    DateType: 0,
-  };
-}
-
-export async function getVendorInvoiceHistory(
-  credentials: MeritCredentials,
-  params: {
-    vendorId: string;
-    extraction: FindExistingInvoiceParams["extraction"];
-  },
-): Promise<ProviderHistoricalInvoiceRow[]> {
-  const body = invoiceWindowForExtraction(params.extraction);
-  const cacheKey = namespacedCacheKey(
-    credentials,
-    `purchaseInvoices:${JSON.stringify(body)}`,
-  );
-  const invoices = await cachedValue(
-    cacheKey,
-    CACHE_TTLS.purchaseInvoices,
-    async () => {
-      const response = await meritRequest<unknown>(
-        "getpurchorders",
-        credentials,
-        body,
-      );
-      return extractList(response);
-    },
-  );
-
-  return invoices
-    .filter((invoice) => toOptionalString(invoice.VendorId) === params.vendorId)
-    .flatMap((invoice) => {
-      const vendorId = toOptionalString(invoice.VendorId);
-      const vendorName = toOptionalString(invoice.VendorName ?? invoice.Name);
-      const invoiceId = toOptionalString(invoice.PIHId ?? invoice.Id);
-      if (!vendorId || !vendorName || !invoiceId) {
-        return [];
-      }
-
-      const rows = Array.isArray(invoice.InvoiceRow) ? invoice.InvoiceRow : [];
-      return rows
-        .map((row) => {
-          const record =
-            row !== null && typeof row === "object"
-              ? (row as Record<string, unknown>)
-              : null;
-          if (!record) {
-            return null;
-          }
-
-          const item =
-            record.Item !== null && typeof record.Item === "object"
-              ? (record.Item as Record<string, unknown>)
-              : null;
-          const articleCode = toOptionalString(item?.Code);
-          const description =
-            toOptionalString(record.Description) ??
-            toOptionalString(item?.Description);
-          if (!articleCode || !description) {
-            return null;
-          }
-
-          return {
-            invoiceId,
-            invoiceNumber: toOptionalString(invoice.BillNo),
-            issueDate:
-              toOptionalString(invoice.DocDate) ??
-              toOptionalString(invoice.TransactionDate),
-            vendorId,
-            vendorName,
-            sourceArticleCode: articleCode,
-            description,
-            articleCode,
-            articleDescription: toOptionalString(item?.Description),
-            purchaseAccountCode:
-              toOptionalString(record.PurchaseAccCode) ??
-              toOptionalString(record.GLAccountCode),
-            taxCode: toOptionalString(record.TaxId),
-            unit: toOptionalString(item?.UOMName),
-          } satisfies ProviderHistoricalInvoiceRow;
-        })
-        .filter(isNonNull);
-    });
-}
+export { getVendorInvoiceHistory } from "./purchase-invoice-history";
 
 export async function findExistingPurchaseInvoice(
   credentials: MeritCredentials,
   params: FindExistingInvoiceParams,
 ): Promise<{ invoiceId: string } | null> {
   const body = invoiceWindowForExtraction(params.extraction);
-  const cacheKey = namespacedCacheKey(
-    credentials,
-    `purchaseInvoices:${JSON.stringify(body)}`,
-  );
-  const invoices = await cachedValue(
-    cacheKey,
-    CACHE_TTLS.purchaseInvoices,
-    async () => {
-      const response = await meritRequest<unknown>(
-        "getpurchorders",
-        credentials,
-        body,
-      );
-      return extractList(response);
-    },
-  );
+  const invoices = await loadPurchaseInvoiceHeaders(credentials, body);
 
   const match = invoices.find((invoice) => {
     const billNo = toOptionalString(invoice.BillNo);

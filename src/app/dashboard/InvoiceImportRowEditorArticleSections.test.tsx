@@ -3,7 +3,6 @@ import { expect, it } from "vitest";
 import type { InvoiceImportDraft } from "@/lib/invoice-import-types";
 import {
   buildPreview,
-  findButton,
   findControlByLabel,
   hostProps,
   renderTree,
@@ -19,6 +18,7 @@ it("renders the minimal existing-article flow and allows article override", () =
   expect(markup).not.toContain("Source article code");
   expect(markup).not.toContain("Row details");
   expect(markup).not.toContain("Accounting</p>");
+  expect(markup).not.toContain("Create new");
 
   const articleSelect = findControlByLabel(
     tree,
@@ -38,138 +38,6 @@ it("renders the minimal existing-article flow and allows article override", () =
   });
 });
 
-it("switches between existing and create modes", () => {
-  const preview = buildPreview();
-  const updates: InvoiceImportDraft[] = [];
-
-  const existingTree = renderTree(preview, (draft) => updates.push(draft));
-  const createButton = findButton(existingTree, "Create new");
-  if (!createButton) {
-    throw new Error("Expected create button.");
-  }
-
-  hostProps(createButton).onClick?.();
-  expect(updates.at(-1)?.rows[0].articleDecision).toBe("create");
-
-  const createPreview = {
-    ...preview,
-    draft: updates.at(-1) ?? preview.draft,
-  };
-  const createTree = renderTree(createPreview, (draft) => updates.push(draft));
-  const existingButton = findButton(createTree, "Use existing");
-  if (!existingButton) {
-    throw new Error("Expected existing button.");
-  }
-
-  hostProps(existingButton).onClick?.();
-  expect(updates.at(-1)?.rows[0].articleDecision).toBe("existing");
-});
-
-it("updates create-mode fields and default option fallbacks", () => {
-  const preview = buildPreview({
-    articleDecision: "create",
-    unit: null,
-    newArticle: {
-      code: "NEW-MONITOR",
-      description: "Monitor",
-      unit: "",
-      type: "SERVICE",
-      purchaseAccountCode: "10921",
-      taxCode: "VAT24",
-    },
-  });
-  preview.articleTypeOptions = undefined;
-  preview.articleOptions = undefined;
-  preview.unitOptions = undefined;
-
-  const updates: InvoiceImportDraft[] = [];
-  const tree = renderTree(preview, (draft) => updates.push(draft));
-  const markup = renderToStaticMarkup(tree);
-
-  expect(markup).toContain("New article unit");
-  expect(markup).toContain(">SERVICE<");
-
-  const newCodeInput = findControlByLabel(tree, "New article code", "input");
-  hostProps(newCodeInput).onChange?.({
-    target: { value: "MONITOR_NEW" },
-  });
-  expect(updates.at(-1)?.rows[0].newArticle.code).toBe("MONITOR_NEW");
-
-  const newDescriptionInput = findControlByLabel(
-    tree,
-    "New article description",
-    "input",
-  );
-  hostProps(newDescriptionInput).onChange?.({
-    target: { value: "Monitor created from review" },
-  });
-  expect(updates.at(-1)?.rows[0].newArticle.description).toBe(
-    "Monitor created from review",
-  );
-
-  const newUnitSelect = findControlByLabel(tree, "New article unit", "select");
-  hostProps(newUnitSelect).onChange?.({
-    target: { value: "" },
-  });
-  expect(updates.at(-1)?.rows[0].newArticle.unit).toBe("");
-
-  const newTypeSelect = findControlByLabel(tree, "New article type", "select");
-  hostProps(newTypeSelect).onChange?.({
-    target: { value: "SERVICE" },
-  });
-  expect(updates.at(-1)?.rows[0].newArticle.type).toBe("SERVICE");
-});
-
-it("uses available unit options when creating a new article", () => {
-  const preview = buildPreview({
-    articleDecision: "create",
-    selectedArticleCode: null,
-    selectedArticleDescription: null,
-  });
-  preview.unitOptions = ["", "tk"];
-  preview.articleOptions = [
-    {
-      code: "MONITOR-ALT",
-      description: "Monitor alt",
-      unit: null,
-      purchaseAccountCode: "10921",
-      taxCode: "VAT24",
-      type: "PRODUCT",
-    },
-  ];
-  const updates: InvoiceImportDraft[] = [];
-  const tree = renderTree(preview, (draft) => updates.push(draft));
-
-  const newUnitSelect = findControlByLabel(tree, "New article unit", "select");
-  hostProps(newUnitSelect).onChange?.({
-    target: { value: "tk" },
-  });
-  expect(updates.at(-1)?.rows[0].newArticle.unit).toBe("tk");
-});
-
-it("includes units discovered from preview article metadata", () => {
-  const preview = buildPreview({
-    articleDecision: "create",
-    selectedArticleCode: null,
-    selectedArticleDescription: null,
-  });
-  preview.unitOptions = undefined;
-  preview.articleOptions = [
-    {
-      code: "BOXED-ITEM",
-      description: "Boxed item",
-      unit: "box",
-      purchaseAccountCode: "4000",
-      taxCode: "VAT24",
-      type: "PRODUCT",
-    },
-  ];
-
-  const markup = renderToStaticMarkup(renderTree(preview));
-
-  expect(markup).toContain(">box<");
-});
-
 it("handles ambiguous and missing article states cleanly", () => {
   const ambiguousPreview = buildPreview({
     suggestionStatus: "ambiguous",
@@ -177,7 +45,7 @@ it("handles ambiguous and missing article states cleanly", () => {
     selectedArticleDescription: null,
   });
   expect(renderToStaticMarkup(renderTree(ambiguousPreview))).toContain(
-    "Several similar articles were found.",
+    "Several similar articles were found. Choose the correct article manually.",
   );
 
   const missingPreview = buildPreview({
@@ -202,8 +70,11 @@ it("handles ambiguous and missing article states cleanly", () => {
   const tree = renderTree(missingPreview, (draft) => updates.push(draft));
   const markup = renderToStaticMarkup(tree);
 
-  expect(markup).toContain("No reliable article match was found.");
+  expect(markup).toContain(
+    "Article not detected, choose manually or create new article and refresh the article cache.",
+  );
   expect(markup).toContain("No description");
+  expect(markup).toContain("Available articles");
 
   const articleSelect = findControlByLabel(
     tree,
@@ -218,6 +89,47 @@ it("handles ambiguous and missing article states cleanly", () => {
     selectedArticleCode: null,
     selectedArticleDescription: null,
   });
+});
+
+it("falls back to normalized candidate metadata when preview articles omit fields", () => {
+  const preview = buildPreview({
+    selectedArticleCode: null,
+    selectedArticleDescription: null,
+    articleCandidates: [],
+    suggestionStatus: "missing",
+  });
+  preview.articleOptions = [
+    {
+      code: "NO-META",
+      description: null,
+      unit: undefined,
+      purchaseAccountCode: undefined,
+      taxCode: undefined,
+      type: undefined,
+    },
+  ];
+  const updates: InvoiceImportDraft[] = [];
+  const tree = renderTree(preview, (draft) => updates.push(draft));
+
+  const articleSelect = findControlByLabel(
+    tree,
+    "Accounting article/item",
+    "select",
+  );
+  hostProps(articleSelect).onChange?.({
+    target: { value: "NO-META" },
+  });
+
+  expect(updates.at(-1)?.rows[0].articleCandidates).toContainEqual(
+    expect.objectContaining({
+      code: "NO-META",
+      description: "NO-META",
+      unit: null,
+      purchaseAccountCode: null,
+      taxCode: null,
+      type: null,
+    }),
+  );
 });
 
 it("uses preview article metadata when the manual selection is outside suggestions", () => {
@@ -242,6 +154,32 @@ it("uses preview article metadata when the manual selection is outside suggestio
   expect(updates.at(-1)?.rows[0]).toMatchObject({
     selectedArticleCode: "MONITOR-ALT",
     selectedArticleDescription: "Monitor alt",
+  });
+});
+
+it("uses candidate metadata when preview article metadata is unavailable", () => {
+  const preview = buildPreview({
+    selectedArticleCode: null,
+    selectedArticleDescription: null,
+  });
+  preview.articleOptions = undefined;
+  const updates: InvoiceImportDraft[] = [];
+  const tree = renderTree(preview, (draft) => updates.push(draft));
+
+  const articleSelect = findControlByLabel(
+    tree,
+    "Accounting article/item",
+    "select",
+  );
+  hostProps(articleSelect).onChange?.({
+    target: { value: "MSIMAG2701" },
+  });
+
+  expect(updates.at(-1)?.rows[0]).toMatchObject({
+    selectedArticleCode: "MSIMAG2701",
+    selectedArticleDescription: "MSI MAG 275QF E20",
+    unit: "pcs",
+    accountCode: "10921",
   });
 });
 

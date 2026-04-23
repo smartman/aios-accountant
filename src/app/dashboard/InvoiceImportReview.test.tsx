@@ -11,6 +11,11 @@ import {
   hostProps,
 } from "./InvoiceImportRowEditorTestUtils";
 
+vi.mock("./actions", () => ({
+  clearAccountingConnectionCache: vi.fn(async (state: unknown) => state),
+  clearAccountingConnectionCacheFromForm: vi.fn(async () => undefined),
+}));
+
 function buildValidPreview(): InvoiceImportPreviewResult {
   const preview = buildPreview({
     reviewed: true,
@@ -66,6 +71,20 @@ it("renders duplicate and warning summaries and blocks confirm when validation f
   expect(markup).toContain("Check vendor details.");
   expect(markup).toContain("Vendor name is required.");
   expect(hostProps(confirmButton).disabled).toBe(true);
+});
+
+it("shows the missing-article warning and cache-clear action for unresolved rows", () => {
+  const preview = buildValidPreview();
+  preview.draft.rows[0].suggestionStatus = "missing";
+  preview.draft.rows[0].selectedArticleCode = null;
+  preview.draft.rows[0].selectedArticleDescription = null;
+
+  const markup = renderToStaticMarkup(renderReview({ preview }));
+
+  expect(markup).toContain(
+    "Article not detected, choose manually or create new article and refresh the article cache.",
+  );
+  expect(markup).toContain("Clear article cache");
 });
 
 it("prompts before confirming duplicates and respects the user's choice", () => {
