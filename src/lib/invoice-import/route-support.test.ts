@@ -58,10 +58,15 @@ describe("invoice import route support", () => {
       JSON.stringify({
         provider: "merit",
         vendor: { name: "Vendor" },
-        invoice: { invoiceNumber: "INV-1" },
-        payment: {},
+        invoice: {
+          invoiceNumber: "INV-1",
+          amountExcludingVat: 1.239,
+          vatAmount: 0.441,
+          totalAmount: 1.68,
+        },
+        payment: { paymentAmount: 1.239 },
         actions: {},
-        rows: [],
+        rows: [{ price: 1.239, sum: 1.239 }],
         warnings: [],
         duplicateInvoice: null,
       }),
@@ -69,7 +74,13 @@ describe("invoice import route support", () => {
 
     expect(draft).toMatchObject({
       provider: "merit",
-      invoice: { invoiceNumber: "INV-1" },
+      invoice: {
+        invoiceNumber: "INV-1",
+        amountExcludingVat: 1.24,
+        vatAmount: 0.44,
+      },
+      payment: { paymentAmount: 1.24 },
+      rows: [{ price: 1.24, sum: 1.24 }],
     });
     expect(() => parseInvoiceImportDraft(null)).toThrow(
       "Missing reviewed import draft.",

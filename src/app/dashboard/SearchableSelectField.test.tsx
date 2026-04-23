@@ -135,6 +135,9 @@ it("renders a single visible combobox field plus a hidden synced select", () => 
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain(">4000 - Consulting services<");
   expect(markup).toContain('class="sr-only"');
+  expect(markup).toContain("!bg-white");
+  expect(markup).toContain('data-searchable-select-chevron="true"');
+  expect(markup).toContain('viewBox="0 0 16 16"');
   expect(markup).not.toContain("Open search purchase accounts");
   expect(markup).not.toContain("Type to filter accounts by code or name");
 });

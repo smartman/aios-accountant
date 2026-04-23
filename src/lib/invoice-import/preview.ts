@@ -12,6 +12,7 @@ import {
   buildPreviewUnitOptions,
   chooseDefaultPaymentAccount,
 } from "./preview-helpers";
+import { normalizeInvoiceImportDraft } from "./normalization";
 import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
@@ -98,7 +99,7 @@ function buildPreviewDraft(params: {
   duplicateInvoiceId: string | null;
   rows: InvoiceImportDraftRow[];
 }): InvoiceImportDraft {
-  return {
+  return normalizeInvoiceImportDraft({
     provider: params.savedConnection.provider,
     vendor: {
       name: params.extraction.vendor.name ?? "",
@@ -152,7 +153,7 @@ function buildPreviewDraft(params: {
       vendorMatch: params.vendorMatch,
       invoiceNumber: params.extraction.invoice.invoiceNumber,
     }),
-  };
+  });
 }
 
 export async function previewInvoiceImport<TCredentials>(params: {

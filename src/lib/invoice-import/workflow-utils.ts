@@ -10,6 +10,7 @@ import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
 } from "./observability";
+import { normalizeInvoiceExtraction } from "./normalization";
 
 function bufferToDataUrl(buffer: Buffer, mimeType: string): string {
   return `data:${mimeType};base64,${buffer.toString("base64")}`;
@@ -44,7 +45,7 @@ export async function extractInvoiceData<TCredentials>(
     ReturnType<AccountingProviderActivities<TCredentials>["loadContext"]>
   >["referenceData"]["taxCodes"],
 ) {
-  const extraction = await measureInvoiceImportPhase({
+  const rawExtraction = await measureInvoiceImportPhase({
     workflow: params.workflow,
     provider: params.savedConnection.provider,
     phase: "extractInvoice",
@@ -62,6 +63,7 @@ export async function extractInvoiceData<TCredentials>(
         taxCodes,
       }),
   });
+  const extraction = normalizeInvoiceExtraction(rawExtraction);
 
   const usedFallbackInvoiceNumber = !extraction.invoice.invoiceNumber;
   if (usedFallbackInvoiceNumber) {

@@ -12,6 +12,10 @@ import { uniqueAccounts } from "../provider-import-helpers";
 import { StoredAccountingConnection } from "../user-accounting-connections";
 import { validateDraft } from "./draft-validation";
 import {
+  normalizeInvoiceExtraction,
+  normalizeInvoiceImportDraft,
+} from "./normalization";
+import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
 } from "./observability";
@@ -38,7 +42,7 @@ interface ConfirmWorkflowParams<TCredentials> {
 }
 
 function extractionFromDraft(draft: InvoiceImportDraft): InvoiceExtraction {
-  return {
+  return normalizeInvoiceExtraction({
     vendor: {
       name: draft.vendor.name,
       regCode: draft.vendor.regCode,
@@ -86,7 +90,7 @@ function extractionFromDraft(draft: InvoiceImportDraft): InvoiceExtraction {
       accountSelectionReason: row.accountSelectionReason,
     })),
     warnings: [...draft.warnings],
-  };
+  });
 }
 
 async function resolveVendorForConfirm<TCredentials>(params: {
@@ -351,27 +355,28 @@ async function finalizeConfirmedInvoice<TCredentials>(params: {
 export async function confirmInvoiceImport<TCredentials>(
   params: ConfirmWorkflowParams<TCredentials>,
 ): Promise<ImportedInvoiceResult> {
-  const validationErrors = validateDraft(params.draft);
+  const normalizedDraft = normalizeInvoiceImportDraft(params.draft);
+  const validationErrors = validateDraft(normalizedDraft);
   if (validationErrors.length) {
     throw new Error(validationErrors[0]);
   }
 
   const context = await loadConfirmContext(params);
-  const extraction = extractionFromDraft(params.draft);
+  const extraction = extractionFromDraft(normalizedDraft);
   const fileContentBase64 = params.buffer.toString("base64");
   const vendor = await measureInvoiceImportPhase({
     workflow: "confirm",
     provider: params.savedConnection.provider,
     phase: "resolveVendor",
     metadata: {
-      hasPreviewVendorMatch: Boolean(params.draft.vendor.existingVendorId),
+      hasPreviewVendorMatch: Boolean(normalizedDraft.vendor.existingVendorId),
     },
     run: () =>
       resolveVendorForConfirm({
         activities: params.activities,
         credentials: params.credentials,
         context,
-        draft: params.draft,
+        draft: normalizedDraft,
         extraction,
       }),
   });
@@ -384,7 +389,7 @@ export async function confirmInvoiceImport<TCredentials>(
         params.credentials,
         {
           vendorId: vendor.vendorId,
-          invoiceNumber: params.draft.invoice.invoiceNumber,
+          invoiceNumber: normalizedDraft.invoice.invoiceNumber,
           extraction,
         },
         context,
@@ -395,7 +400,7 @@ export async function confirmInvoiceImport<TCredentials>(
     activities: params.activities,
     credentials: params.credentials,
     context,
-    draft: params.draft,
+    draft: normalizedDraft,
   });
   const purchaseAccounts = uniqueAccounts(
     resolvedRows,
@@ -406,7 +411,7 @@ export async function confirmInvoiceImport<TCredentials>(
     return buildExistingResult({
       provider: params.savedConnection.provider,
       invoiceId: existingInvoice.invoiceId,
-      invoiceNumber: params.draft.invoice.invoiceNumber,
+      invoiceNumber: normalizedDraft.invoice.invoiceNumber,
       vendor,
       extraction,
       purchaseAccounts,

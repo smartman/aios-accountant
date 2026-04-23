@@ -1,4 +1,5 @@
 import { InvoiceImportDraft } from "../invoice-import-types";
+import { normalizeInvoiceImportDraft } from "./normalization";
 
 const BAD_REQUEST_ERRORS = new Set([
   "Missing invoice file.",
@@ -48,7 +49,7 @@ export function parseInvoiceImportDraft(
   }
 
   try {
-    return JSON.parse(value) as InvoiceImportDraft;
+    return normalizeInvoiceImportDraft(JSON.parse(value) as InvoiceImportDraft);
   } catch {
     throw new Error("Reviewed import draft is invalid.");
   }
