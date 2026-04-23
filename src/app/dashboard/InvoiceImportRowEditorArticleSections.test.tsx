@@ -26,6 +26,7 @@ it("renders the minimal existing-article flow and allows article override", () =
   expect(markup).not.toContain(
     "Article not detected, choose manually or create new article and refresh the article cache.",
   );
+  expect(markup).toContain("Search accounting articles");
 
   const articleSelect = findControlByLabel(
     tree,
@@ -80,7 +81,7 @@ it("handles ambiguous and missing article states cleanly", () => {
     "Article not detected, choose manually or create new article and refresh the article cache.",
   );
   expect(markup).toContain("No description");
-  expect(markup).toContain("Available articles");
+  expect(markup).toContain("Type to filter articles by code, description, or unit");
 
   const articleSelect = findControlByLabel(
     tree,

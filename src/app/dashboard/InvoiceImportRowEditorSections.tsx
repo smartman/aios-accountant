@@ -16,6 +16,7 @@ import {
   ArticleMatchSection,
   UnitDropdown,
 } from "./InvoiceImportRowEditorArticleSections";
+import { SearchableSelectField } from "./SearchableSelectField";
 
 const rowFieldLabelClass = compactFieldLabelClass;
 
@@ -256,6 +257,12 @@ function RowAccountingFields({
   preview,
   setDraft,
 }: RowEditorProps) {
+  const purchaseAccountOptions = preview.referenceData.accounts.map((account) => ({
+    label: account.label,
+    searchText: `${account.code} ${account.label}`,
+    value: account.code,
+  }));
+
   return (
     <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
@@ -270,23 +277,19 @@ function RowAccountingFields({
             i
           </button>
         </span>
-        <select
-          className={fieldClass()}
+        <SearchableSelectField
+          options={purchaseAccountOptions}
+          placeholder="Select account"
+          searchAriaLabel="Search purchase accounts"
+          searchPlaceholder="Type to filter accounts by code or name"
           value={row.accountCode}
-          onChange={(event) =>
+          onChange={(value) =>
             updateDraftRow(draft, row.id, setDraft, (current) => ({
               ...current,
-              accountCode: event.target.value,
+              accountCode: value,
             }))
           }
-        >
-          <option value="">Select account</option>
-          {preview.referenceData.accounts.map((account) => (
-            <option key={account.code} value={account.code}>
-              {account.label}
-            </option>
-          ))}
-        </select>
+        />
       </label>
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
         <span className={rowFieldLabelClass}>VAT code</span>

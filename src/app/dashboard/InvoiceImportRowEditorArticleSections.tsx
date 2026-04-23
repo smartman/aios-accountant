@@ -13,6 +13,10 @@ import {
   RowEditorProps,
   updateDraftRow,
 } from "./InvoiceImportRowEditorSections";
+import {
+  SearchableSelectField,
+  type SearchableSelectOption,
+} from "./SearchableSelectField";
 
 const rowArticleLabelClass = compactFieldLabelClass;
 
@@ -75,6 +79,20 @@ function toArticleCandidate(article: ArticleOption) {
     reasons: [],
     historyMatches: 0,
     recentInvoiceDate: null,
+  };
+}
+
+function toSearchableArticleOption(article: ArticleOption): SearchableSelectOption {
+  return {
+    label: formatArticleOptionLabel(article),
+    searchText: [
+      article.code,
+      article.description ?? "",
+      article.unit ?? "",
+      article.purchaseAccountCode ?? "",
+      article.taxCode ?? "",
+    ].join(" "),
+    value: article.code,
   };
 }
 
@@ -157,46 +175,24 @@ function ExistingArticleFields({
     suggestedOptions,
     articleOptions,
   );
+  const searchableOptions = [...suggestedOptions, ...remainingOptions].map(
+    toSearchableArticleOption,
+  );
 
   return (
     <div className="flex flex-col gap-3">
       <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
         <span className={rowArticleLabelClass}>Accounting article/item</span>
-        <select
-          className={fieldClass()}
+        <SearchableSelectField
+          options={searchableOptions}
+          placeholder="Select accounting article"
+          searchAriaLabel="Search accounting articles"
+          searchPlaceholder="Type to filter articles by code, description, or unit"
           value={row.selectedArticleCode ?? ""}
-          onChange={(event) =>
-            updateArticleSelection(
-              { draft, row, setDraft },
-              event.target.value,
-              preview,
-            )
+          onChange={(value) =>
+            updateArticleSelection({ draft, row, setDraft }, value, preview)
           }
-        >
-          <option value="">Select accounting article</option>
-          {suggestedOptions.length ? (
-            <optgroup label="Suggested matches">
-              {suggestedOptions.map((article) => (
-                <option key={article.code} value={article.code}>
-                  {formatArticleOptionLabel(article)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-          {remainingOptions.length ? (
-            <optgroup
-              label={
-                suggestedOptions.length ? "All articles" : "Available articles"
-              }
-            >
-              {remainingOptions.map((article) => (
-                <option key={article.code} value={article.code}>
-                  {formatArticleOptionLabel(article)}
-                </option>
-              ))}
-            </optgroup>
-          ) : null}
-        </select>
+        />
       </label>
     </div>
   );

@@ -102,6 +102,7 @@ it("updates accounting fields", () => {
   const markup = renderToStaticMarkup(tree);
 
   expect(markup).toContain("Purchase account");
+  expect(markup).toContain("Search purchase accounts");
   expect(markup).toContain(
     'aria-label="Why this account? Matched machinery and equipment account."',
   );
