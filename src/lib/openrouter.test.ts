@@ -143,6 +143,9 @@ async function expectVendorPromptAndRawPdfUpload() {
   );
   expect(systemPrompt).toContain("flattened reading order");
   expect(systemPrompt).toContain("branding as the vendor by default");
+  expect(systemPrompt).toContain(
+    "Do not add a warning when the vendor is confidently resolved",
+  );
   expect(userContent.some((item) => item.type === "file")).toBe(true);
   expect(userContent.some((item) => item.type === "image_url")).toBe(false);
   expect(body.plugins).toBeUndefined();
@@ -220,8 +223,54 @@ async function expectImageUploadNormalization() {
   expect(extraction.invoice.currency).toBe("EUR");
   expect(extraction.invoice.entryDate).toBe("2026-02-03");
   expect(extraction.payment.isPaid).toBe(false);
+  expect(extraction.warnings).toEqual([]);
+}
+
+async function expectAmountRoundingAndVendorWarningFiltering() {
+  setupEnv();
+
+  mockOpenRouterResponse(
+    buildResponse(
+      JSON.stringify({
+        ...buildBaseExtraction(),
+        invoice: {
+          ...buildBaseExtraction().invoice,
+          amountExcludingVat: 181.294,
+          vatAmount: 39.884,
+          totalAmount: 221.178,
+        },
+        payment: {
+          ...buildBaseExtraction().payment,
+          paymentAmount: 221.178,
+        },
+        rows: [
+          {
+            ...buildBaseExtraction().rows[0],
+            price: 36.2097,
+            sum: 181.294,
+          },
+        ],
+        warnings: [
+          "Buyer block at top left is labeled 'Maksja', vendor was taken from the separately grouped supplier block.",
+          "Vendor bankAccount selected as Swedbank IBAN shown on the invoice; multiple supplier bank accounts are listed.",
+          "Line totals were rounded from the source document.",
+        ],
+      }),
+    ),
+  );
+
+  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+
+  expect(extraction.invoice.amountExcludingVat).toBe(181.29);
+  expect(extraction.invoice.vatAmount).toBe(39.88);
+  expect(extraction.invoice.totalAmount).toBe(221.18);
+  expect(extraction.payment.paymentAmount).toBe(221.18);
+  expect(extraction.rows[0]).toMatchObject({
+    price: 36.21,
+    sum: 181.29,
+  });
   expect(extraction.warnings).toEqual([
-    "Recipient details ignored for vendor extraction",
+    "Line totals were rounded from the source document.",
   ]);
 }
 
@@ -333,6 +382,10 @@ describe("extractInvoiceWithOpenRouter", () => {
   it(
     "supports image uploads and normalizes null-heavy array responses",
     expectImageUploadNormalization,
+  );
+  it(
+    "rounds extracted monetary amounts and removes non-actionable vendor warnings",
+    expectAmountRoundingAndVendorWarningFiltering,
   );
   it(
     "normalizes missing row and warning arrays to empty lists",

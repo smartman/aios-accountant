@@ -1,4 +1,5 @@
 import { InvoiceExtraction } from "./invoice-import-types";
+import { normalizeInvoiceExtraction } from "./invoice-import/normalization";
 import {
   AccountingProvider,
   ProviderReferenceAccount,
@@ -143,7 +144,8 @@ function buildSystemPrompt(): string {
     "Do not rely on flattened reading order when it conflicts with the visible PDF layout.",
     "Do not treat top-of-page branding as the vendor by default. Use branding only as fallback evidence when explicit role labels are missing.",
     "Cross-check the payment direction: the payment recipient or payee is usually the vendor, while the invoice recipient or bill-to party is the customer.",
-    "If role evidence conflicts, prefer the clearest labeled role assignment, leave uncertain fields null, and explain the ambiguity in warnings.",
+    "If role evidence conflicts, prefer the clearest labeled role assignment, leave uncertain fields null, and explain only unresolved ambiguity in warnings.",
+    "Do not add a warning when the vendor is confidently resolved from explicit role labels.",
     "Return only data grounded in the document.",
   ].join("\n");
 }
@@ -182,8 +184,10 @@ function buildUserPrompt(
     "Use one of the provided tax codes when you can determine it from the document. If unclear, return null.",
     "Set payment.isPaid = true only when the document clearly shows it is already paid or is a receipt-like fully paid document.",
     "payment.paymentChannelHint should be BANK for transfers/cards and CASH for cash receipts when reasonably clear; otherwise null.",
+    "Focus payment guessing on the customer's own payment channel only, not on supplier bank-account ambiguity.",
     "If the invoice has multiple meaningful rows, return them. If not, return one summarized row.",
     "If a supplier-specific product or article code is shown on a row, return it as sourceArticleCode. This is source evidence only, not the accounting item code.",
+    "Round all monetary amounts to 2 decimals.",
     "If something is unclear, keep fields null and add a warning.",
     `Available purchase accounts: ${JSON.stringify(simplifiedAccounts)}`,
     `Available tax codes: ${JSON.stringify(simplifiedTaxCodes)}`,
@@ -310,13 +314,13 @@ function normalizeWarnings(
 }
 
 function normalizeExtraction(data: InvoiceExtraction): InvoiceExtraction {
-  return {
+  return normalizeInvoiceExtraction({
     vendor: normalizeVendor(data),
     invoice: normalizeInvoice(data),
     payment: normalizePayment(data),
     rows: normalizeRows(data),
     warnings: normalizeWarnings(data),
-  };
+  });
 }
 
 export async function extractInvoiceWithOpenRouter(params: {

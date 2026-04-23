@@ -112,7 +112,7 @@ vi.mock("@headlessui/react", async () => {
   };
 });
 
-import { SearchableSelectField } from "./SearchableSelectField";
+import { __test__, SearchableSelectField } from "./SearchableSelectField";
 
 function getHiddenSelect(
   element: React.ReactElement<{ children: React.ReactNode }>,
@@ -153,6 +153,9 @@ it("renders the client combobox path with the selected badge", () => {
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain("Selected");
   expect(markup).toContain('class="sr-only"');
+  expect(markup).toContain("!bg-white");
+  expect(markup).toContain('data-searchable-select-chevron="true"');
+  expect(markup).toContain('viewBox="0 0 16 16"');
 });
 
 it("renders the empty state when filtering leaves no matching options", () => {
@@ -172,6 +175,18 @@ it("renders the empty state when filtering leaves no matching options", () => {
   mockState.capturedInputProps?.onChange?.({
     target: { value: "missing" },
   });
+});
+
+it("hides the static display label once the user starts typing a query", () => {
+  const markup = renderToStaticMarkup(
+    <__test__.SearchableSelectDisplay
+      label="10921 - Machinery and Equipment"
+      muted={false}
+      visible={false}
+    />,
+  );
+
+  expect(markup).toBe("");
 });
 
 it("wires combobox callbacks to selection behavior", () => {

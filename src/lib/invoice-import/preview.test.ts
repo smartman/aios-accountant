@@ -379,3 +379,90 @@ it("loads vendor history when the catalog-only description match is low confiden
     suggestionStatus: "clear",
   });
 });
+
+it("rounds preview amounts and hides non-actionable vendor warnings", async () => {
+  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+    buildExtraction({
+      invoice: {
+        ...buildExtraction().invoice,
+        amountExcludingVat: 181.294,
+        vatAmount: 39.884,
+        totalAmount: 221.178,
+      },
+      payment: {
+        ...buildExtraction().payment,
+        paymentAmount: 221.178,
+      },
+      rows: [
+        {
+          ...buildExtraction().rows[0],
+          price: 36.2097,
+          sum: 181.294,
+        },
+      ],
+      warnings: [
+        "Buyer block at top left is labeled 'Maksja', vendor was taken from the separately grouped supplier block.",
+        "Vendor bankAccount selected as Swedbank IBAN shown on the invoice; multiple supplier bank accounts are listed.",
+        "Row totals were rounded from the source document.",
+      ],
+    }) as never,
+  );
+
+  const preview = await previewInvoiceImport({
+    savedConnection: {
+      workosUserId: "user-1",
+      provider: "merit",
+      credentials: {
+        provider: "merit",
+        credentials: { apiId: "merit-id", apiKey: "merit-key" },
+      },
+      summary: {
+        provider: "merit",
+        label: "Merit",
+        detail: "Verified",
+        verifiedAt: new Date().toISOString(),
+      },
+      verifiedAt: new Date(),
+    },
+    activities: {
+      loadContext: vi.fn().mockResolvedValue({
+        provider: "merit",
+        referenceData: {
+          accounts: [
+            { code: "4000", type: "EXPENSE", label: "4000 - Services" },
+          ],
+          taxCodes: [],
+          paymentAccounts: [
+            { type: "BANK", name: "Main bank", currency: "EUR" },
+          ],
+        },
+      }),
+      findVendor: vi.fn().mockResolvedValue({
+        vendorId: "vendor-1",
+        vendorName: "Vendor OÜ",
+      }),
+      findExistingInvoice: vi.fn().mockResolvedValue(null),
+      listArticles: vi.fn().mockResolvedValue([]),
+      getVendorArticleHistory: vi.fn().mockResolvedValue([]),
+    } as never,
+    credentials: {} as never,
+    mimeType: "application/pdf",
+    filename: "invoice.pdf",
+    buffer: Buffer.from("invoice"),
+    fingerprint: "abcdef123456",
+  });
+
+  expect(preview.draft.invoice).toMatchObject({
+    amountExcludingVat: 181.29,
+    vatAmount: 39.88,
+    totalAmount: 221.18,
+  });
+  expect(preview.draft.payment.paymentAmount).toBe(221.18);
+  expect(preview.draft.rows[0]).toMatchObject({
+    price: 36.21,
+    sum: 181.29,
+  });
+  expect(preview.draft.warnings).toEqual([
+    "Row totals were rounded from the source document.",
+  ]);
+});

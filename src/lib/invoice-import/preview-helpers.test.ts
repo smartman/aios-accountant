@@ -125,10 +125,16 @@ it("chooses the default payment account by preferred type, currency, and fallbac
     "Bank EUR",
   );
   expect(chooseDefaultPaymentAccount(paymentAccounts, "GBP", "BANK")).toBe(
-    "Bank USD",
+    "Bank EUR",
   );
   expect(chooseDefaultPaymentAccount(paymentAccounts, "EUR", null)).toBe(
     "Bank EUR",
+  );
+  expect(chooseDefaultPaymentAccount(paymentAccounts, "EUR", "CASH")).toBe(
+    "Cash EUR",
+  );
+  expect(chooseDefaultPaymentAccount(paymentAccounts, "GBP", "CASH")).toBe(
+    "Cash EUR",
   );
   expect(chooseDefaultPaymentAccount([], "EUR", "BANK")).toBeNull();
 });

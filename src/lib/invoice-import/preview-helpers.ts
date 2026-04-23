@@ -5,6 +5,36 @@ export function createRowId(index: number): string {
   return `row-${index + 1}`;
 }
 
+function rankPaymentAccount(params: {
+  account: {
+    type: "BANK" | "CASH";
+    currency?: string;
+  };
+  desiredCurrency: string;
+  preferredType: "BANK" | "CASH";
+}) {
+  let score = 0;
+
+  if (params.account.type === params.preferredType) {
+    score += 20;
+  }
+
+  if (
+    (params.account.currency ?? "EUR").toUpperCase() ===
+    params.desiredCurrency.toUpperCase()
+  ) {
+    score += 10;
+  } else if ((params.account.currency ?? "").toUpperCase() === "EUR") {
+    score += 3;
+  }
+
+  if (params.account.type === "BANK") {
+    score += 1;
+  }
+
+  return score;
+}
+
 export function chooseDefaultPaymentAccount(
   paymentAccounts: Array<{
     name: string;
@@ -15,16 +45,18 @@ export function chooseDefaultPaymentAccount(
   channelHint: "BANK" | "CASH" | null,
 ): string | null {
   const preferredType = channelHint ?? "BANK";
-  return (
-    paymentAccounts.find(
-      (account) =>
-        account.type === preferredType &&
-        (account.currency ?? "EUR").toUpperCase() === currency.toUpperCase(),
-    )?.name ??
-    paymentAccounts.find((account) => account.type === preferredType)?.name ??
-    paymentAccounts[0]?.name ??
-    null
-  );
+  const rankedAccounts = paymentAccounts
+    .map((account) => ({
+      account,
+      score: rankPaymentAccount({
+        account,
+        desiredCurrency: currency,
+        preferredType,
+      }),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  return rankedAccounts[0]?.account.name ?? null;
 }
 
 export function buildPreviewArticleOptions(catalog: ProviderCatalogArticle[]) {

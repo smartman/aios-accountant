@@ -114,3 +114,78 @@ it("returns an existing invoice result when a duplicate is found", async () => {
     vendorId: "vendor-existing",
   });
 });
+
+it("rounds invoice, payment, and row amounts before confirmation", async () => {
+  const draft = buildDraft();
+  draft.invoice.amountExcludingVat = 120.444;
+  draft.invoice.vatAmount = 26.445;
+  draft.invoice.totalAmount = 146.889;
+  draft.payment.paymentAmount = 146.889;
+  draft.rows[0].price = 120.444;
+  draft.rows[0].sum = 120.444;
+
+  const activities = {
+    loadContext: vi.fn().mockResolvedValue({
+      provider: "merit",
+      referenceData: {
+        accounts: [{ code: "4004", type: "EXPENSE", label: "4004 - Assets" }],
+        taxCodes: [{ code: "VAT22", rate: 22, description: "22%" }],
+        paymentAccounts: [{ type: "BANK", name: "LHV", currency: "EUR" }],
+      },
+    }),
+    findVendor: vi.fn().mockResolvedValue({
+      vendorId: "vendor-existing",
+      vendorName: "Office Supplies OU",
+    }),
+    createVendor: vi.fn(),
+    findExistingInvoice: vi.fn().mockResolvedValue(null),
+    createPurchaseInvoice: vi.fn().mockResolvedValue({
+      invoiceId: "invoice-1",
+      attachedFile: true,
+    }),
+    createPayment: vi.fn().mockResolvedValue({
+      paymentId: "payment-1",
+      paymentAccount: { type: "BANK", name: "LHV" },
+    }),
+    attachDocument: vi.fn(),
+  };
+
+  await confirmInvoiceImport({
+    savedConnection: buildSavedConnection(),
+    activities: activities as never,
+    credentials: { apiId: "merit-id", apiKey: "merit-key" } as never,
+    mimeType: "image/png",
+    filename: "invoice.png",
+    buffer: Buffer.from("invoice"),
+    draft,
+  });
+
+  expect(activities.findExistingInvoice).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      extraction: expect.objectContaining({
+        invoice: expect.objectContaining({
+          amountExcludingVat: 120.44,
+          vatAmount: 26.45,
+          totalAmount: 146.89,
+        }),
+        payment: expect.objectContaining({
+          paymentAmount: 146.89,
+        }),
+      }),
+    }),
+    expect.anything(),
+  );
+  expect(activities.createPurchaseInvoice).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      rows: [
+        expect.objectContaining({
+          price: 120.44,
+          sum: 120.44,
+        }),
+      ],
+    }),
+    expect.anything(),
+  );
+});
