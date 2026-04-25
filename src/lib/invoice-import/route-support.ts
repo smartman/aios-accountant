@@ -7,6 +7,8 @@ const BAD_REQUEST_ERRORS = new Set([
   "Missing reviewed import draft.",
   "Reviewed import draft is invalid.",
   "Choose a company before importing.",
+  "Uploaded invoice reference is invalid.",
+  "Uploaded invoice could not be loaded.",
 ]);
 
 const CONFLICT_ERRORS = new Set([

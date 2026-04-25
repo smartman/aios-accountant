@@ -6,12 +6,9 @@ import {
 } from "@/lib/accounting-provider-types";
 import { previewInvoiceImport } from "@/lib/invoice-import/preview";
 import {
-  getSafeInvoiceFilename,
   getInvoiceImportResponseStatus,
-  getMimeType,
   parseImportCompanyId,
   toErrorMessage,
-  validateInvoiceFile,
 } from "@/lib/invoice-import/route-support";
 import { getStoredAccountingConnection } from "@/lib/user-accounting-connections";
 import { getUser } from "@/lib/workos";
@@ -23,19 +20,23 @@ import {
 } from "@/lib/accounting-provider-cache";
 import { buildCompanyAiContext } from "@/lib/companies/ai-context";
 import { requireCompanyForUser } from "@/lib/companies/repository";
+import {
+  cleanupTemporaryInvoiceBlobReference,
+  readInvoiceUploadContent,
+} from "@/lib/invoice-import/temporary-blob";
 
 export const runtime = "nodejs";
 
-async function previewForSavedConnection(
-  file: File,
+async function previewForSavedConnection(params: {
+  filename: string;
+  mimeType: string;
+  buffer: Buffer;
   savedConnection: NonNullable<
     Awaited<ReturnType<typeof getStoredAccountingConnection>>
-  >,
-) {
-  const mimeType = getMimeType(file);
-  const buffer = Buffer.from(await file.arrayBuffer());
+  >;
+}) {
+  const { buffer, filename, mimeType, savedConnection } = params;
   const fingerprint = crypto.createHash("sha1").update(buffer).digest("hex");
-  const filename = getSafeInvoiceFilename(file);
 
   if (savedConnection.provider === "smartaccounts") {
     const credentials = scopeSmartAccountsCredentials(
@@ -74,8 +75,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let formData: FormData | null = null;
+  let invoiceUpload: Awaited<
+    ReturnType<typeof readInvoiceUploadContent>
+  > | null = null;
+
   try {
-    const formData = await request.formData();
+    formData = await request.formData();
     const companyId = parseImportCompanyId(formData.get("companyId"));
     const company = await requireCompanyForUser({
       companyId,
@@ -86,20 +92,35 @@ export async function POST(request: Request) {
     });
     const savedConnection = await getStoredAccountingConnection(company.id);
     if (!savedConnection) {
+      await cleanupTemporaryInvoiceBlobReference(formData);
       return NextResponse.json(
         { error: "Connect Merit or SmartAccounts before importing." },
         { status: 409 },
       );
     }
+    invoiceUpload = await readInvoiceUploadContent(formData);
+    try {
+      const result = await previewForSavedConnection({
+        filename: invoiceUpload.filename,
+        mimeType: invoiceUpload.mimeType,
+        buffer: invoiceUpload.buffer,
+        savedConnection: {
+          ...savedConnection,
+          companyContext: buildCompanyAiContext(company),
+        },
+      });
 
-    const file = validateInvoiceFile(formData.get("invoice"));
-    const result = await previewForSavedConnection(file, {
-      ...savedConnection,
-      companyContext: buildCompanyAiContext(company),
-    });
-
-    return NextResponse.json(result);
+      return NextResponse.json(result);
+    } finally {
+      await invoiceUpload.cleanup();
+    }
   } catch (error) {
+    if (formData && !invoiceUpload) {
+      try {
+        await cleanupTemporaryInvoiceBlobReference(formData);
+      } catch {}
+    }
+
     return NextResponse.json(
       { error: toErrorMessage(error) },
       { status: getInvoiceImportResponseStatus(error) },

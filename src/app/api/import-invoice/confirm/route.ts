@@ -5,13 +5,10 @@ import {
 } from "@/lib/accounting-provider-types";
 import { confirmInvoiceImport } from "@/lib/invoice-import/confirm";
 import {
-  getSafeInvoiceFilename,
   getInvoiceImportResponseStatus,
-  getMimeType,
   parseImportCompanyId,
   parseInvoiceImportDraft,
   toErrorMessage,
-  validateInvoiceFile,
 } from "@/lib/invoice-import/route-support";
 import { meritProviderAdapter } from "@/lib/merit";
 import { smartAccountsProviderAdapter } from "@/lib/smartaccounts";
@@ -23,6 +20,10 @@ import {
 } from "@/lib/accounting-provider-cache";
 import { buildCompanyAiContext } from "@/lib/companies/ai-context";
 import { requireCompanyForUser } from "@/lib/companies/repository";
+import {
+  cleanupTemporaryInvoiceBlobReference,
+  readInvoiceUploadContent,
+} from "@/lib/invoice-import/temporary-blob";
 
 export const runtime = "nodejs";
 
@@ -32,8 +33,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  let formData: FormData | null = null;
+  let invoiceUpload: Awaited<
+    ReturnType<typeof readInvoiceUploadContent>
+  > | null = null;
+
   try {
-    const formData = await request.formData();
+    formData = await request.formData();
     const companyId = parseImportCompanyId(formData.get("companyId"));
     const company = await requireCompanyForUser({
       companyId,
@@ -44,6 +50,7 @@ export async function POST(request: Request) {
     });
     const storedConnection = await getStoredAccountingConnection(company.id);
     if (!storedConnection) {
+      await cleanupTemporaryInvoiceBlobReference(formData);
       return NextResponse.json(
         { error: "Connect Merit or SmartAccounts before importing." },
         { status: 409 },
@@ -53,42 +60,48 @@ export async function POST(request: Request) {
       ...storedConnection,
       companyContext: buildCompanyAiContext(company),
     };
-    const file = validateInvoiceFile(formData.get("invoice"));
     const draft = parseInvoiceImportDraft(formData.get("draft"));
-    const mimeType = getMimeType(file);
-    const filename = getSafeInvoiceFilename(file);
-    const buffer = Buffer.from(await file.arrayBuffer());
+    invoiceUpload = await readInvoiceUploadContent(formData);
+    try {
+      const result =
+        savedConnection.provider === "smartaccounts"
+          ? await confirmInvoiceImport({
+              savedConnection,
+              activities: smartAccountsProviderAdapter,
+              credentials: scopeSmartAccountsCredentials(
+                savedConnection.credentials
+                  .credentials as SmartAccountsCredentials,
+                savedConnection.companyId ?? "global",
+              ),
+              mimeType: invoiceUpload.mimeType,
+              filename: invoiceUpload.filename,
+              buffer: invoiceUpload.buffer,
+              draft,
+            })
+          : await confirmInvoiceImport({
+              savedConnection,
+              activities: meritProviderAdapter,
+              credentials: scopeMeritCredentials(
+                savedConnection.credentials.credentials as MeritCredentials,
+                savedConnection.companyId ?? "global",
+              ),
+              mimeType: invoiceUpload.mimeType,
+              filename: invoiceUpload.filename,
+              buffer: invoiceUpload.buffer,
+              draft,
+            });
 
-    const result =
-      savedConnection.provider === "smartaccounts"
-        ? await confirmInvoiceImport({
-            savedConnection,
-            activities: smartAccountsProviderAdapter,
-            credentials: scopeSmartAccountsCredentials(
-              savedConnection.credentials
-                .credentials as SmartAccountsCredentials,
-              savedConnection.companyId ?? "global",
-            ),
-            mimeType,
-            filename,
-            buffer,
-            draft,
-          })
-        : await confirmInvoiceImport({
-            savedConnection,
-            activities: meritProviderAdapter,
-            credentials: scopeMeritCredentials(
-              savedConnection.credentials.credentials as MeritCredentials,
-              savedConnection.companyId ?? "global",
-            ),
-            mimeType,
-            filename,
-            buffer,
-            draft,
-          });
-
-    return NextResponse.json(result);
+      return NextResponse.json(result);
+    } finally {
+      await invoiceUpload.cleanup();
+    }
   } catch (error) {
+    if (formData && !invoiceUpload) {
+      try {
+        await cleanupTemporaryInvoiceBlobReference(formData);
+      } catch {}
+    }
+
     return NextResponse.json(
       { error: toErrorMessage(error) },
       { status: getInvoiceImportResponseStatus(error) },
