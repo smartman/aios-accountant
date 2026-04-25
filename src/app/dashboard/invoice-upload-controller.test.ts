@@ -5,6 +5,14 @@ import type {
   InvoiceUploadBatchState,
 } from "./invoice-upload-batch";
 
+const blobMocks = vi.hoisted(() => ({
+  upload: vi.fn(),
+}));
+
+vi.mock("@vercel/blob/client", () => ({
+  upload: blobMocks.upload,
+}));
+
 interface HookHarness {
   cleanupEffects: () => void;
   renderController: () => Promise<{
@@ -127,6 +135,7 @@ function buildReadyItem(): InvoiceBatchItem {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  blobMocks.upload.mockReset();
   vi.doUnmock("react");
   vi.unstubAllGlobals();
 });
@@ -245,6 +254,165 @@ it("does not confirm when no ready invoice is active", async () => {
   await controller.handleConfirm();
 
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("uses temporary blob storage for oversized invoice previews", async () => {
+  blobMocks.upload.mockResolvedValue({
+    url: "https://blob.test/invoice.jpg",
+    downloadUrl: "https://blob.test/invoice.jpg?download=1",
+    pathname: "invoice-import/company-1/invoice.jpg",
+    contentType: "image/jpeg",
+    contentDisposition: "",
+    etag: "etag",
+  });
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    Response.json({
+      ...buildPreview({ reviewed: true }),
+      draft: buildPreview({ reviewed: true }).draft,
+    }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File([new Uint8Array(4 * 1024 * 1024 + 1)], "large.jpg", {
+      type: "image/jpeg",
+    }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("ready");
+  });
+  expect(blobMocks.upload).toHaveBeenCalledOnce();
+  const body = (fetchMock.mock.calls[0][1] as RequestInit).body as FormData;
+  expect(body.get("invoice")).toBeNull();
+  expect(String(body.get("invoiceBlob"))).toContain(
+    "invoice-import/company-1/invoice.jpg",
+  );
+});
+
+it("reports Vercel 413 responses without parsing them as JSON", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("Request Entity Too Large", {
+      status: 413,
+      headers: { "content-type": "text/plain" },
+    }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("failed");
+    expect(batch.items[0].error).toContain("Vercel deployment");
+  });
+});
+
+it("uses the upload limit message for JSON Vercel 413 responses", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    Response.json({ message: "FUNCTION_PAYLOAD_TOO_LARGE" }, { status: 413 }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("failed");
+    expect(batch.items[0].error).toContain("Vercel deployment");
+  });
+});
+
+it("surfaces non-json import failures from the endpoint", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("Gateway unavailable", {
+      status: 502,
+      headers: { "content-type": "text/plain" },
+    }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("failed");
+    expect(batch.items[0].error).toBe("Gateway unavailable");
+  });
+});
+
+it("uses fallback errors for unexpected import responses", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("ok", {
+      status: 200,
+      headers: { "content-type": "text/plain" },
+    }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("failed");
+    expect(batch.items[0].error).toBe("Import failed.");
+  });
+});
+
+it("uses fallback errors when JSON failures omit an error message", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    Response.json({ message: "No error field" }, { status: 500 }),
+  );
+  const { renderController, states } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+
+  controller.handleFileChange([
+    new File(["invoice"], "invoice.jpg", { type: "image/jpeg" }),
+  ]);
+
+  await waitForCondition(() => {
+    const batch = states[0] as InvoiceUploadBatchState;
+    expect(batch.items[0].status).toBe("failed");
+    expect(batch.items[0].error).toBe("Import failed.");
+  });
 });
 
 it("cancels queued preview requests when the controller unmounts", async () => {

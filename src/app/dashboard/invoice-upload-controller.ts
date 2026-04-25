@@ -4,6 +4,7 @@ import type {
   InvoiceImportDraft,
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
+import { VERCEL_DIRECT_UPLOAD_LIMIT_MESSAGE } from "@/lib/invoice-import/upload-limits";
 import {
   createInitialInvoiceUploadBatchState,
   createInvoiceBatchItem,
@@ -18,6 +19,10 @@ import {
   resolveActiveItemId,
   updateInvoiceBatchItem,
 } from "./invoice-upload-batch";
+import {
+  appendInvoiceUploadSource,
+  prepareInvoiceUploadSource,
+} from "./invoice-upload-files";
 
 type SetBatch = (
   updater: (state: InvoiceUploadBatchState) => InvoiceUploadBatchState,
@@ -25,13 +30,57 @@ type SetBatch = (
 
 type Ref<T> = { current: T };
 
+function getResponseError(data: unknown, fallback: string): string {
+  if (
+    data &&
+    typeof data === "object" &&
+    "error" in data &&
+    typeof data.error === "string"
+  ) {
+    return data.error;
+  }
+
+  return fallback;
+}
+
+async function parseImportResponse<T>(
+  response: Response,
+  fallbackError: string,
+): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const data = (await response.json()) as unknown;
+    if (!response.ok) {
+      const fallback =
+        response.status === 413
+          ? VERCEL_DIRECT_UPLOAD_LIMIT_MESSAGE
+          : fallbackError;
+      throw new Error(getResponseError(data, fallback));
+    }
+
+    return data as T;
+  }
+
+  if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error(VERCEL_DIRECT_UPLOAD_LIMIT_MESSAGE);
+    }
+
+    const message = (await response.text()).trim();
+    throw new Error(message || fallbackError);
+  }
+
+  throw new Error(fallbackError);
+}
+
 async function previewInvoice(
   file: File,
   companyId: string,
   signal: AbortSignal,
 ): Promise<InvoiceImportPreviewResult> {
+  const source = await prepareInvoiceUploadSource(file, companyId, signal);
   const formData = new FormData();
-  formData.append("invoice", file);
+  appendInvoiceUploadSource(formData, source);
   formData.append("companyId", companyId);
 
   const response = await fetch("/api/import-invoice", {
@@ -39,13 +88,10 @@ async function previewInvoice(
     body: formData,
     signal,
   });
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error ?? "Import failed.");
-  }
-
-  return data as InvoiceImportPreviewResult;
+  return parseImportResponse<InvoiceImportPreviewResult>(
+    response,
+    "Import failed.",
+  );
 }
 
 async function confirmInvoice(
@@ -53,8 +99,9 @@ async function confirmInvoice(
   draft: InvoiceImportDraft,
   companyId: string,
 ): Promise<ImportedInvoiceResult> {
+  const source = await prepareInvoiceUploadSource(file, companyId);
   const formData = new FormData();
-  formData.append("invoice", file);
+  appendInvoiceUploadSource(formData, source);
   formData.append("draft", JSON.stringify(draft));
   formData.append("companyId", companyId);
 
@@ -62,13 +109,10 @@ async function confirmInvoice(
     method: "POST",
     body: formData,
   });
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error ?? "Import confirm failed.");
-  }
-
-  return data as ImportedInvoiceResult;
+  return parseImportResponse<ImportedInvoiceResult>(
+    response,
+    "Import confirm failed.",
+  );
 }
 
 function createFilePreviewUrl(file: File): string | null {
