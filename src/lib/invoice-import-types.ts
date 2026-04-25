@@ -77,6 +77,8 @@ export interface InvoiceExtractionRow {
   vatPc: string | null;
   accountPurchase: string | null;
   accountSelectionReason: string;
+  needsManualReview?: boolean;
+  manualReviewReason?: string | null;
 }
 
 export interface InvoiceExtraction {
@@ -172,6 +174,8 @@ export interface InvoiceImportDraftRow {
   taxCode: string | null;
   accountCode: string;
   accountSelectionReason: string;
+  needsManualReview?: boolean;
+  manualReviewReason?: string | null;
   reviewed: boolean;
   selectedArticleCode: string | null;
   selectedArticleDescription: string | null;

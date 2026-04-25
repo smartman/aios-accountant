@@ -94,6 +94,8 @@ function extractionFromDraft(draft: InvoiceImportDraft): InvoiceExtraction {
       vatPc: row.taxCode,
       accountPurchase: row.accountCode,
       accountSelectionReason: row.accountSelectionReason,
+      needsManualReview: row.needsManualReview,
+      manualReviewReason: row.manualReviewReason,
     })),
     warnings: [...draft.warnings],
   });

@@ -34,6 +34,8 @@ export function buildRow(
     taxCode: "VAT24",
     accountCode: "10921",
     accountSelectionReason: "Matched machinery and equipment account.",
+    needsManualReview: false,
+    manualReviewReason: null,
     reviewed: false,
     selectedArticleCode: "MSIMAG2701",
     selectedArticleDescription: "MSI MAG 275QF E20",

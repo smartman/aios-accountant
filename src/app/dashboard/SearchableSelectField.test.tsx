@@ -157,6 +157,32 @@ it("renders the placeholder as a visible selectable option", () => {
   expect(markup).toContain("Selected");
 });
 
+it("renders duplicate option values without collapsing option rows", () => {
+  const markup = renderToStaticMarkup(
+    <SearchableSelectField
+      options={[
+        {
+          label: "1000 - Riigid",
+          searchText: "1000 Riigid",
+          value: "Riigid",
+        },
+        {
+          label: "2000 - Riigid",
+          searchText: "2000 Riigid",
+          value: "Riigid",
+        },
+      ]}
+      placeholder="Select account"
+      searchAriaLabel="Search purchase accounts"
+      value=""
+      onChange={() => undefined}
+    />,
+  );
+
+  expect(markup).toContain(">1000 - Riigid<");
+  expect(markup).toContain(">2000 - Riigid<");
+});
+
 it("renders an empty hidden select option and disabled state", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField

@@ -82,11 +82,26 @@ export function buildDraftAmountMismatchWarnings(params: {
       return sum + roundCurrencyAmount((rowNet * rowVatRate) / 100);
     }, 0),
   );
+  const roundingAmount = deriveInvoiceRoundingAmount(params.draft.invoice);
   const rowTotalAmount = roundCurrencyAmount(
-    rowNetAmount +
-      rowVatAmount +
-      deriveInvoiceRoundingAmount(params.draft.invoice),
+    rowNetAmount + rowVatAmount + roundingAmount,
   );
+  const totalMismatch = compareAmount(
+    "Total amount",
+    params.draft.invoice.totalAmount,
+    rowTotalAmount,
+  );
+  const vatMismatch = compareAmount(
+    "VAT amount",
+    params.draft.invoice.vatAmount,
+    rowVatAmount,
+  );
+  const vatMismatchExplainedByRounding =
+    !totalMismatch &&
+    isFiniteAmount(params.draft.invoice.vatAmount) &&
+    roundingAmount !== 0 &&
+    roundCurrencyAmount(rowVatAmount + roundingAmount) ===
+      roundCurrencyAmount(params.draft.invoice.vatAmount);
 
   const mismatches = [
     compareAmount(
@@ -94,12 +109,8 @@ export function buildDraftAmountMismatchWarnings(params: {
       params.draft.invoice.amountExcludingVat,
       rowNetAmount,
     ),
-    compareAmount("VAT amount", params.draft.invoice.vatAmount, rowVatAmount),
-    compareAmount(
-      "Total amount",
-      params.draft.invoice.totalAmount,
-      rowTotalAmount,
-    ),
+    vatMismatchExplainedByRounding ? null : vatMismatch,
+    totalMismatch,
   ].filter((mismatch): mismatch is string => Boolean(mismatch));
 
   if (!mismatches.length) {

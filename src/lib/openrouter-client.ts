@@ -125,6 +125,8 @@ const ROW_PROPERTIES = {
   vatPc: { type: ["string", "null"] },
   accountPurchase: { type: ["string", "null"] },
   accountSelectionReason: { type: "string" },
+  needsManualReview: { type: "boolean" },
+  manualReviewReason: { type: ["string", "null"] },
 } as const;
 
 const ROW_ONLY_SCHEMA = {

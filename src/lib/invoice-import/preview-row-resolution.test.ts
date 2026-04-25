@@ -223,4 +223,34 @@ describe("resolvePreviewRows", () => {
       suggestionStatus: "clear",
     });
   });
+
+  it("carries manual review flags from extracted rows into the draft", async () => {
+    const params = buildParams({
+      extraction: buildExtraction({
+        rows: [
+          {
+            sourceArticleCode: null,
+            description: "Unreadable cafe receipt row",
+            quantity: 1,
+            unit: null,
+            price: 10,
+            sum: 10,
+            vatRate: 22,
+            vatPc: "VAT22",
+            accountPurchase: "4000",
+            accountSelectionReason: "Matched utilities account.",
+            needsManualReview: true,
+            manualReviewReason: "Description is partly hidden by glare.",
+          },
+        ],
+      }),
+    });
+
+    const result = await resolvePreviewRows(params);
+
+    expect(result.rows[0]).toMatchObject({
+      needsManualReview: true,
+      manualReviewReason: "Description is partly hidden by glare.",
+    });
+  });
 });

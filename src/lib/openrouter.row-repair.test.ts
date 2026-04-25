@@ -61,6 +61,8 @@ function buildMergedExtraction() {
         vatPc: "VAT22",
         accountPurchase: "4030",
         accountSelectionReason: "Matched utility expense account.",
+        needsManualReview: false,
+        manualReviewReason: null,
       },
     ],
     warnings: ["Row summary may contain multiple source lines."],
