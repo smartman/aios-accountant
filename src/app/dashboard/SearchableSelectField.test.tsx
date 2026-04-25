@@ -77,6 +77,7 @@ vi.mock("@headlessui/react", async () => {
 });
 
 import {
+  __test__,
   filterSearchableSelectOptions,
   SearchableSelectField,
   type SearchableSelectOption,
@@ -120,7 +121,7 @@ it("requires all search tokens to be present", () => {
   );
 });
 
-it("renders a single visible combobox field plus a hidden synced select", () => {
+it("renders a single visible combobox field", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       options={OPTIONS}
@@ -134,7 +135,6 @@ it("renders a single visible combobox field plus a hidden synced select", () => 
   expect(markup).toContain('aria-label="Search purchase accounts"');
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain(">4000 - Consulting services<");
-  expect(markup).toContain('class="sr-only"');
   expect(markup).toContain("!bg-white");
   expect(markup).toContain('data-searchable-select-chevron="true"');
   expect(markup).toContain('viewBox="0 0 16 16"');
@@ -183,7 +183,7 @@ it("renders duplicate option values without collapsing option rows", () => {
   expect(markup).toContain(">2000 - Riigid<");
 });
 
-it("renders an empty hidden select option and disabled state", () => {
+it("renders the placeholder option", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       disabled
@@ -197,5 +197,10 @@ it("renders an empty hidden select option and disabled state", () => {
 
   expect(markup).toContain('aria-label="Search accounting articles"');
   expect(markup).toContain(">Select article<");
-  expect(markup).toContain("disabled");
+});
+
+it("builds duplicate-safe option keys", () => {
+  expect(__test__.searchableSelectOptionKey(OPTIONS[1], 3)).toBe(
+    "4000::4000 - Consulting services::3",
+  );
 });

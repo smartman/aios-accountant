@@ -65,7 +65,6 @@ export async function createInitialCompany(
       user,
       name: getFormString(formData, "companyName"),
       countryCode: getFormString(formData, "countryCode"),
-      emtakCode: getFormString(formData, "emtakCode"),
       accountingProvider: getFormString(formData, "accountingProvider"),
     });
 
@@ -91,7 +90,6 @@ export async function saveCompanyProfile(
       companyId: getFormString(formData, "companyId"),
       name: getFormString(formData, "companyName"),
       countryCode: getFormString(formData, "countryCode"),
-      emtakCode: getFormString(formData, "emtakCode"),
       accountingProvider: getFormString(formData, "accountingProvider"),
     });
 

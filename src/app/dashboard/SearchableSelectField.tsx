@@ -40,7 +40,6 @@ export function filterSearchableSelectOptions<
 interface SearchableSelectFieldProps {
   disabled?: boolean;
   emptyStateText?: string;
-  name?: string;
   onChange: (value: string) => void;
   options: SearchableSelectOption[];
   placeholder: string;
@@ -269,7 +268,6 @@ function VisibleSearchableSelect({
 export function SearchableSelectField({
   disabled = false,
   emptyStateText = "No matches found.",
-  name,
   onChange,
   options,
   placeholder,
@@ -278,25 +276,6 @@ export function SearchableSelectField({
 }: SearchableSelectFieldProps) {
   return (
     <div className="min-w-0">
-      <select
-        aria-hidden="true"
-        className="sr-only"
-        disabled={disabled}
-        name={name}
-        tabIndex={-1}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option, index) => (
-          <option
-            key={searchableSelectOptionKey(option, index)}
-            value={option.value}
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
       <VisibleSearchableSelect
         disabled={disabled}
         emptyStateText={emptyStateText}
@@ -312,4 +291,5 @@ export function SearchableSelectField({
 
 export const __test__ = {
   SearchableSelectDisplay,
+  searchableSelectOptionKey,
 };

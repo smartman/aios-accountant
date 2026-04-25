@@ -1,23 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { EMTAK_RECORDS } from "@/lib/companies/emtak";
+import { useActionState, useEffect } from "react";
 import { initialCompanyActionState } from "./action-state";
 import { createInitialCompany } from "./actions";
-import {
-  SearchableSelectField,
-  type SearchableSelectOption,
-} from "./SearchableSelectField";
 
 const fieldClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-900";
 const labelClass = "flex min-w-0 flex-col gap-2 text-sm";
 const helperClass = "text-sm text-slate-500 dark:text-slate-400";
-const emtakOptions: SearchableSelectOption[] = EMTAK_RECORDS.map((record) => ({
-  label: `${record.code} - ${record.label}`,
-  searchText: `${record.code} ${record.label}`,
-  value: record.code,
-}));
 
 function WizardActions({
   onCancel,
@@ -59,7 +49,6 @@ export default function CompanySetupWizard({
     createInitialCompany,
     initialCompanyActionState,
   );
-  const [emtakCode, setEmtakCode] = useState("69202");
 
   useEffect(() => {
     if (state.status === "success" && state.companyId) {
@@ -95,18 +84,6 @@ export default function CompanySetupWizard({
           <select className={fieldClass} value="EE" disabled>
             <option value="EE">Estonia</option>
           </select>
-        </label>
-
-        <label className={labelClass}>
-          <span>EMTAK activity</span>
-          <SearchableSelectField
-            name="emtakCode"
-            options={emtakOptions}
-            placeholder="Select EMTAK activity"
-            searchAriaLabel="Search EMTAK activities"
-            value={emtakCode}
-            onChange={setEmtakCode}
-          />
         </label>
 
         <label className={labelClass}>

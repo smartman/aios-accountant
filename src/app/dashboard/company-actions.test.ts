@@ -87,7 +87,6 @@ describe("company dashboard actions", () => {
       formData({
         companyName: "Acme",
         countryCode: "EE",
-        emtakCode: "69202",
         accountingProvider: "smartaccounts",
       }),
     );
@@ -99,7 +98,6 @@ describe("company dashboard actions", () => {
       },
       name: "Acme",
       countryCode: "EE",
-      emtakCode: "69202",
       accountingProvider: "smartaccounts",
     });
     expect(result).toEqual({
@@ -116,7 +114,6 @@ describe("company dashboard actions", () => {
         companyId: "company-1",
         companyName: "Acme",
         countryCode: "EE",
-        emtakCode: "62010",
         accountingProvider: "merit",
       }),
     );
@@ -218,7 +215,6 @@ describe("company dashboard action errors", () => {
         formData({
           companyName: "Acme",
           countryCode: "EE",
-          emtakCode: "69202",
           accountingProvider: "smartaccounts",
         }),
       ),
@@ -238,7 +234,6 @@ describe("company dashboard action errors", () => {
         formData({
           companyName: "Acme",
           countryCode: "EE",
-          emtakCode: "69202",
           accountingProvider: "smartaccounts",
         }),
       ),
@@ -260,7 +255,6 @@ describe("company dashboard action errors", () => {
           companyId: "company-1",
           companyName: "",
           countryCode: "EE",
-          emtakCode: "69202",
           accountingProvider: "smartaccounts",
         }),
       ),
