@@ -15,16 +15,17 @@ export interface SearchableSelectOption {
   value: string;
 }
 
-const MAX_RENDERED_SEARCHABLE_OPTIONS = 50;
+interface VisibleSearchableSelectOption extends SearchableSelectOption {
+  optionKey: string;
+}
 
 function normalizeSearchQuery(value: string): string[] {
   return value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
 }
 
-export function filterSearchableSelectOptions(
-  options: SearchableSelectOption[],
-  query: string,
-): SearchableSelectOption[] {
+export function filterSearchableSelectOptions<
+  TOption extends SearchableSelectOption,
+>(options: TOption[], query: string): TOption[] {
   const tokens = normalizeSearchQuery(query);
   if (!tokens.length) {
     return options;
@@ -39,7 +40,6 @@ export function filterSearchableSelectOptions(
 interface SearchableSelectFieldProps {
   disabled?: boolean;
   emptyStateText?: string;
-  name?: string;
   onChange: (value: string) => void;
   options: SearchableSelectOption[];
   placeholder: string;
@@ -50,33 +50,26 @@ interface SearchableSelectFieldProps {
 function buildVisibleOptions(
   options: SearchableSelectOption[],
   placeholder: string,
-): SearchableSelectOption[] {
+): VisibleSearchableSelectOption[] {
   return [
     {
       label: placeholder,
+      optionKey: "__placeholder__",
       searchText: placeholder,
       value: "",
     },
-    ...options,
+    ...options.map((option, index) => ({
+      ...option,
+      optionKey: searchableSelectOptionKey(option, index),
+    })),
   ];
 }
 
-function limitSearchableSelectOptions({
-  options,
-  selectedOption,
-}: {
-  options: SearchableSelectOption[];
-  selectedOption: SearchableSelectOption | null;
-}): SearchableSelectOption[] {
-  const limitedOptions = options.slice(0, MAX_RENDERED_SEARCHABLE_OPTIONS);
-  if (
-    !selectedOption ||
-    limitedOptions.some((option) => option.value === selectedOption.value)
-  ) {
-    return limitedOptions;
-  }
-
-  return [selectedOption, ...limitedOptions.slice(0, -1)];
+function searchableSelectOptionKey(
+  option: SearchableSelectOption,
+  index: number,
+): string {
+  return `${option.value}::${option.label}::${index}`;
 }
 
 function isPrintableSearchKey(event: KeyboardEvent<HTMLInputElement>): boolean {
@@ -151,27 +144,20 @@ function SearchableSelectChevron() {
 function SearchableSelectOptions({
   emptyStateText,
   filteredOptions,
-  selectedOption,
 }: {
   emptyStateText: string;
-  filteredOptions: SearchableSelectOption[];
-  selectedOption: SearchableSelectOption | null;
+  filteredOptions: VisibleSearchableSelectOption[];
 }) {
-  const renderedOptions = limitSearchableSelectOptions({
-    options: filteredOptions,
-    selectedOption,
-  });
-
   return (
     <ComboboxOptions
       anchor="bottom start"
       transition
       className="isolate z-30 mt-2 max-h-64 w-[var(--input-width)] overflow-auto rounded-[16px] border border-slate-200 bg-white p-2 shadow-[0_22px_45px_rgba(15,23,42,0.16)] ring-1 ring-slate-950/5 empty:invisible data-[closed]:opacity-0 data-[leave]:transition data-[leave]:duration-100 data-[leave]:ease-in dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10"
     >
-      {renderedOptions.length ? (
-        renderedOptions.map((option, index) => (
+      {filteredOptions.length ? (
+        filteredOptions.map((option) => (
           <ComboboxOption
-            key={`${option.value}-${index}`}
+            key={option.optionKey}
             as="button"
             className="group flex w-full items-center rounded-[12px] border border-transparent px-3 py-2.5 text-left text-sm text-slate-700 transition-colors data-[focus]:border-indigo-200 data-[focus]:bg-indigo-50 data-[focus]:text-slate-900 dark:text-slate-200 dark:data-[focus]:border-indigo-500/20 dark:data-[focus]:bg-indigo-500/10 dark:data-[focus]:text-white"
             type="button"
@@ -214,7 +200,7 @@ function VisibleSearchableSelect({
   const filteredOptions = filterSearchableSelectOptions(visibleOptions, query);
   const inputValue = query || selectedOption?.label || "";
 
-  function handleComboboxChange(option: SearchableSelectOption | null) {
+  function handleComboboxChange(option: VisibleSearchableSelectOption | null) {
     onChange(option?.value ?? "");
   }
 
@@ -248,12 +234,12 @@ function VisibleSearchableSelect({
       immediate
       disabled={disabled}
       value={selectedOption}
-      by="value"
+      by="optionKey"
       onChange={handleComboboxChange}
       onClose={handleComboboxClose}
     >
       <div className="relative min-w-0">
-        <ComboboxInput<SearchableSelectOption | null>
+        <ComboboxInput<VisibleSearchableSelectOption | null>
           aria-label={searchAriaLabel}
           autoComplete="off"
           className={buildSearchableSelectInputClassName(query)}
@@ -273,7 +259,6 @@ function VisibleSearchableSelect({
         <SearchableSelectOptions
           emptyStateText={emptyStateText}
           filteredOptions={filteredOptions}
-          selectedOption={selectedOption}
         />
       </div>
     </Combobox>
@@ -283,7 +268,6 @@ function VisibleSearchableSelect({
 export function SearchableSelectField({
   disabled = false,
   emptyStateText = "No matches found.",
-  name,
   onChange,
   options,
   placeholder,
@@ -292,13 +276,6 @@ export function SearchableSelectField({
 }: SearchableSelectFieldProps) {
   return (
     <div className="min-w-0">
-      <input
-        type="hidden"
-        value={value}
-        name={name}
-        disabled={disabled}
-        readOnly
-      />
       <VisibleSearchableSelect
         disabled={disabled}
         emptyStateText={emptyStateText}
@@ -313,7 +290,6 @@ export function SearchableSelectField({
 }
 
 export const __test__ = {
-  MAX_RENDERED_SEARCHABLE_OPTIONS,
   SearchableSelectDisplay,
-  limitSearchableSelectOptions,
+  searchableSelectOptionKey,
 };

@@ -170,6 +170,8 @@ it("normalizes extraction amounts and coerces missing numeric values to null", (
   extraction.payment.paymentAmount = undefined as unknown as number | null;
   extraction.rows[0].price = undefined as unknown as number | null;
   extraction.rows[0].sum = undefined as unknown as number | null;
+  extraction.rows[0].manualReviewReason =
+    "  Description is partially unreadable.  ";
 
   expect(normalizeInvoiceExtraction(extraction)).toMatchObject({
     invoice: {
@@ -180,7 +182,14 @@ it("normalizes extraction amounts and coerces missing numeric values to null", (
     payment: {
       paymentAmount: null,
     },
-    rows: [{ price: null, sum: null }],
+    rows: [
+      {
+        price: null,
+        sum: null,
+        needsManualReview: true,
+        manualReviewReason: "Description is partially unreadable.",
+      },
+    ],
   });
 });
 
@@ -211,6 +220,206 @@ it("preserves exact extraction amounts while normalizing nulls", () => {
   });
 });
 
+it("converts VAT-inclusive receipt rows to net amounts", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 39.19;
+  extraction.invoice.vatAmount = 9.41;
+  extraction.invoice.totalAmount = 48.6;
+  extraction.rows = [
+    {
+      ...extraction.rows[0],
+      description: "Pelmeenid kodused Valgusfoor",
+      quantity: 1,
+      price: 7.9,
+      sum: 7.9,
+      vatRate: 24,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Burger KANA",
+      quantity: 1,
+      price: 15.9,
+      sum: 15.9,
+      vatRate: 24,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Kanatefteelid Maagilised",
+      quantity: 1,
+      price: 7.9,
+      sum: 7.9,
+      vatRate: 24,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Soe kanafilee salat",
+      quantity: 1,
+      price: 12.9,
+      sum: 12.9,
+      vatRate: 24,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Vesi kann",
+      quantity: 1,
+      price: 4,
+      sum: 4,
+      vatRate: 24,
+    },
+  ];
+
+  expect(normalizeInvoiceExtraction(extraction).rows).toMatchObject([
+    { price: 6.37, sum: 6.37 },
+    { price: 12.82, sum: 12.82 },
+    { price: 6.37, sum: 6.37 },
+    { price: 10.4, sum: 10.4 },
+    { price: 3.23, sum: 3.23 },
+  ]);
+});
+
+it("reconciles VAT-inclusive receipt row rounding to the stated net total", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 190.46;
+  extraction.invoice.vatAmount = 45.72;
+  extraction.invoice.totalAmount = 236.18;
+  extraction.rows = [
+    2.99, 1, 8.97, 7.98, 7.99, 11.97, 17.99, 15.99, 12.99, 74.99, 4.99, 3.99,
+    3.99, 12.99, 0.99, 4.99, 1.49, 1.99, 0.99, 3.99, 6.99, 4.49, 5.99, 2.49,
+    3.49, 5.98, -1, 4.49,
+  ].map((grossAmount, index) => ({
+    ...extraction.rows[0],
+    description: `Receipt row ${index + 1}`,
+    quantity: 1,
+    price: grossAmount,
+    sum: grossAmount,
+    vatRate: 24,
+  }));
+
+  const rows = normalizeInvoiceExtraction(extraction).rows;
+  const rowNetTotal = roundAmount(
+    rows.reduce((total, row) => total + (row.sum ?? 0), 0),
+  );
+
+  expect(rowNetTotal).toBe(190.46);
+  expect(rows[7]).toMatchObject({ price: 12.89, sum: 12.89 });
+});
+
+it("skips gross-to-net conversion when a numeric gross row has no VAT rate", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 8.06;
+  extraction.invoice.vatAmount = 1.94;
+  extraction.invoice.totalAmount = 10;
+  extraction.rows[0].price = 10;
+  extraction.rows[0].sum = 10;
+  extraction.rows[0].vatRate = null;
+
+  expect(normalizeInvoiceExtraction(extraction).rows[0]).toMatchObject({
+    price: 10,
+    sum: 10,
+  });
+});
+
+it("keeps converted receipt rows when invoice net is not a rounding match", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 10;
+  extraction.invoice.vatAmount = 2.2;
+  extraction.invoice.totalAmount = 12.2;
+  extraction.rows[0].price = 12.2;
+  extraction.rows[0].sum = 12.2;
+  extraction.rows[0].vatRate = 24;
+
+  expect(normalizeInvoiceExtraction(extraction).rows[0]).toMatchObject({
+    price: 9.84,
+    sum: 9.84,
+  });
+});
+
+it("does not over-adjust receipt row rounding beyond one cent per row", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 0.84;
+  extraction.invoice.vatAmount = 0.16;
+  extraction.invoice.totalAmount = 1;
+  extraction.rows[0].price = 1;
+  extraction.rows[0].sum = 1;
+  extraction.rows[0].vatRate = 24;
+
+  expect(normalizeInvoiceExtraction(extraction).rows[0]).toMatchObject({
+    price: 0.81,
+    sum: 0.81,
+  });
+});
+
+it("keeps the cent rounding on the invoice when VAT-inclusive net rounds down", () => {
+  const extraction = buildExtraction();
+  Object.assign(extraction.invoice, {
+    amountExcludingVat: 0.52,
+    vatAmount: 0.13,
+    totalAmount: 0.65,
+  });
+  Object.assign(extraction.rows[0], { price: 0.65, sum: 0.65, vatRate: 24 });
+
+  expect(normalizeInvoiceExtraction(extraction)).toMatchObject({
+    invoice: { roundingAmount: 0.01 },
+    rows: [{ price: 0.52, sum: 0.52 }],
+  });
+});
+
+it("preserves non-amount rows while converting VAT-inclusive receipt rows", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 0.81;
+  extraction.invoice.vatAmount = 0.19;
+  extraction.invoice.totalAmount = 1;
+  extraction.rows = [
+    {
+      ...extraction.rows[0],
+      description: "Receipt note",
+      price: null,
+      sum: null,
+      vatRate: null,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Receipt item",
+      price: 1,
+      sum: 1,
+      vatRate: 24,
+    },
+  ];
+
+  expect(normalizeInvoiceExtraction(extraction).rows).toMatchObject([
+    { description: "Receipt note", price: null, sum: null },
+    { description: "Receipt item", price: 0.81, sum: 0.81 },
+  ]);
+});
+
+it("ignores non-amount rows while reconciling receipt row rounding", () => {
+  const extraction = buildExtraction();
+  extraction.invoice.amountExcludingVat = 0.8;
+  extraction.invoice.vatAmount = 0.2;
+  extraction.invoice.totalAmount = 1;
+  extraction.rows = [
+    {
+      ...extraction.rows[0],
+      description: "Receipt note",
+      price: null,
+      sum: null,
+      vatRate: null,
+    },
+    {
+      ...extraction.rows[0],
+      description: "Receipt item",
+      price: 1,
+      sum: 1,
+      vatRate: 24,
+    },
+  ];
+
+  expect(normalizeInvoiceExtraction(extraction).rows).toMatchObject([
+    { description: "Receipt note", price: null, sum: null },
+    { description: "Receipt item", price: 0.8, sum: 0.8 },
+  ]);
+});
+
 it("moves standalone rounding notes into the rounding amount field", () => {
   const extraction = buildExtraction();
   extraction.invoice.notes = "Ümardus: 0,01";
@@ -229,6 +438,7 @@ it("normalizes draft amounts and coerces missing numeric values to null", () => 
   draft.payment.paymentAmount = undefined as unknown as number | null;
   draft.rows[0].price = null;
   draft.rows[0].sum = null;
+  draft.rows[0].manualReviewReason = "  Amount needs checking.  ";
 
   expect(normalizeInvoiceImportDraft(draft)).toMatchObject({
     invoice: {
@@ -239,7 +449,14 @@ it("normalizes draft amounts and coerces missing numeric values to null", () => 
     payment: {
       paymentAmount: null,
     },
-    rows: [{ price: null, sum: null }],
+    rows: [
+      {
+        price: null,
+        sum: null,
+        needsManualReview: true,
+        manualReviewReason: "Amount needs checking.",
+      },
+    ],
   });
 });
 

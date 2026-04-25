@@ -293,7 +293,46 @@ describe("POST imports", () => {
       }),
     );
   });
+});
 
+describe("POST photographed invoice imports", () => {
+  it("imports photographed invoice images even when the browser sends a generic MIME type", async () => {
+    const [
+      { POST },
+      { getUser },
+      { getStoredAccountingConnection },
+      { extractInvoiceWithOpenRouter },
+    ] = await Promise.all([
+      import("./route"),
+      import("@/lib/workos"),
+      import("@/lib/user-accounting-connections"),
+      import("@/lib/openrouter"),
+    ]);
+    vi.mocked(getUser).mockResolvedValue({ user: { id: "user-1" } as never });
+    vi.mocked(getStoredAccountingConnection).mockResolvedValue(
+      buildSavedConnection("smartaccounts"),
+    );
+
+    const response = await POST(
+      buildRequest(
+        new File(["photo-bytes"], "restaurant receipt.JPG", {
+          type: "application/octet-stream",
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(extractInvoiceWithOpenRouter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: "restaurant_receipt.JPG",
+        mimeType: "image/jpeg",
+        fileDataUrl: expect.stringMatching(/^data:image\/jpeg;base64,/),
+      }),
+    );
+  });
+});
+
+describe("POST Merit imports", () => {
   it("imports with the Merit adapter when a Merit connection is present", async () => {
     const [{ POST }, { getUser }, { getStoredAccountingConnection }] =
       await Promise.all([

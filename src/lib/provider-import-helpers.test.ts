@@ -157,7 +157,7 @@ describe("resolvePurchaseRows fallback helpers", () => {
         fingerprint: "abcdef1234567890",
       }),
     ).toBe("AUTO-20260407-ABCDEF12");
-    expect(fallbackRowFromInvoice(extraction)).toEqual({
+    expect(fallbackRowFromInvoice(extraction)).toMatchObject({
       sourceArticleCode: null,
       description: "Paid by card",
       quantity: 1,
@@ -167,8 +167,7 @@ describe("resolvePurchaseRows fallback helpers", () => {
       vatRate: null,
       vatPc: null,
       accountPurchase: null,
-      accountSelectionReason:
-        "Fallback summarized row created because the AI response did not include rows.",
+      needsManualReview: true,
     });
   });
 

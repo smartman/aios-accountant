@@ -46,13 +46,18 @@ describe("invoice import route support", () => {
     const unnamedPdf = new File(["invoice"], "placeholder.pdf", {
       type: "application/pdf",
     });
+    const cameraPhoto = new File(["invoice"], "receipt photo.JPG", {
+      type: "application/octet-stream",
+    });
     Object.defineProperty(unnamedPdf, "name", {
       value: "",
       configurable: true,
     });
 
     expect(getMimeType(pdf)).toBe("application/pdf");
+    expect(getMimeType(cameraPhoto)).toBe("image/jpeg");
     expect(validateInvoiceFile(pdf)).toBe(pdf);
+    expect(validateInvoiceFile(cameraPhoto)).toBe(cameraPhoto);
     expect(sanitizeFilename(pdf.name)).toBe("invoice_one_.pdf");
     expect(getSafeInvoiceFilename(unnamedPdf)).toBe("invoice");
 

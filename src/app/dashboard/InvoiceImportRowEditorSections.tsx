@@ -7,12 +7,20 @@ import {
 } from "@/lib/invoice-import-types";
 import { formatInvoiceImportRowLabel } from "@/lib/invoice-import/row-label";
 import {
+  isFiniteAmount,
+  resolveAuthoritativeRowNetAmount,
+  roundCurrencyAmount,
+} from "@/lib/invoice-import/amounts";
+import {
   compactFieldLabelClass,
   fieldClass,
   statusChipClass,
   updateRow,
 } from "./InvoiceImportReviewShared";
-import { FormattedAmountInput } from "./FormattedAmountInput";
+import {
+  FormattedAmountInput,
+  formatAmountInputValue,
+} from "./FormattedAmountInput";
 import {
   ArticleMatchSection,
   UnitDropdown,
@@ -66,6 +74,7 @@ function buildRowUnitOptions(
 function RowHeader({ draft, row, setDraft }: Omit<RowEditorProps, "preview">) {
   const canRemoveRow = draft.rows.length > 1;
   const showStatusChip = row.suggestionStatus !== "clear";
+  const showManualReview = Boolean(row.needsManualReview);
 
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -73,10 +82,20 @@ function RowHeader({ draft, row, setDraft }: Omit<RowEditorProps, "preview">) {
         <strong className="text-base text-slate-900 dark:text-slate-100">
           {formatInvoiceImportRowLabel(row.id)}
         </strong>
-        {showStatusChip ? (
-          <span className={statusChipClass(row.suggestionStatus)}>
-            {row.suggestionStatus}
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {showManualReview ? (
+            <span className={statusChipClass("warning")}>Needs manual fix</span>
+          ) : null}
+          {showStatusChip ? (
+            <span className={statusChipClass(row.suggestionStatus)}>
+              {row.suggestionStatus}
+            </span>
+          ) : null}
+        </div>
+        {showManualReview && row.manualReviewReason ? (
+          <p className="m-0 max-w-2xl text-sm leading-5 text-amber-800 dark:text-amber-100">
+            {row.manualReviewReason}
+          </p>
         ) : null}
       </div>
 
@@ -124,7 +143,7 @@ function DescriptionField({
   setDraft,
 }: Omit<RowEditorProps, "preview">) {
   return (
-    <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm sm:col-span-2 xl:col-span-4">
+    <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm sm:col-span-2 xl:col-span-5">
       <span className={rowFieldLabelClass}>Description</span>
       <input
         className={fieldClass()}
@@ -136,6 +155,60 @@ function DescriptionField({
           }))
         }
       />
+    </label>
+  );
+}
+
+function resolveRowVatRate(
+  row: InvoiceImportDraftRow,
+  preview: InvoiceImportPreviewResult,
+): number {
+  const taxCodeRate = row.taxCode
+    ? preview.referenceData.taxCodes.find(
+        (taxCode) => taxCode.code === row.taxCode,
+      )?.rate
+    : null;
+
+  if (isFiniteAmount(taxCodeRate)) {
+    return taxCodeRate;
+  }
+
+  return isFiniteAmount(row.vatRate) ? row.vatRate : 0;
+}
+
+function resolveRowTotalWithVat(
+  row: InvoiceImportDraftRow,
+  preview: InvoiceImportPreviewResult,
+): number | null {
+  const netAmount = resolveAuthoritativeRowNetAmount(row);
+  if (!isFiniteAmount(netAmount)) {
+    return null;
+  }
+
+  const vatRate = resolveRowVatRate(row, preview);
+  const vatAmount = roundCurrencyAmount((netAmount * vatRate) / 100);
+  return roundCurrencyAmount(netAmount + vatAmount);
+}
+
+function ReadOnlyAmountField({
+  label,
+  labelClassName = rowFieldLabelClass,
+  value,
+}: {
+  label: string;
+  labelClassName?: string;
+  value: number | null;
+}) {
+  return (
+    <label className="flex min-w-0 flex-col gap-[0.45rem] text-sm">
+      <span className={labelClassName}>{label}</span>
+      <output
+        className={fieldClass(
+          "flex items-center text-slate-700 dark:text-slate-200",
+        )}
+      >
+        {formatAmountInputValue(value) || "—"}
+      </output>
     </label>
   );
 }
@@ -203,9 +276,10 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
   const unitOptions = buildRowUnitOptions(row, preview, suggestedArticleUnit);
   const rowMetricLabelClass =
     "flex min-h-[2.5rem] items-end text-sm leading-5 text-slate-600 whitespace-normal text-pretty dark:text-slate-400";
+  const rowTotalWithVat = resolveRowTotalWithVat(row, preview);
 
   return (
-    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <DescriptionField draft={draft} row={row} setDraft={setDraft} />
       <div className="min-w-0">
         <NumericField
@@ -265,6 +339,13 @@ function RowValueFields({ draft, row, preview, setDraft }: RowEditorProps) {
             ...current,
             sum: value,
           })}
+        />
+      </div>
+      <div className="min-w-0">
+        <ReadOnlyAmountField
+          label="Row total with VAT"
+          labelClassName={rowMetricLabelClass}
+          value={rowTotalWithVat}
         />
       </div>
     </div>

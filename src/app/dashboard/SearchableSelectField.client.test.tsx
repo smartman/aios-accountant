@@ -114,24 +114,6 @@ vi.mock("@headlessui/react", async () => {
 
 import { __test__, SearchableSelectField } from "./SearchableSelectField";
 
-function getHiddenInput(
-  element: React.ReactElement<{ children: React.ReactNode }>,
-): React.ReactElement<{
-  name?: string;
-  readOnly?: boolean;
-  type: string;
-  value: string;
-}> {
-  const children = React.Children.toArray(element.props.children);
-
-  return children[0] as React.ReactElement<{
-    name?: string;
-    readOnly?: boolean;
-    type: string;
-    value: string;
-  }>;
-}
-
 beforeEach(() => {
   mockState.capturedComboboxProps = null;
   mockState.capturedInputProps = null;
@@ -156,7 +138,6 @@ it("renders the client combobox path with the selected badge", () => {
 
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain("Selected");
-  expect(markup).toContain('type="hidden"');
   expect(markup).toContain("!bg-white");
   expect(markup).toContain('data-searchable-select-chevron="true"');
   expect(markup).toContain('viewBox="0 0 16 16"');
@@ -328,9 +309,8 @@ it("does not intercept typing when the current value is outside the option list"
   expect(preventDefaultSpy).not.toHaveBeenCalled();
 });
 
-it("keeps the hidden input synced on the client path", () => {
+it("returns the visible combobox wrapper on the client path", () => {
   const element = SearchableSelectField({
-    name: "accountCode",
     onChange: vi.fn(),
     options: [
       {
@@ -349,10 +329,5 @@ it("keeps the hidden input synced on the client path", () => {
     value: "10921",
   });
 
-  const input = getHiddenInput(element);
-
-  expect(input.props.type).toBe("hidden");
-  expect(input.props.name).toBe("accountCode");
-  expect(input.props.value).toBe("10921");
-  expect(input.props.readOnly).toBe(true);
+  expect(element.props.className).toBe("min-w-0");
 });

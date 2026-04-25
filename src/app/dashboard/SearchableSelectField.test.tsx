@@ -121,7 +121,7 @@ it("requires all search tokens to be present", () => {
   );
 });
 
-it("renders a single visible combobox field plus a hidden synced input", () => {
+it("renders a single visible combobox field", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       options={OPTIONS}
@@ -135,8 +135,6 @@ it("renders a single visible combobox field plus a hidden synced input", () => {
   expect(markup).toContain('aria-label="Search purchase accounts"');
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain(">4000 - Consulting services<");
-  expect(markup).toContain('type="hidden"');
-  expect(markup).toContain('value="4000"');
   expect(markup).toContain("!bg-white");
   expect(markup).toContain('data-searchable-select-chevron="true"');
   expect(markup).toContain('viewBox="0 0 16 16"');
@@ -159,7 +157,33 @@ it("renders the placeholder as a visible selectable option", () => {
   expect(markup).toContain("Selected");
 });
 
-it("renders an empty hidden input and disabled state", () => {
+it("renders duplicate option values without collapsing option rows", () => {
+  const markup = renderToStaticMarkup(
+    <SearchableSelectField
+      options={[
+        {
+          label: "1000 - Riigid",
+          searchText: "1000 Riigid",
+          value: "Riigid",
+        },
+        {
+          label: "2000 - Riigid",
+          searchText: "2000 Riigid",
+          value: "Riigid",
+        },
+      ]}
+      placeholder="Select account"
+      searchAriaLabel="Search purchase accounts"
+      value=""
+      onChange={() => undefined}
+    />,
+  );
+
+  expect(markup).toContain(">1000 - Riigid<");
+  expect(markup).toContain(">2000 - Riigid<");
+});
+
+it("renders the placeholder option", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       disabled
@@ -173,24 +197,10 @@ it("renders an empty hidden input and disabled state", () => {
 
   expect(markup).toContain('aria-label="Search accounting articles"');
   expect(markup).toContain(">Select article<");
-  expect(markup).toContain('type="hidden"');
-  expect(markup).toContain("disabled");
 });
 
-it("limits rendered options while preserving the selected value", () => {
-  const options = Array.from(
-    { length: __test__.MAX_RENDERED_SEARCHABLE_OPTIONS + 5 },
-    (_, index) => ({
-      label: `Option ${index}`,
-      value: `option-${index}`,
-    }),
+it("builds duplicate-safe option keys", () => {
+  expect(__test__.searchableSelectOptionKey(OPTIONS[1], 3)).toBe(
+    "4000::4000 - Consulting services::3",
   );
-  const selectedOption = options.at(-1)!;
-
-  expect(
-    __test__.limitSearchableSelectOptions({ options, selectedOption }),
-  ).toEqual([
-    selectedOption,
-    ...options.slice(0, __test__.MAX_RENDERED_SEARCHABLE_OPTIONS - 1),
-  ]);
 });

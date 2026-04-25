@@ -162,6 +162,9 @@ function selectedFilesEvent(files: File[]) {
   };
 }
 
+const pdfFile = (name = "invoice.pdf") =>
+  new File(["invoice"], name, { type: "application/pdf" });
+
 function getBatchState(states: unknown[]): InvoiceUploadBatchState {
   return states[0] as InvoiceUploadBatchState;
 }
@@ -172,9 +175,7 @@ function buildStatusItem(
 ): InvoiceBatchItem {
   return {
     id: `status-${status}`,
-    file: new File(["invoice"], `${status}.pdf`, {
-      type: "application/pdf",
-    }),
+    file: pdfFile(`${status}.pdf`),
     filePreviewUrl: null,
     status,
     preview: null,
@@ -212,9 +213,7 @@ it("ignores empty selections and selections made before import is available", as
 
   let tree = render({ canImport: false, activeProvider: null });
   hostProps(findFirstElementByTag(tree, "input")).onChange?.(
-    selectedFilesEvent([
-      new File(["invoice"], "blocked.pdf", { type: "application/pdf" }),
-    ]),
+    selectedFilesEvent([pdfFile("blocked.pdf")]),
   );
 
   tree = render({ canImport: true, activeProvider: "smartaccounts" });
@@ -356,9 +355,7 @@ it("retries failed previews and shows confirmed results after saving", async () 
     .mockResolvedValueOnce(jsonResponse(preview))
     .mockResolvedValueOnce(jsonResponse(importedResult));
   const { render, states } = await loadInvoiceUploadHarness();
-  const file = new File(["invoice"], "invoice.pdf", {
-    type: "application/pdf",
-  });
+  const file = pdfFile();
 
   let tree = render({ canImport: true, activeProvider: "smartaccounts" });
   hostProps(findFirstElementByTag(tree, "input")).onChange?.(
@@ -401,9 +398,7 @@ it("uses the default preview error when the response has no message", async () =
 
   let tree = render({ canImport: true, activeProvider: "smartaccounts" });
   hostProps(findFirstElementByTag(tree, "input")).onChange?.(
-    selectedFilesEvent([
-      new File(["invoice"], "invoice.pdf", { type: "application/pdf" }),
-    ]),
+    selectedFilesEvent([pdfFile()]),
   );
   await flushAsyncWork();
 
@@ -426,9 +421,7 @@ it("keeps a ready preview active when confirmation fails", async () => {
 
   let tree = render({ canImport: true, activeProvider: "smartaccounts" });
   hostProps(findFirstElementByTag(tree, "input")).onChange?.(
-    selectedFilesEvent([
-      new File(["invoice"], "invoice.pdf", { type: "application/pdf" }),
-    ]),
+    selectedFilesEvent([pdfFile()]),
   );
   await flushAsyncWork();
 
@@ -441,6 +434,11 @@ it("keeps a ready preview active when confirmation fails", async () => {
     status: "ready",
     error: "Confirm failed.",
   });
+
+  tree = render({ canImport: true, activeProvider: "smartaccounts" });
+  const markup = renderToStaticMarkup(tree);
+  expect(markup).toContain("Confirm failed.");
+  expect(markup).toContain("Confirm and create invoice");
 });
 
 it("opens and closes the active preview lightbox and revokes URLs on cleanup", async () => {
@@ -451,9 +449,7 @@ it("opens and closes the active preview lightbox and revokes URLs on cleanup", a
 
   let tree = render({ canImport: true, activeProvider: "smartaccounts" });
   hostProps(findFirstElementByTag(tree, "input")).onChange?.(
-    selectedFilesEvent([
-      new File(["invoice"], "invoice.pdf", { type: "application/pdf" }),
-    ]),
+    selectedFilesEvent([pdfFile()]),
   );
   await flushAsyncWork();
 

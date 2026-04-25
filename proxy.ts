@@ -34,6 +34,6 @@ export const config = {
     "/dashboard/:path*",
     "/api/auth/signin",
     "/api/auth/callback",
-    "/api/import-invoice",
+    "/api/import-invoice/:path*",
   ],
 };

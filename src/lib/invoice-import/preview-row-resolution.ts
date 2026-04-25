@@ -81,6 +81,8 @@ function buildBaseDraftRow(params: {
     taxCode: params.resolvedRow.taxCode ?? null,
     accountCode: params.resolvedRow.accountCode,
     accountSelectionReason: params.resolvedRow.accountSelectionReason,
+    needsManualReview: Boolean(params.sourceRow.needsManualReview),
+    manualReviewReason: params.sourceRow.manualReviewReason?.trim() || null,
     reviewed: false,
     selectedArticleCode: null,
     selectedArticleDescription: null,

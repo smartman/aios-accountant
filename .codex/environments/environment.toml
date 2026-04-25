@@ -19,4 +19,6 @@ fi
 
 ln -sfn "$SOURCE/.env.local" .env.local
 echo "Symlinked .env.local -> $SOURCE/.env.local"
+
+npm install
 '''

@@ -19,6 +19,7 @@
     "@headlessui/react": "^2.2.10",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
+    "@vercel/blob": "^2.3.3",
     "@workos-inc/authkit-nextjs": "^3.0.0",
     "date-fns": "^4.1.0",
     "fast-check": "^4.6.0",
