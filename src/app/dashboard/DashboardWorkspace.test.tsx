@@ -154,11 +154,13 @@ describe("DashboardWorkspace", () => {
       id: "company-2",
       name: "Other",
     });
+    const navigateToCompany = vi.fn();
 
     render(
       <DashboardWorkspace
         activeCompany={company}
         companies={[company, otherCompany]}
+        navigateToCompany={navigateToCompany}
         userEmail="dev@example.com"
       />,
     );
@@ -166,6 +168,8 @@ describe("DashboardWorkspace", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Company" }), {
       target: { value: "company-2" },
     });
+
+    expect(navigateToCompany).toHaveBeenCalledWith("company-2");
   });
 });
 

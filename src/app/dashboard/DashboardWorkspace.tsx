@@ -20,10 +20,12 @@ function CompanySwitcher({
   activeCompany,
   companies,
   onCreateCompany,
+  onSelectCompany,
 }: {
   activeCompany: CompanySummary;
   companies: CompanySummary[];
   onCreateCompany: () => void;
+  onSelectCompany: (companyId: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -40,7 +42,7 @@ function CompanySwitcher({
               return;
             }
 
-            window.location.href = `/dashboard?companyId=${event.target.value}`;
+            onSelectCompany(event.target.value);
           }}
         >
           {companies.map((company) => (
@@ -55,13 +57,21 @@ function CompanySwitcher({
   );
 }
 
+/* v8 ignore start -- jsdom cannot perform full document navigation. */
+function navigateToCompanyDashboard(companyId: string) {
+  window.location.href = `/dashboard?companyId=${companyId}`;
+}
+/* v8 ignore stop */
+
 export default function DashboardWorkspace({
   activeCompany,
   companies,
+  navigateToCompany = navigateToCompanyDashboard,
   userEmail,
 }: {
   activeCompany: CompanySummary | null;
   companies: CompanySummary[];
+  navigateToCompany?: (companyId: string) => void;
   userEmail: string;
 }) {
   const [workspaceState, setWorkspaceState] = useState(() =>
@@ -131,6 +141,7 @@ export default function DashboardWorkspace({
               activeCompany={activeCompany}
               companies={companies}
               onCreateCompany={handleCreateCompany}
+              onSelectCompany={navigateToCompany}
             />
             <DashboardWorkspaceMenu
               actions={menuActions}
