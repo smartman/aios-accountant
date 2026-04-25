@@ -2,7 +2,6 @@ import { Prisma } from "@/generated/prisma/client";
 import { getPrismaClient } from "../prisma";
 import { assertAccountingProvider } from "../accounting-providers";
 import type { SavedConnectionSummary } from "../accounting-provider-types";
-import { assertEmtakRecord } from "./emtak";
 import {
   createDefaultCompanyConfiguration,
   normalizeCompanyConfiguration,
@@ -78,8 +77,6 @@ function mapCompany(record: CompanyRecord): CompanySummary {
     id: record.id,
     name: record.name,
     countryCode,
-    emtakCode: record.emtakCode,
-    emtakLabel: record.emtakLabel,
     accountingProvider: provider,
     configuration: normalizeCompanyConfiguration(record.configuration),
     connectionSummary: sanitizeConnectionSummary(
@@ -199,13 +196,11 @@ export async function createCompanyForUser(params: {
   user: AuthenticatedCompanyUser;
   name: string;
   countryCode: string;
-  emtakCode: string;
   accountingProvider: string;
 }): Promise<CompanySummary> {
   const email = normalizeEmail(params.user.email);
   const countryCode = assertSupportedCountry(params.countryCode);
   const provider = assertAccountingProvider(params.accountingProvider);
-  const emtak = assertEmtakRecord(params.emtakCode);
   const name = params.name.trim();
 
   if (!name) {
@@ -220,8 +215,6 @@ export async function createCompanyForUser(params: {
     data: {
       name,
       countryCode,
-      emtakCode: emtak.code,
-      emtakLabel: emtak.label,
       accountingProvider: provider,
       configuration:
         createDefaultCompanyConfiguration() as unknown as Prisma.InputJsonValue,
@@ -243,13 +236,11 @@ export async function updateCompanyProfile(params: {
   user: AuthenticatedCompanyUser;
   name: string;
   countryCode: string;
-  emtakCode: string;
   accountingProvider: string;
 }): Promise<CompanySummary> {
   const current = await requireCompanyForUser(params);
   const provider = assertAccountingProvider(params.accountingProvider);
   const countryCode = assertSupportedCountry(params.countryCode);
-  const emtak = assertEmtakRecord(params.emtakCode);
   const name = params.name.trim();
 
   if (!name) {
@@ -272,8 +263,6 @@ export async function updateCompanyProfile(params: {
     data: {
       name,
       countryCode,
-      emtakCode: emtak.code,
-      emtakLabel: emtak.label,
       accountingProvider: provider,
     },
     include: companyInclude,

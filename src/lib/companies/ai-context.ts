@@ -34,7 +34,6 @@ export function buildCompanyAiContext(company: CompanySummary): string {
   const lines = nonEmptyLines([
     "Company accounting profile:",
     `Country: Estonia (${company.countryCode}). Apply Estonian accounting and VAT conventions.`,
-    `EMTAK activity: ${company.emtakCode} - ${company.emtakLabel}.`,
     `Fixed asset threshold: ${config.fixedAssetThreshold} EUR.`,
     `Car VAT policy: ${config.carVatPolicy}.`,
     config.costPreference ? `Cost preference: ${config.costPreference}.` : null,

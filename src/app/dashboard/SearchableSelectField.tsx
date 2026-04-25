@@ -15,6 +15,8 @@ export interface SearchableSelectOption {
   value: string;
 }
 
+const MAX_RENDERED_SEARCHABLE_OPTIONS = 50;
+
 function normalizeSearchQuery(value: string): string[] {
   return value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
 }
@@ -57,6 +59,24 @@ function buildVisibleOptions(
     },
     ...options,
   ];
+}
+
+function limitSearchableSelectOptions({
+  options,
+  selectedOption,
+}: {
+  options: SearchableSelectOption[];
+  selectedOption: SearchableSelectOption | null;
+}): SearchableSelectOption[] {
+  const limitedOptions = options.slice(0, MAX_RENDERED_SEARCHABLE_OPTIONS);
+  if (
+    !selectedOption ||
+    limitedOptions.some((option) => option.value === selectedOption.value)
+  ) {
+    return limitedOptions;
+  }
+
+  return [selectedOption, ...limitedOptions.slice(0, -1)];
 }
 
 function isPrintableSearchKey(event: KeyboardEvent<HTMLInputElement>): boolean {
@@ -131,18 +151,25 @@ function SearchableSelectChevron() {
 function SearchableSelectOptions({
   emptyStateText,
   filteredOptions,
+  selectedOption,
 }: {
   emptyStateText: string;
   filteredOptions: SearchableSelectOption[];
+  selectedOption: SearchableSelectOption | null;
 }) {
+  const renderedOptions = limitSearchableSelectOptions({
+    options: filteredOptions,
+    selectedOption,
+  });
+
   return (
     <ComboboxOptions
       anchor="bottom start"
       transition
       className="isolate z-30 mt-2 max-h-64 w-[var(--input-width)] overflow-auto rounded-[16px] border border-slate-200 bg-white p-2 shadow-[0_22px_45px_rgba(15,23,42,0.16)] ring-1 ring-slate-950/5 empty:invisible data-[closed]:opacity-0 data-[leave]:transition data-[leave]:duration-100 data-[leave]:ease-in dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10"
     >
-      {filteredOptions.length ? (
-        filteredOptions.map((option, index) => (
+      {renderedOptions.length ? (
+        renderedOptions.map((option, index) => (
           <ComboboxOption
             key={`${option.value}-${index}`}
             as="button"
@@ -246,6 +273,7 @@ function VisibleSearchableSelect({
         <SearchableSelectOptions
           emptyStateText={emptyStateText}
           filteredOptions={filteredOptions}
+          selectedOption={selectedOption}
         />
       </div>
     </Combobox>
@@ -264,22 +292,13 @@ export function SearchableSelectField({
 }: SearchableSelectFieldProps) {
   return (
     <div className="min-w-0">
-      <select
-        aria-hidden="true"
-        className="sr-only"
-        disabled={disabled}
-        name={name}
-        tabIndex={-1}
+      <input
+        type="hidden"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option, index) => (
-          <option key={`${option.value}-${index}`} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        name={name}
+        disabled={disabled}
+        readOnly
+      />
       <VisibleSearchableSelect
         disabled={disabled}
         emptyStateText={emptyStateText}
@@ -294,5 +313,7 @@ export function SearchableSelectField({
 }
 
 export const __test__ = {
+  MAX_RENDERED_SEARCHABLE_OPTIONS,
   SearchableSelectDisplay,
+  limitSearchableSelectOptions,
 };

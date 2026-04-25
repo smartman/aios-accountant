@@ -28,8 +28,6 @@ vi.mock("@/lib/companies/repository", () => ({
     id: companyId || "company-1",
     name: "Test company",
     countryCode: "EE",
-    emtakCode: "69202",
-    emtakLabel: "Bookkeeping",
     accountingProvider: "smartaccounts",
     configuration: {},
     connectionSummary: null,

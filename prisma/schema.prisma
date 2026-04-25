@@ -11,8 +11,6 @@ model Company {
   id                 String                       @id @default(cuid())
   name               String
   countryCode        String
-  emtakCode          String
-  emtakLabel         String
   accountingProvider String
   configuration      Json
   createdAt          DateTime                     @default(now())

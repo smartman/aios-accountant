@@ -56,8 +56,6 @@ function buildCompany(overrides?: Partial<CompanySummary>): CompanySummary {
     id: "company-1",
     name: "Acme",
     countryCode: "EE",
-    emtakCode: "69202",
-    emtakLabel: "Raamatupidamine, maksualane nõustamine",
     accountingProvider: "smartaccounts",
     configuration: {
       fixedAssetThreshold: 2000,

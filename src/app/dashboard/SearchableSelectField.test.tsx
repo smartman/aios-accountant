@@ -77,6 +77,7 @@ vi.mock("@headlessui/react", async () => {
 });
 
 import {
+  __test__,
   filterSearchableSelectOptions,
   SearchableSelectField,
   type SearchableSelectOption,
@@ -120,7 +121,7 @@ it("requires all search tokens to be present", () => {
   );
 });
 
-it("renders a single visible combobox field plus a hidden synced select", () => {
+it("renders a single visible combobox field plus a hidden synced input", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       options={OPTIONS}
@@ -134,7 +135,8 @@ it("renders a single visible combobox field plus a hidden synced select", () => 
   expect(markup).toContain('aria-label="Search purchase accounts"');
   expect(markup).toContain('data-headlessui-combobox="true"');
   expect(markup).toContain(">4000 - Consulting services<");
-  expect(markup).toContain('class="sr-only"');
+  expect(markup).toContain('type="hidden"');
+  expect(markup).toContain('value="4000"');
   expect(markup).toContain("!bg-white");
   expect(markup).toContain('data-searchable-select-chevron="true"');
   expect(markup).toContain('viewBox="0 0 16 16"');
@@ -157,7 +159,7 @@ it("renders the placeholder as a visible selectable option", () => {
   expect(markup).toContain("Selected");
 });
 
-it("renders an empty hidden select option and disabled state", () => {
+it("renders an empty hidden input and disabled state", () => {
   const markup = renderToStaticMarkup(
     <SearchableSelectField
       disabled
@@ -171,5 +173,24 @@ it("renders an empty hidden select option and disabled state", () => {
 
   expect(markup).toContain('aria-label="Search accounting articles"');
   expect(markup).toContain(">Select article<");
+  expect(markup).toContain('type="hidden"');
   expect(markup).toContain("disabled");
+});
+
+it("limits rendered options while preserving the selected value", () => {
+  const options = Array.from(
+    { length: __test__.MAX_RENDERED_SEARCHABLE_OPTIONS + 5 },
+    (_, index) => ({
+      label: `Option ${index}`,
+      value: `option-${index}`,
+    }),
+  );
+  const selectedOption = options.at(-1)!;
+
+  expect(
+    __test__.limitSearchableSelectOptions({ options, selectedOption }),
+  ).toEqual([
+    selectedOption,
+    ...options.slice(0, __test__.MAX_RENDERED_SEARCHABLE_OPTIONS - 1),
+  ]);
 });

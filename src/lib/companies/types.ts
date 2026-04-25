@@ -5,12 +5,6 @@ import type {
 
 export type SupportedCompanyCountry = "EE";
 
-export interface EmtakRecord {
-  code: string;
-  parent: string | null;
-  label: string;
-}
-
 export interface CompanyProjectRule {
   id: string;
   name: string;
@@ -56,8 +50,6 @@ export interface CompanySummary {
   id: string;
   name: string;
   countryCode: SupportedCompanyCountry;
-  emtakCode: string;
-  emtakLabel: string;
   accountingProvider: AccountingProvider;
   configuration: CompanyConfiguration;
   connectionSummary: SavedConnectionSummary | null;

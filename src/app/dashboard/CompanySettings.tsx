@@ -1,8 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import type { CompanySummary } from "@/lib/companies/types";
-import { EMTAK_RECORDS } from "@/lib/companies/emtak";
 import { initialCompanyActionState } from "./action-state";
 import {
   deleteCompanyFromForm,
@@ -13,10 +12,6 @@ import {
 } from "./actions";
 import ConnectionSettings from "./ConnectionSettings";
 import CompanySettingsRules from "./CompanySettingsRules";
-import {
-  SearchableSelectField,
-  type SearchableSelectOption,
-} from "./SearchableSelectField";
 
 const sectionClass =
   "rounded-xl border border-slate-200 bg-slate-100 p-5 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.08)] sm:p-6 dark:border-slate-700 dark:bg-slate-900";
@@ -27,11 +22,6 @@ const buttonClass =
   "inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60";
 const dangerButtonClass =
   "inline-flex min-h-[44px] items-center justify-center rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60";
-const emtakOptions: SearchableSelectOption[] = EMTAK_RECORDS.map((record) => ({
-  label: `${record.code} - ${record.label}`,
-  searchText: `${record.code} ${record.label}`,
-  value: record.code,
-}));
 
 function ActionMessage({
   message,
@@ -62,7 +52,6 @@ function CompanyProfileForm({ company }: { company: CompanySummary }) {
     saveCompanyProfile,
     initialCompanyActionState,
   );
-  const [emtakCode, setEmtakCode] = useState(company.emtakCode);
 
   return (
     <section className={sectionClass}>
@@ -84,17 +73,6 @@ function CompanyProfileForm({ company }: { company: CompanySummary }) {
           <select className={fieldClass} value="EE" disabled>
             <option value="EE">Estonia</option>
           </select>
-        </label>
-        <label className={labelClass}>
-          <span>EMTAK activity</span>
-          <SearchableSelectField
-            name="emtakCode"
-            options={emtakOptions}
-            placeholder="Select EMTAK activity"
-            searchAriaLabel="Search EMTAK activities"
-            value={emtakCode}
-            onChange={setEmtakCode}
-          />
         </label>
         <input
           type="hidden"
