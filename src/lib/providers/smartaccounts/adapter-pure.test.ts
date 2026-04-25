@@ -260,7 +260,9 @@ describe("smartaccounts adapter pure invoice rounding", () => {
       }),
     );
   });
+});
 
+describe("smartaccounts adapter pure invoice details", () => {
   it("rounds invoice header amounts only when building the SmartAccounts payload", () => {
     const payload = __test__.buildInvoicePayload({
       ...buildInvoiceParams(),
@@ -304,5 +306,35 @@ describe("smartaccounts adapter pure invoice rounding", () => {
         sum: 9.88,
       }),
     ]);
+  });
+
+  it("adds selected SmartAccounts object ids to invoice and rows", () => {
+    const params = buildInvoiceParams();
+    const payload = __test__.buildInvoicePayload({
+      ...params,
+      extraction: {
+        ...params.extraction,
+        dimension: {
+          code: "OBJ",
+          name: "Object",
+          reason: "Matched project",
+        },
+      },
+      referenceData: {
+        ...params.referenceData,
+        dimensions: [
+          {
+            code: "OBJ",
+            name: "Object",
+            providerId: "object-1",
+          },
+        ],
+      },
+    });
+
+    expect(payload.objectId).toBe("object-1");
+    expect((payload.rows as Array<Record<string, unknown>>)[0].objectId).toBe(
+      "object-1",
+    );
   });
 });

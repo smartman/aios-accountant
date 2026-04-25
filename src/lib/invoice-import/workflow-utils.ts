@@ -5,6 +5,7 @@ import {
   AccountingProviderActivities,
   ProviderCreateVendorResult,
 } from "../accounting-provider-activities";
+import type { ProviderDimension } from "../accounting-provider-types";
 import { StoredAccountingConnection } from "../user-accounting-connections";
 import {
   logInvoiceImportEvent,
@@ -44,6 +45,7 @@ export async function extractInvoiceData<TCredentials>(
   taxCodes: Awaited<
     ReturnType<AccountingProviderActivities<TCredentials>["loadContext"]>
   >["referenceData"]["taxCodes"],
+  dimensions: ProviderDimension[] = [],
 ) {
   const rawExtraction = await measureInvoiceImportPhase({
     workflow: params.workflow,
@@ -61,6 +63,8 @@ export async function extractInvoiceData<TCredentials>(
         fileDataUrl: bufferToDataUrl(params.buffer, params.mimeType),
         accounts,
         taxCodes,
+        dimensions,
+        companyContext: params.savedConnection.companyContext,
       }),
   });
   const extraction = normalizeInvoiceExtraction(rawExtraction);

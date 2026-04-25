@@ -78,6 +78,11 @@ function extractionFromDraft(draft: InvoiceImportDraft): InvoiceExtraction {
       reason: draft.payment.reason,
       paymentAccountName: draft.payment.paymentAccountName,
     },
+    dimension: {
+      code: draft.dimension?.code ?? null,
+      name: draft.dimension?.name ?? null,
+      reason: draft.dimension?.reason ?? null,
+    },
     rows: draft.rows.map((row) => ({
       sourceArticleCode: row.sourceArticleCode,
       description: row.description,
@@ -200,6 +205,7 @@ async function resolveDraftRows<TCredentials>(params: {
       taxCode: row.taxCode ?? undefined,
       accountCode: row.accountCode,
       accountSelectionReason: row.accountSelectionReason,
+      dimensionCode: params.draft.dimension?.code ?? undefined,
     });
   }
 

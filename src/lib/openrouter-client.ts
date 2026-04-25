@@ -63,6 +63,12 @@ const PAYMENT_PROPERTIES = {
   reason: { type: ["string", "null"] },
 } as const;
 
+const DIMENSION_PROPERTIES = {
+  code: { type: ["string", "null"] },
+  name: { type: ["string", "null"] },
+  reason: { type: ["string", "null"] },
+} as const;
+
 const ROW_PROPERTIES = {
   sourceArticleCode: { type: ["string", "null"] },
   description: { type: "string" },
@@ -96,7 +102,7 @@ const ROW_ONLY_SCHEMA = {
 const INVOICE_EXTRACTION_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["vendor", "invoice", "payment", "rows", "warnings"],
+  required: ["vendor", "invoice", "payment", "dimension", "rows", "warnings"],
   properties: {
     vendor: {
       type: "object",
@@ -115,6 +121,12 @@ const INVOICE_EXTRACTION_SCHEMA = {
       additionalProperties: false,
       required: Object.keys(PAYMENT_PROPERTIES),
       properties: PAYMENT_PROPERTIES,
+    },
+    dimension: {
+      type: "object",
+      additionalProperties: false,
+      required: Object.keys(DIMENSION_PROPERTIES),
+      properties: DIMENSION_PROPERTIES,
     },
     rows: {
       type: "array",

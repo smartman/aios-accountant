@@ -160,6 +160,10 @@ export function buildInvoicePayload(
       "The invoice date could not be extracted from the uploaded file.",
     );
   }
+  const selectedObject = (params.referenceData.dimensions ?? []).find(
+    (dimension) => dimension.code === params.extraction.dimension?.code,
+  );
+  const objectId = selectedObject?.providerId;
 
   return {
     vendorId: params.vendorId,
@@ -180,6 +184,7 @@ export function buildInvoicePayload(
     vatAmount: normalizeRoundedNumber(params.extraction.invoice.vatAmount),
     totalAmount: normalizeRoundedNumber(params.extraction.invoice.totalAmount),
     comment: params.extraction.invoice.notes ?? undefined,
+    objectId,
     rows: params.rows.map((row, index) => ({
       code: row.code,
       description: row.description,
@@ -190,6 +195,7 @@ export function buildInvoicePayload(
       vatPc: row.taxCode ?? undefined,
       order: index + 1,
       accountPurchase: row.accountCode,
+      objectId,
     })),
   };
 }

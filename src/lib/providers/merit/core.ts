@@ -9,18 +9,17 @@ import {
   MeritUnit,
 } from "../../accounting-provider-types";
 import { inflightCache, memoryCache } from "./core-cache";
-
 export const CACHE_TTLS = {
   accounts: 10 * 60 * 1000,
   taxes: 10 * 60 * 1000,
   banks: 10 * 60 * 1000,
   paymentTypes: 10 * 60 * 1000,
   units: 10 * 60 * 1000,
+  dimensions: 10 * 60 * 1000,
   items: 10 * 60 * 1000,
   vendors: 5 * 60 * 1000,
   purchaseInvoices: 2 * 60 * 1000,
 } as const;
-
 const MERIT_API_ROOT = "https://aktiva.merit.ee";
 
 const MERIT_ENDPOINT_VERSIONS = {
@@ -30,6 +29,7 @@ const MERIT_ENDPOINT_VERSIONS = {
   getvendors: "v1",
   getpaymenttypes: "v2",
   getunits: "v1",
+  getdimensions: "v2",
   getitems: "v1",
   sendvendor: "v2",
   getpurchorders: "v2",
@@ -474,9 +474,9 @@ export async function getItems(
 }
 
 function meritPeriodDate(date: Date): string {
-  return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(
-    date.getUTCDate(),
-  ).padStart(2, "0")}`;
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${date.getUTCFullYear()}${month}${day}`;
 }
 
 export async function validateMeritV2Access(

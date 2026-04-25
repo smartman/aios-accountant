@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   getPaymentTypes: vi.fn(),
   getTaxes: vi.fn(),
   getUnits: vi.fn(),
+  getDimensions: vi.fn(),
   meritDate: vi.fn((value?: string | null) => (value ? "20260414" : undefined)),
   meritDateTime: vi.fn(() => "202604141200"),
   meritRequest: vi.fn(),
@@ -30,6 +31,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./core", () => mocks);
+vi.mock("./dimensions", () => ({
+  getDimensions: mocks.getDimensions,
+}));
 vi.mock("./data", () => ({
   createVendor: mocks.createVendor,
   findExistingPurchaseInvoice: mocks.findExistingPurchaseInvoice,
@@ -71,6 +75,7 @@ function buildContext(): Extract<
       units: [{ code: "tk", name: "tk" }],
       items: [],
       vendors: [],
+      dimensions: [],
     },
   };
 }
@@ -181,6 +186,7 @@ beforeEach(() => {
     { id: "tax-22", code: "22", name: "VAT", rate: 22 },
   ]);
   mocks.getUnits.mockResolvedValue([{ code: "tk", name: "tk" }]);
+  mocks.getDimensions.mockResolvedValue([]);
   mocks.meritRequest.mockResolvedValue({
     PIHId: "invoice-1",
     PaymentId: "payment-1",

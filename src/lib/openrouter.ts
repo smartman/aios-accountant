@@ -6,6 +6,7 @@ import {
 } from "./invoice-import/row-repair";
 import type {
   AccountingProvider,
+  ProviderDimension,
   ProviderReferenceAccount,
   ProviderReferenceTaxCode,
 } from "./accounting-provider-types";
@@ -79,6 +80,16 @@ function normalizePayment(
   };
 }
 
+function normalizeDimension(
+  data: InvoiceExtraction,
+): NonNullable<InvoiceExtraction["dimension"]> {
+  return {
+    code: data.dimension?.code ?? null,
+    name: data.dimension?.name ?? null,
+    reason: data.dimension?.reason ?? null,
+  };
+}
+
 function normalizeRows(data: InvoiceExtraction): InvoiceExtraction["rows"] {
   return Array.isArray(data.rows) ? data.rows : [];
 }
@@ -94,6 +105,7 @@ function normalizeExtraction(data: InvoiceExtraction): InvoiceExtraction {
     vendor: normalizeVendor(data),
     invoice: normalizeInvoice(data),
     payment: normalizePayment(data),
+    dimension: normalizeDimension(data),
     rows: normalizeRows(data),
     warnings: normalizeWarnings(data),
   });
@@ -106,6 +118,8 @@ export async function extractInvoiceWithOpenRouter(params: {
   fileDataUrl: string;
   accounts: ProviderReferenceAccount[];
   taxCodes: ProviderReferenceTaxCode[];
+  dimensions?: ProviderDimension[];
+  companyContext?: string | null;
 }): Promise<InvoiceExtraction> {
   const apiKey = assertEnv("OPENROUTER_API_KEY");
   const model = assertEnv("OPENROUTER_MODEL");
@@ -122,6 +136,8 @@ export async function extractInvoiceWithOpenRouter(params: {
         params.provider,
         params.accounts,
         params.taxCodes,
+        params.dimensions ?? [],
+        params.companyContext,
       ),
     }),
     jsonSchema: jsonSchemaForInvoiceExtraction(),
@@ -150,6 +166,8 @@ export async function extractInvoiceWithOpenRouter(params: {
           extraction,
           params.accounts,
           params.taxCodes,
+          params.dimensions ?? [],
+          params.companyContext,
         ),
       }),
       jsonSchema: jsonSchemaForInvoiceRows(),

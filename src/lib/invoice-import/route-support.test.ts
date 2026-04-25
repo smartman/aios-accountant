@@ -3,6 +3,7 @@ import {
   getSafeInvoiceFilename,
   getInvoiceImportResponseStatus,
   getMimeType,
+  parseImportCompanyId,
   parseInvoiceImportDraft,
   sanitizeFilename,
   toErrorMessage,
@@ -21,8 +22,20 @@ describe("invoice import route support", () => {
         new Error("Connect Merit or SmartAccounts before importing."),
       ),
     ).toBe(409);
+    expect(
+      getInvoiceImportResponseStatus(
+        new Error("Company access was not found."),
+      ),
+    ).toBe(403);
     expect(getInvoiceImportResponseStatus(new Error("Provider offline"))).toBe(
       500,
+    );
+  });
+
+  it("parses required company ids", () => {
+    expect(parseImportCompanyId(" company-1 ")).toBe("company-1");
+    expect(() => parseImportCompanyId(null)).toThrow(
+      "Choose a company before importing.",
     );
   });
 

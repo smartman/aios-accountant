@@ -8,6 +8,7 @@ import {
   getSafeInvoiceFilename,
   getInvoiceImportResponseStatus,
   getMimeType,
+  parseImportCompanyId,
   parseInvoiceImportDraft,
   toErrorMessage,
   validateInvoiceFile,
@@ -20,6 +21,8 @@ import {
   scopeMeritCredentials,
   scopeSmartAccountsCredentials,
 } from "@/lib/accounting-provider-cache";
+import { buildCompanyAiContext } from "@/lib/companies/ai-context";
+import { requireCompanyForUser } from "@/lib/companies/repository";
 
 export const runtime = "nodejs";
 
@@ -29,16 +32,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const savedConnection = await getStoredAccountingConnection(user.id);
-  if (!savedConnection) {
-    return NextResponse.json(
-      { error: "Connect Merit or SmartAccounts before importing." },
-      { status: 409 },
-    );
-  }
-
   try {
     const formData = await request.formData();
+    const companyId = parseImportCompanyId(formData.get("companyId"));
+    const company = await requireCompanyForUser({
+      companyId,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+    const storedConnection = await getStoredAccountingConnection(company.id);
+    if (!storedConnection) {
+      return NextResponse.json(
+        { error: "Connect Merit or SmartAccounts before importing." },
+        { status: 409 },
+      );
+    }
+    const savedConnection = {
+      ...storedConnection,
+      companyContext: buildCompanyAiContext(company),
+    };
     const file = validateInvoiceFile(formData.get("invoice"));
     const draft = parseInvoiceImportDraft(formData.get("draft"));
     const mimeType = getMimeType(file);
@@ -53,7 +67,7 @@ export async function POST(request: Request) {
             credentials: scopeSmartAccountsCredentials(
               savedConnection.credentials
                 .credentials as SmartAccountsCredentials,
-              user.id,
+              savedConnection.companyId ?? "global",
             ),
             mimeType,
             filename,
@@ -65,7 +79,7 @@ export async function POST(request: Request) {
             activities: meritProviderAdapter,
             credentials: scopeMeritCredentials(
               savedConnection.credentials.credentials as MeritCredentials,
-              user.id,
+              savedConnection.companyId ?? "global",
             ),
             mimeType,
             filename,

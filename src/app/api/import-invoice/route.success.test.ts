@@ -43,6 +43,28 @@ vi.mock("@/lib/workos", () => ({
 vi.mock("@/lib/user-accounting-connections", () => ({
   getStoredAccountingConnection: vi.fn(),
 }));
+vi.mock("@/lib/companies/repository", () => ({
+  requireCompanyForUser: vi.fn(async ({ companyId }) => ({
+    id: companyId,
+    name: "Test company",
+    countryCode: "EE",
+    emtakCode: "69202",
+    emtakLabel: "Bookkeeping",
+    accountingProvider: "smartaccounts",
+    configuration: {
+      fixedAssetThreshold: 2000,
+      inventory: { defaultUnit: "tk", newArticlePolicy: "confirm" },
+      vendorExceptions: {},
+      projects: [],
+    },
+    connectionSummary: null,
+    members: [],
+    invitations: [],
+  })),
+}));
+vi.mock("@/lib/companies/ai-context", () => ({
+  buildCompanyAiContext: vi.fn(() => "Company context"),
+}));
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
@@ -168,9 +190,10 @@ function buildAdapter(): AccountingProviderActivities<SmartAccountsCredentials> 
 
 function buildSavedConnection(
   provider: "smartaccounts" | "merit",
+  companyId: string | undefined = "company-1",
 ): StoredAccountingConnection {
   return {
-    workosUserId: "user-1",
+    companyId,
     provider,
     credentials:
       provider === "smartaccounts"
@@ -200,6 +223,7 @@ function buildSavedConnection(
 
 function buildRequest(file?: File): Request {
   const formData = new FormData();
+  formData.set("companyId", "company-1");
   if (file) {
     formData.set("invoice", file);
   }
@@ -267,7 +291,7 @@ describe("POST imports", () => {
       hoisted.smartAccountsProviderAdapter.loadContext,
     ).toHaveBeenCalledWith(
       expect.objectContaining({
-        cacheScope: "user-1",
+        cacheScope: "company-1",
       }),
     );
   });
@@ -296,7 +320,33 @@ describe("POST imports", () => {
     expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledOnce();
     expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledWith(
       expect.objectContaining({
-        cacheScope: "user-1",
+        cacheScope: "company-1",
+      }),
+    );
+  });
+
+  it("falls back to a global cache scope for old provider records", async () => {
+    const [{ POST }, { getUser }, { getStoredAccountingConnection }] =
+      await Promise.all([
+        import("./route"),
+        import("@/lib/workos"),
+        import("@/lib/user-accounting-connections"),
+      ]);
+    vi.mocked(getUser).mockResolvedValue({ user: { id: "user-1" } as never });
+    const oldConnection = buildSavedConnection("merit");
+    delete oldConnection.companyId;
+    vi.mocked(getStoredAccountingConnection).mockResolvedValue(oldConnection);
+
+    const response = await POST(
+      buildRequest(
+        new File(["invoice"], "invoice.pdf", { type: "application/pdf" }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.meritProviderAdapter.loadContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cacheScope: "global",
       }),
     );
   });

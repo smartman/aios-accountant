@@ -9,6 +9,7 @@ import {
   getSafeInvoiceFilename,
   getInvoiceImportResponseStatus,
   getMimeType,
+  parseImportCompanyId,
   toErrorMessage,
   validateInvoiceFile,
 } from "@/lib/invoice-import/route-support";
@@ -20,6 +21,8 @@ import {
   scopeMeritCredentials,
   scopeSmartAccountsCredentials,
 } from "@/lib/accounting-provider-cache";
+import { buildCompanyAiContext } from "@/lib/companies/ai-context";
+import { requireCompanyForUser } from "@/lib/companies/repository";
 
 export const runtime = "nodejs";
 
@@ -28,7 +31,6 @@ async function previewForSavedConnection(
   savedConnection: NonNullable<
     Awaited<ReturnType<typeof getStoredAccountingConnection>>
   >,
-  workosUserId: string,
 ) {
   const mimeType = getMimeType(file);
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -38,7 +40,7 @@ async function previewForSavedConnection(
   if (savedConnection.provider === "smartaccounts") {
     const credentials = scopeSmartAccountsCredentials(
       savedConnection.credentials.credentials as SmartAccountsCredentials,
-      workosUserId,
+      savedConnection.companyId ?? "global",
     );
     return previewInvoiceImport({
       savedConnection,
@@ -53,7 +55,7 @@ async function previewForSavedConnection(
 
   const credentials = scopeMeritCredentials(
     savedConnection.credentials.credentials as MeritCredentials,
-    workosUserId,
+    savedConnection.companyId ?? "global",
   );
   return previewInvoiceImport({
     savedConnection,
@@ -72,22 +74,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const savedConnection = await getStoredAccountingConnection(user.id);
-  if (!savedConnection) {
-    return NextResponse.json(
-      { error: "Connect Merit or SmartAccounts before importing." },
-      { status: 409 },
-    );
-  }
-
   try {
     const formData = await request.formData();
+    const companyId = parseImportCompanyId(formData.get("companyId"));
+    const company = await requireCompanyForUser({
+      companyId,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+    });
+    const savedConnection = await getStoredAccountingConnection(company.id);
+    if (!savedConnection) {
+      return NextResponse.json(
+        { error: "Connect Merit or SmartAccounts before importing." },
+        { status: 409 },
+      );
+    }
+
     const file = validateInvoiceFile(formData.get("invoice"));
-    const result = await previewForSavedConnection(
-      file,
-      savedConnection,
-      user.id,
-    );
+    const result = await previewForSavedConnection(file, {
+      ...savedConnection,
+      companyContext: buildCompanyAiContext(company),
+    });
 
     return NextResponse.json(result);
   } catch (error) {

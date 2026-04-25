@@ -37,6 +37,7 @@ export function filterSearchableSelectOptions(
 interface SearchableSelectFieldProps {
   disabled?: boolean;
   emptyStateText?: string;
+  name?: string;
   onChange: (value: string) => void;
   options: SearchableSelectOption[];
   placeholder: string;
@@ -254,6 +255,7 @@ function VisibleSearchableSelect({
 export function SearchableSelectField({
   disabled = false,
   emptyStateText = "No matches found.",
+  name,
   onChange,
   options,
   placeholder,
@@ -266,6 +268,7 @@ export function SearchableSelectField({
         aria-hidden="true"
         className="sr-only"
         disabled={disabled}
+        name={name}
         tabIndex={-1}
         value={value}
         onChange={(event) => onChange(event.target.value)}

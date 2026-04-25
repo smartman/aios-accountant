@@ -198,6 +198,7 @@ function buildUserPrompt(params: {
   rows: InvoiceImportDraftRow[];
   catalog: ProviderCatalogArticle[];
   history: ProviderHistoricalInvoiceRow[];
+  companyContext?: string | null;
 }): string {
   const providerLabel =
     params.provider === "smartaccounts" ? "SmartAccounts" : "Merit";
@@ -222,13 +223,16 @@ function buildUserPrompt(params: {
 
   return [
     `Return only structured article matching decisions for importing purchase invoice rows into ${providerLabel}.`,
+    params.companyContext?.trim() ? params.companyContext.trim() : null,
     "Each returned rowId must match one of the provided rows.",
     "selectedArticleCode and alternativeArticleCodes must come from the provided catalog article codes.",
     "If the row description clearly starts with or contains a catalog article description, prefer that article unless stronger conflicting evidence exists.",
     `Rows to classify: ${JSON.stringify(rows)}`,
     `Available catalog articles: ${JSON.stringify(activeCatalog)}`,
     `Vendor history summary: ${JSON.stringify(summarizeVendorHistory(params.history))}`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildAiCandidate(params: {
@@ -409,6 +413,7 @@ export async function matchArticlesWithOpenRouter(params: {
   rows: InvoiceImportDraftRow[];
   catalog: ProviderCatalogArticle[];
   history: ProviderHistoricalInvoiceRow[];
+  companyContext?: string | null;
 }): Promise<OpenRouterArticleMatch[] | null> {
   const config = getOpenRouterConfig();
 

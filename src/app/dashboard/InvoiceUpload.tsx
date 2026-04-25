@@ -8,9 +8,13 @@ import {
 import InvoiceImportReview from "./InvoiceImportReview";
 import { ImportResultCard } from "./InvoiceImportReviewShared";
 
-async function previewInvoice(file: File): Promise<InvoiceImportPreviewResult> {
+async function previewInvoice(
+  file: File,
+  companyId: string,
+): Promise<InvoiceImportPreviewResult> {
   const formData = new FormData();
   formData.append("invoice", file);
+  formData.append("companyId", companyId);
 
   const response = await fetch("/api/import-invoice", {
     method: "POST",
@@ -28,10 +32,12 @@ async function previewInvoice(file: File): Promise<InvoiceImportPreviewResult> {
 async function confirmInvoice(
   file: File,
   draft: InvoiceImportDraft,
+  companyId: string,
 ): Promise<ImportedInvoiceResult> {
   const formData = new FormData();
   formData.append("invoice", file);
   formData.append("draft", JSON.stringify(draft));
+  formData.append("companyId", companyId);
 
   const response = await fetch("/api/import-invoice/confirm", {
     method: "POST",
@@ -155,9 +161,11 @@ function ImportInvoiceCard({
 export default function InvoiceUpload({
   canImport,
   activeProvider,
+  companyId = "",
 }: {
   canImport: boolean;
   activeProvider: "smartaccounts" | "merit" | null;
+  companyId?: string;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -181,7 +189,7 @@ export default function InvoiceUpload({
     setDraft(null);
 
     try {
-      const importedPreview = await previewInvoice(file);
+      const importedPreview = await previewInvoice(file, companyId);
       setPreview(importedPreview);
       setDraft(importedPreview.draft);
     } catch (caughtError) {
@@ -202,7 +210,7 @@ export default function InvoiceUpload({
     setPreviewLightboxOpen(false);
 
     try {
-      const imported = await confirmInvoice(file, draft);
+      const imported = await confirmInvoice(file, draft, companyId);
       setResult(imported);
       setPreview(null);
       setDraft(null);
@@ -255,6 +263,7 @@ export default function InvoiceUpload({
           setDraft={setDraft}
           confirming={confirming}
           onConfirm={handleConfirm}
+          companyId={companyId}
         />
       ) : null}
 

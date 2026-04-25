@@ -88,62 +88,100 @@ async function findPreviewDuplicate<TCredentials>(params: {
   });
 }
 
+type PreviewVendorMatch = {
+  vendorId: string;
+  vendorName: string;
+} | null;
+
+type PreviewPaymentAccount = {
+  name: string;
+  type: "BANK" | "CASH";
+  currency?: string;
+};
+
+function buildDraftVendor(
+  extraction: InvoiceExtraction,
+  vendorMatch: PreviewVendorMatch,
+): InvoiceImportDraft["vendor"] {
+  return {
+    name: extraction.vendor.name ?? "",
+    regCode: extraction.vendor.regCode,
+    vatNumber: extraction.vendor.vatNumber,
+    bankAccount: extraction.vendor.bankAccount,
+    email: extraction.vendor.email,
+    phone: extraction.vendor.phone,
+    countryCode: extraction.vendor.countryCode,
+    city: extraction.vendor.city,
+    postalCode: extraction.vendor.postalCode,
+    addressLine1: extraction.vendor.addressLine1,
+    addressLine2: extraction.vendor.addressLine2,
+    selectionMode: vendorMatch ? "existing" : "create",
+    existingVendorId: vendorMatch?.vendorId ?? null,
+    existingVendorName: vendorMatch?.vendorName ?? null,
+  };
+}
+
+function buildDraftInvoice(
+  extraction: InvoiceExtraction,
+): InvoiceImportDraft["invoice"] {
+  return {
+    documentType: extraction.invoice.documentType,
+    invoiceNumber: extraction.invoice.invoiceNumber!,
+    referenceNumber: extraction.invoice.referenceNumber,
+    currency: extraction.invoice.currency ?? "EUR",
+    issueDate: extraction.invoice.issueDate ?? "",
+    dueDate: extraction.invoice.dueDate,
+    entryDate: extraction.invoice.entryDate,
+    amountExcludingVat: extraction.invoice.amountExcludingVat,
+    vatAmount: extraction.invoice.vatAmount,
+    totalAmount: extraction.invoice.totalAmount,
+    roundingAmount: deriveInvoiceRoundingAmount(extraction.invoice),
+    notes: extraction.invoice.notes,
+  };
+}
+
+function buildDraftPayment(
+  extraction: InvoiceExtraction,
+  paymentAccounts: PreviewPaymentAccount[],
+): InvoiceImportDraft["payment"] {
+  return {
+    isPaid: extraction.payment.isPaid,
+    paymentDate: extraction.payment.paymentDate,
+    paymentAmount: extraction.payment.paymentAmount,
+    paymentChannelHint: extraction.payment.paymentChannelHint,
+    reason: extraction.payment.reason,
+    paymentAccountName: chooseDefaultPaymentAccount(
+      paymentAccounts,
+      extraction.invoice.currency ?? "EUR",
+      extraction.payment.paymentChannelHint,
+    ),
+  };
+}
+
+function buildDraftDimension(
+  extraction: InvoiceExtraction,
+): InvoiceImportDraft["dimension"] {
+  return {
+    code: extraction.dimension?.code ?? null,
+    name: extraction.dimension?.name ?? null,
+    reason: extraction.dimension?.reason ?? null,
+  };
+}
+
 function buildPreviewDraft(params: {
   savedConnection: StoredAccountingConnection;
   extraction: InvoiceExtraction;
-  paymentAccounts: Array<{
-    name: string;
-    type: "BANK" | "CASH";
-    currency?: string;
-  }>;
-  vendorMatch: { vendorId: string; vendorName: string } | null;
+  paymentAccounts: PreviewPaymentAccount[];
+  vendorMatch: PreviewVendorMatch;
   duplicateInvoiceId: string | null;
   rows: InvoiceImportDraftRow[];
 }): InvoiceImportDraft {
   return normalizeInvoiceImportDraft({
     provider: params.savedConnection.provider,
-    vendor: {
-      name: params.extraction.vendor.name ?? "",
-      regCode: params.extraction.vendor.regCode,
-      vatNumber: params.extraction.vendor.vatNumber,
-      bankAccount: params.extraction.vendor.bankAccount,
-      email: params.extraction.vendor.email,
-      phone: params.extraction.vendor.phone,
-      countryCode: params.extraction.vendor.countryCode,
-      city: params.extraction.vendor.city,
-      postalCode: params.extraction.vendor.postalCode,
-      addressLine1: params.extraction.vendor.addressLine1,
-      addressLine2: params.extraction.vendor.addressLine2,
-      selectionMode: params.vendorMatch ? "existing" : "create",
-      existingVendorId: params.vendorMatch?.vendorId ?? null,
-      existingVendorName: params.vendorMatch?.vendorName ?? null,
-    },
-    invoice: {
-      documentType: params.extraction.invoice.documentType,
-      invoiceNumber: params.extraction.invoice.invoiceNumber!,
-      referenceNumber: params.extraction.invoice.referenceNumber,
-      currency: params.extraction.invoice.currency ?? "EUR",
-      issueDate: params.extraction.invoice.issueDate ?? "",
-      dueDate: params.extraction.invoice.dueDate,
-      entryDate: params.extraction.invoice.entryDate,
-      amountExcludingVat: params.extraction.invoice.amountExcludingVat,
-      vatAmount: params.extraction.invoice.vatAmount,
-      totalAmount: params.extraction.invoice.totalAmount,
-      roundingAmount: deriveInvoiceRoundingAmount(params.extraction.invoice),
-      notes: params.extraction.invoice.notes,
-    },
-    payment: {
-      isPaid: params.extraction.payment.isPaid,
-      paymentDate: params.extraction.payment.paymentDate,
-      paymentAmount: params.extraction.payment.paymentAmount,
-      paymentChannelHint: params.extraction.payment.paymentChannelHint,
-      reason: params.extraction.payment.reason,
-      paymentAccountName: chooseDefaultPaymentAccount(
-        params.paymentAccounts,
-        params.extraction.invoice.currency ?? "EUR",
-        params.extraction.payment.paymentChannelHint,
-      ),
-    },
+    vendor: buildDraftVendor(params.extraction, params.vendorMatch),
+    invoice: buildDraftInvoice(params.extraction),
+    payment: buildDraftPayment(params.extraction, params.paymentAccounts),
+    dimension: buildDraftDimension(params.extraction),
     actions: {
       createVendor: !params.vendorMatch,
       recordPayment: params.extraction.payment.isPaid,
@@ -185,6 +223,7 @@ export async function previewInvoiceImport<TCredentials>(params: {
     },
     context.referenceData.accounts,
     context.referenceData.taxCodes,
+    context.referenceData.dimensions ?? [],
   );
   const vendorMatch = await findPreviewVendor({
     savedConnection: params.savedConnection,
@@ -247,6 +286,10 @@ export async function previewInvoiceImport<TCredentials>(params: {
       paymentAccounts: context.referenceData.paymentAccounts.map((account) => ({
         name: account.name,
         type: account.type,
+      })),
+      dimensions: (context.referenceData.dimensions ?? []).map((dimension) => ({
+        code: dimension.code,
+        name: dimension.name,
       })),
     },
   };

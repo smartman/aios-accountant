@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   getArticles: vi.fn(),
   getBankAccounts: vi.fn(),
   getCashAccounts: vi.fn(),
+  getObjects: vi.fn(),
   getVatPcs: vi.fn(),
   uploadDocumentAttachment: vi.fn(),
 }));
@@ -60,6 +61,7 @@ function buildContext(): Extract<
       ],
       cashAccounts: [{ name: "Cash desk", currency: "EUR", account: "1000" }],
       articles: [],
+      objects: [],
     },
   };
 }
@@ -150,6 +152,7 @@ beforeEach(() => {
   mocks.getCashAccounts.mockResolvedValue([
     { name: "Cash desk", currency: "EUR", account: "1000" },
   ]);
+  mocks.getObjects.mockResolvedValue([]);
   mocks.getVatPcs.mockResolvedValue([
     { vatPc: "VAT22", percent: 22, description: "22% VAT" },
   ]);
@@ -207,6 +210,44 @@ describe("smartaccounts adapter validation and context", () => {
         rate: undefined,
         description: undefined,
         purchaseAccountCode: undefined,
+      },
+    ]);
+  });
+
+  it("maps active SmartAccounts objects into provider dimensions", async () => {
+    const { smartAccountsProviderAdapter } = await import("./adapter");
+    mocks.getObjects.mockResolvedValueOnce([
+      {
+        id: "object-1",
+        code: "OBJ",
+        name: "Office build",
+        active: true,
+      },
+      {
+        id: "object-2",
+        name: "Uncoded object",
+      },
+      {
+        id: "object-3",
+        code: "OLD",
+        name: "Archived",
+        active: false,
+      },
+    ]);
+
+    const context =
+      await smartAccountsProviderAdapter.loadContext(buildCredentials());
+
+    expect(context.referenceData.dimensions).toEqual([
+      {
+        code: "OBJ",
+        name: "OBJ - Office build",
+        providerId: "object-1",
+      },
+      {
+        code: "object-2",
+        name: "Uncoded object",
+        providerId: "object-2",
       },
     ]);
   });
@@ -341,6 +382,30 @@ describe("smartaccounts adapter invoice creation", () => {
         buildContext(),
       ),
     ).rejects.toThrow("invoice date could not be extracted");
+  });
+
+  it("rejects non-finite SmartAccounts payment amounts", async () => {
+    const { smartAccountsProviderAdapter } = await import("./adapter");
+
+    await expect(
+      smartAccountsProviderAdapter.createPayment(
+        buildCredentials(),
+        {
+          vendorId: "vendor-1",
+          vendorName: "Vendor OÜ",
+          invoiceId: "invoice-1",
+          extraction: {
+            ...buildVendorExtraction(),
+            payment: {
+              ...buildVendorExtraction().payment,
+              paymentAmount: Number.POSITIVE_INFINITY,
+            },
+          },
+          referenceData: buildContext().referenceData,
+        },
+        buildContext(),
+      ),
+    ).rejects.toThrow("payment amount could not be determined");
   });
 });
 

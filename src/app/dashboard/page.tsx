@@ -1,18 +1,31 @@
 import { redirect } from "next/navigation";
 import { getUser, signOut } from "@/lib/workos";
 import DashboardWorkspace from "./DashboardWorkspace";
-import { getStoredAccountingConnection } from "@/lib/user-accounting-connections";
+import { listCompaniesForUser } from "@/lib/companies/repository";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ companyId?: string | string[] }>;
+}) {
   const { user } = await getUser();
 
   if (!user) {
     redirect("/");
   }
 
-  const savedConnection = user.id
-    ? await getStoredAccountingConnection(user.id)
-    : null;
+  const companies = await listCompaniesForUser({
+    id: user.id,
+    email: user.email,
+  });
+  const requestedParams = await searchParams;
+  const requestedCompanyId = Array.isArray(requestedParams.companyId)
+    ? requestedParams.companyId[0]
+    : requestedParams.companyId;
+  const activeCompany =
+    companies.find((company) => company.id === requestedCompanyId) ??
+    companies[0] ??
+    null;
 
   async function handleSignOut() {
     "use server";
@@ -46,7 +59,9 @@ export default async function DashboardPage() {
 
       <main className="mx-auto max-w-[1380px] px-3 py-5 sm:px-6 sm:py-8">
         <DashboardWorkspace
-          currentConnection={savedConnection?.summary ?? null}
+          activeCompany={activeCompany}
+          companies={companies}
+          userEmail={user.email ?? ""}
         />
       </main>
     </div>

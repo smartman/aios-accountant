@@ -43,6 +43,28 @@ vi.mock("@/lib/workos", () => ({
 vi.mock("@/lib/user-accounting-connections", () => ({
   getStoredAccountingConnection: vi.fn(),
 }));
+vi.mock("@/lib/companies/repository", () => ({
+  requireCompanyForUser: vi.fn(async ({ companyId }) => ({
+    id: companyId,
+    name: "Test company",
+    countryCode: "EE",
+    emtakCode: "69202",
+    emtakLabel: "Bookkeeping",
+    accountingProvider: "smartaccounts",
+    configuration: {
+      fixedAssetThreshold: 2000,
+      inventory: { defaultUnit: "tk", newArticlePolicy: "confirm" },
+      vendorExceptions: {},
+      projects: [],
+    },
+    connectionSummary: null,
+    members: [],
+    invitations: [],
+  })),
+}));
+vi.mock("@/lib/companies/ai-context", () => ({
+  buildCompanyAiContext: vi.fn(() => "Company context"),
+}));
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
@@ -170,7 +192,7 @@ function buildSavedConnection(
   provider: "smartaccounts" | "merit" = "smartaccounts",
 ): StoredAccountingConnection {
   return {
-    workosUserId: "user-1",
+    companyId: "company-1",
     provider,
     credentials:
       provider === "smartaccounts"
@@ -200,9 +222,23 @@ function buildSavedConnection(
 
 function buildRequest(file?: File): Request {
   const formData = new FormData();
+  formData.set("companyId", "company-1");
   if (file) {
     formData.set("invoice", file);
   }
+
+  return new Request("http://localhost/api/import-invoice", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+function buildRequestWithoutCompany(): Request {
+  const formData = new FormData();
+  formData.set(
+    "invoice",
+    new File(["invoice"], "invoice.pdf", { type: "application/pdf" }),
+  );
 
   return new Request("http://localhost/api/import-invoice", {
     method: "POST",
@@ -251,6 +287,20 @@ describe("POST auth and validation", () => {
     const response = await POST(buildRequest());
 
     expect(response.status).toBe(409);
+  });
+
+  it("returns 400 when company id is missing", async () => {
+    const [{ POST }, { getUser }] = await Promise.all([
+      import("./route"),
+      import("@/lib/workos"),
+    ]);
+    vi.mocked(getUser).mockResolvedValue({ user: { id: "user-1" } as never });
+
+    const response = await POST(buildRequestWithoutCompany());
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe("Choose a company before importing.");
   });
 
   it("returns 400 when the invoice file is missing", async () => {

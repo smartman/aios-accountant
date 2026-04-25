@@ -7,12 +7,59 @@ datasource db {
   provider = "postgresql"
 }
 
-model UserAccountingConnection {
-  workosUserId         String   @id
+model Company {
+  id                 String                       @id @default(cuid())
+  name               String
+  countryCode        String
+  emtakCode          String
+  emtakLabel         String
+  accountingProvider String
+  configuration      Json
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  accountingConnection CompanyAccountingConnection?
+  invitations        CompanyInvitation[]
+  memberships        CompanyMembership[]
+
+  @@index([countryCode])
+}
+
+model CompanyMembership {
+  id            String   @id @default(cuid())
+  companyId     String
+  workosUserId  String
+  email         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, workosUserId])
+  @@unique([companyId, email])
+  @@index([workosUserId])
+  @@index([email])
+}
+
+model CompanyInvitation {
+  id                   String    @id @default(cuid())
+  companyId            String
+  email                String
+  invitedByWorkosUserId String
+  acceptedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  company              Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, email])
+  @@index([email])
+}
+
+model CompanyAccountingConnection {
+  companyId            String   @id
   provider             String
   encryptedCredentials String
   credentialSummary    Json
   verifiedAt           DateTime
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  company              Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
