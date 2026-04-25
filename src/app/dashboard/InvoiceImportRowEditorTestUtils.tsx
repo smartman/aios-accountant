@@ -240,8 +240,8 @@ function renderSearchableSelectField(
         onChange={(event) => props.onChange(event.target.value)}
       >
         <option value="">{props.placeholder}</option>
-        {props.options.map((option) => (
-          <option key={option.value} value={option.value}>
+        {props.options.map((option, index) => (
+          <option key={`${option.value}-${index}`} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -305,9 +305,11 @@ export function hostProps(element: HostElement) {
   return element.props as {
     children?: ReactNode;
     disabled?: boolean;
+    multiple?: boolean;
     onClick?: () => void;
     onChange?: (event: {
       target: { checked?: boolean; files?: File[]; value?: string };
+      currentTarget?: { value?: string };
     }) => void;
   };
 }

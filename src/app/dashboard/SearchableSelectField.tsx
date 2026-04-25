@@ -142,9 +142,9 @@ function SearchableSelectOptions({
       className="isolate z-30 mt-2 max-h-64 w-[var(--input-width)] overflow-auto rounded-[16px] border border-slate-200 bg-white p-2 shadow-[0_22px_45px_rgba(15,23,42,0.16)] ring-1 ring-slate-950/5 empty:invisible data-[closed]:opacity-0 data-[leave]:transition data-[leave]:duration-100 data-[leave]:ease-in dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10"
     >
       {filteredOptions.length ? (
-        filteredOptions.map((option) => (
+        filteredOptions.map((option, index) => (
           <ComboboxOption
-            key={option.value}
+            key={`${option.value}-${index}`}
             as="button"
             className="group flex w-full items-center rounded-[12px] border border-transparent px-3 py-2.5 text-left text-sm text-slate-700 transition-colors data-[focus]:border-indigo-200 data-[focus]:bg-indigo-50 data-[focus]:text-slate-900 dark:text-slate-200 dark:data-[focus]:border-indigo-500/20 dark:data-[focus]:bg-indigo-500/10 dark:data-[focus]:text-white"
             type="button"
@@ -274,8 +274,8 @@ export function SearchableSelectField({
         onChange={(event) => onChange(event.target.value)}
       >
         <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
+        {options.map((option, index) => (
+          <option key={`${option.value}-${index}`} value={option.value}>
             {option.label}
           </option>
         ))}

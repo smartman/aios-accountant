@@ -23,6 +23,51 @@ type OpenRouterJsonSchema = {
   schema: Record<string, unknown>;
 };
 
+const MAX_PARALLEL_OPENROUTER_CALLS = 3;
+
+type QueuedOpenRouterCall = {
+  run: () => Promise<unknown>;
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+};
+
+let activeOpenRouterCalls = 0;
+const pendingOpenRouterCalls: QueuedOpenRouterCall[] = [];
+
+function runOpenRouterCall(call: QueuedOpenRouterCall) {
+  activeOpenRouterCalls += 1;
+  call
+    .run()
+    .then(call.resolve, call.reject)
+    .finally(() => {
+      activeOpenRouterCalls -= 1;
+      drainOpenRouterCalls();
+    });
+}
+
+function drainOpenRouterCalls() {
+  while (
+    activeOpenRouterCalls < MAX_PARALLEL_OPENROUTER_CALLS &&
+    pendingOpenRouterCalls.length > 0
+  ) {
+    const call = pendingOpenRouterCalls.shift();
+    if (call) {
+      runOpenRouterCall(call);
+    }
+  }
+}
+
+function withOpenRouterConcurrency<T>(run: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    pendingOpenRouterCalls.push({
+      run,
+      resolve: (value) => resolve(value as T),
+      reject,
+    });
+    drainOpenRouterCalls();
+  });
+}
+
 const VENDOR_PROPERTIES = {
   name: { type: ["string", "null"] },
   regCode: { type: ["string", "null"] },
@@ -225,9 +270,8 @@ export async function requestOpenRouterStructuredOutput<T>(params: {
   jsonSchema: OpenRouterJsonSchema;
   invalidJsonMessage: string;
 }): Promise<T> {
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
+  const response = await withOpenRouterConcurrency(() =>
+    fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${params.apiKey}`,
@@ -253,7 +297,7 @@ export async function requestOpenRouterStructuredOutput<T>(params: {
         },
         temperature: 0.1,
       }),
-    },
+    }),
   );
 
   if (!response.ok) {
@@ -282,4 +326,9 @@ export async function requestOpenRouterStructuredOutput<T>(params: {
   } catch {
     throw new Error(params.invalidJsonMessage);
   }
+}
+
+export function __resetOpenRouterConcurrencyForTests() {
+  activeOpenRouterCalls = 0;
+  pendingOpenRouterCalls.splice(0, pendingOpenRouterCalls.length);
 }

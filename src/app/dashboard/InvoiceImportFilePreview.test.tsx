@@ -27,8 +27,8 @@ it("renders a compact pdf preview with a fullscreen action", () => {
 });
 
 it("opens from the small preview click target and closes from the backdrop", () => {
-  const file = new File(["a".repeat(2048)], "printout.pdf", {
-    type: "application/pdf",
+  const file = new File(["a".repeat(2048)], "printout.png", {
+    type: "image/png",
   });
   let opened = false;
   let closed = false;
