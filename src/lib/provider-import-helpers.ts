@@ -283,6 +283,9 @@ export function fallbackRowFromInvoice(
     accountPurchase: null,
     accountSelectionReason:
       "Fallback summarized row created because the AI response did not include rows.",
+    needsManualReview: true,
+    manualReviewReason:
+      "AI did not extract individual rows; verify this fallback row manually.",
   };
 }
 

@@ -106,6 +106,8 @@ export function createBlankRow(
     taxCode: null,
     accountCode: draft.rows[0]?.accountCode ?? "",
     accountSelectionReason: "Added manually during review.",
+    needsManualReview: false,
+    manualReviewReason: null,
     reviewed: false,
     selectedArticleCode: null,
     selectedArticleDescription: null,

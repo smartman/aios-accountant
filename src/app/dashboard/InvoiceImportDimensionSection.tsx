@@ -59,8 +59,8 @@ export default function InvoiceImportDimensionSection({
           }}
         >
           <option value="">No dimension</option>
-          {dimensions.map((dimension) => (
-            <option key={dimension.code} value={dimension.code}>
+          {dimensions.map((dimension, index) => (
+            <option key={`${dimension.code}-${index}`} value={dimension.code}>
               {dimension.name}
             </option>
           ))}

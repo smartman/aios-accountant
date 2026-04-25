@@ -91,7 +91,19 @@ function normalizeDimension(
 }
 
 function normalizeRows(data: InvoiceExtraction): InvoiceExtraction["rows"] {
-  return Array.isArray(data.rows) ? data.rows : [];
+  if (!Array.isArray(data.rows)) {
+    return [];
+  }
+
+  return data.rows.map((row) => {
+    const manualReviewReason = row.manualReviewReason?.trim() || null;
+
+    return {
+      ...row,
+      needsManualReview: Boolean(row.needsManualReview || manualReviewReason),
+      manualReviewReason,
+    };
+  });
 }
 
 function normalizeWarnings(

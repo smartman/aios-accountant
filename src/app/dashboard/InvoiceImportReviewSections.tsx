@@ -412,9 +412,9 @@ function PaymentFields({
           }
         >
           <option value="">No account selected</option>
-          {preview.referenceData.paymentAccounts.map((account) => (
+          {preview.referenceData.paymentAccounts.map((account, index) => (
             <option
-              key={`${account.type}-${account.name}`}
+              key={`${account.type}-${account.name}-${index}`}
               value={account.name}
             >
               {account.type} - {account.name}

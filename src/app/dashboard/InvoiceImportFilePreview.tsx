@@ -1,8 +1,109 @@
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+type PdfJsModule = typeof import("pdfjs-dist");
+type PdfLoadingTask = ReturnType<PdfJsModule["getDocument"]>;
+type PdfDocument = Awaited<PdfLoadingTask["promise"]>;
+type PdfPage = Awaited<ReturnType<PdfDocument["getPage"]>>;
+type PdfRenderTask = ReturnType<PdfPage["render"]>;
 
 function buildPdfPreviewUrl(fileUrl: string): string {
   return `${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&zoom=page-fit&view=FitH`;
+}
+
+function PdfPreviewCanvas({ file, fileUrl }: { file: File; fileUrl: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isRendering, setIsRendering] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    let renderTask: PdfRenderTask | null = null;
+    let loadingTask: PdfLoadingTask | null = null;
+    let pdfDocument: PdfDocument | null = null;
+
+    async function renderPdfPage() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      setError(null);
+      setIsRendering(true);
+
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.mjs",
+          import.meta.url,
+        ).toString();
+
+        const data = new Uint8Array(await file.arrayBuffer());
+        loadingTask = pdfjs.getDocument({ data });
+        const pdf = await loadingTask.promise;
+        pdfDocument = pdf;
+        if (cancelled) return;
+
+        const page = await pdf.getPage(1);
+        if (cancelled) return;
+
+        const viewport = page.getViewport({ scale: 1.6 });
+        const outputScale = window.devicePixelRatio || 1;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) throw new Error("Canvas is not available.");
+
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        renderTask = page.render({
+          canvas,
+          canvasContext: context,
+          transform:
+            outputScale === 1
+              ? undefined
+              : [outputScale, 0, 0, outputScale, 0, 0],
+          viewport,
+        });
+        await renderTask.promise;
+        if (!cancelled) setIsRendering(false);
+      } catch {
+        if (!cancelled) {
+          setError("PDF preview is unavailable in this browser.");
+          setIsRendering(false);
+        }
+      }
+    }
+
+    void renderPdfPage();
+
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      void loadingTask?.destroy();
+      void pdfDocument?.destroy();
+    };
+  }, [file]);
+
+  return (
+    <div className="relative bg-white">
+      {isRendering || error ? (
+        <div className="absolute inset-0 z-10 flex min-h-80 items-center justify-center bg-white px-6 text-center text-sm text-slate-600">
+          {error ?? "Rendering PDF preview."}
+        </div>
+      ) : null}
+      <canvas
+        ref={canvasRef}
+        aria-label={`Preview of ${file.name}`}
+        className="block w-full bg-white"
+      />
+      <a className="sr-only" href={buildPdfPreviewUrl(fileUrl)}>
+        Open PDF preview
+      </a>
+    </div>
+  );
 }
 
 function PreviewSurface({
@@ -28,12 +129,8 @@ function PreviewSurface({
             : "mx-auto w-full overflow-hidden rounded-[22px] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.16)]"
         }
       >
-        <div className="relative aspect-[1/1.414] w-full overflow-hidden bg-white">
-          <iframe
-            title={`Preview of ${file.name}`}
-            src={buildPdfPreviewUrl(fileUrl)}
-            className="absolute inset-0 h-full w-full bg-white"
-          />
+        <div className="w-full overflow-hidden bg-white">
+          <PdfPreviewCanvas file={file} fileUrl={fileUrl} />
         </div>
       </div>
     );
@@ -46,11 +143,7 @@ function PreviewSurface({
       width={1800}
       height={2400}
       unoptimized
-      className={`${imageFrameClass} object-contain ${
-        fullscreen
-          ? "bg-[linear-gradient(180deg,#f8fafc,#e2e8f0)] dark:bg-[linear-gradient(180deg,#0f172a,#020617)]"
-          : "bg-[linear-gradient(180deg,#f8fafc,#e2e8f0)] dark:bg-[linear-gradient(180deg,#0f172a,#020617)]"
-      }`}
+      className={`${imageFrameClass} bg-[linear-gradient(180deg,#f8fafc,#e2e8f0)] object-contain dark:bg-[linear-gradient(180deg,#0f172a,#020617)]`}
     />
   );
 }

@@ -22,6 +22,19 @@ Do not add or rely on ad-hoc import scripts for local testing in this repo.
 
 Invoice import testing should be done through the app UI using Playwright MCP, with credentials read from `.env.local`.
 
+For invoice file upload tests, do not try to control the native macOS file picker. Native file chooser dialogs are outside the browser DOM and are not reliable through browser automation. Use Playwright's controlled upload APIs instead, verified via Context7 Playwright docs on 2026-04-25:
+
+- Prefer setting the app's hidden file input directly:
+  - `await page.locator('input#invoice-file[type="file"]').setInputFiles('/absolute/path/to/invoice.jpg')`
+  - For multiple files, pass an array of absolute paths.
+- If the input is created only after clicking an upload control, start waiting for the chooser before clicking, then set files on the returned chooser:
+  - `const chooserPromise = page.waitForEvent('filechooser')`
+  - `await page.getByText('Upload file').click()`
+  - `const chooser = await chooserPromise`
+  - `await chooser.setFiles('/absolute/path/to/invoice.jpg')`
+- If a Browser Use in-app session does not expose `setInputFiles` or file chooser file-setting, switch to Playwright MCP for upload testing instead of using the OS dialog.
+- Do not add localhost helper servers or injected file-upload workarounds unless the user explicitly approves that workaround for the current task.
+
 If actions or end-to-end behavior are tested for accounting-provider features, sanity and correctness checks must be performed for all supported accounting providers, not just one.
 
 `npm run dev` is started externally for this repo. Assume the existing dev server will automatically pick up file changes, and do not ask for or suggest restarting it unless the user explicitly requests that restart.
@@ -29,30 +42,6 @@ If actions or end-to-end behavior are tested for accounting-provider features, s
 Keep the Playwright MCP browser session and browser window open while testing so progress stays visible to the user. Do not close the browser session or browser window between steps unless the user explicitly asks or the work is fully complete.
 
 Do not print secret values in logs, test output, or commit them into tracked files.
-
-# Playwright MCP Recovery
-
-1. Stop stale Playwright MCP processes:
-   - `pkill -f '@playwright/mcp' || true`
-
-2. Use the known-good stdio config in `~/.codex/config.toml`:
-   - `@playwright/mcp@0.0.70`
-   - `--isolated`
-   - `--output-dir=/Users/smartman/.playwright-mcp`
-   - `--output-mode=file`
-   - `--save-session`
-   - `--console-level=debug`
-
-3. Do not use `--user-data-dir` together with `--isolated`.
-
-4. Fully restart Codex so it reloads the MCP config.
-
-5. If Playwright still fails, start the standalone HTTP server:
-   - `env HOME=/Users/smartman/.codex/playwright-home XDG_CACHE_HOME=/Users/smartman/.codex/playwright-home/.cache PLAYWRIGHT_BROWSERS_PATH=/Users/smartman/.codex/playwright-browsers npx -y @playwright/mcp@0.0.70 --port 8931 --isolated --output-dir=/Users/smartman/.playwright-mcp --save-session --console-level=debug`
-
-6. If using the HTTP fallback, set `~/.codex/config.toml` to:
-   - `url = "http://127.0.0.1:8931/mcp"`
-   - restart Codex again
 
 # Task Completion Requirements
 

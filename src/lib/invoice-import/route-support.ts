@@ -13,13 +13,35 @@ const CONFLICT_ERRORS = new Set([
   "Connect Merit or SmartAccounts before importing.",
 ]);
 const FORBIDDEN_ERRORS = new Set(["Company access was not found."]);
+const DEFAULT_MIME_TYPE = "application/octet-stream";
+const INVOICE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
+  bmp: "image/bmp",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  pdf: "application/pdf",
+  png: "image/png",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  webp: "image/webp",
+};
 
 export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
 export function getMimeType(file: File): string {
-  return file.type || "application/octet-stream";
+  const reportedType = file.type.toLowerCase();
+  if (reportedType && reportedType !== DEFAULT_MIME_TYPE) {
+    return reportedType;
+  }
+
+  const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  return extension
+    ? (INVOICE_MIME_TYPES_BY_EXTENSION[extension] ?? DEFAULT_MIME_TYPE)
+    : DEFAULT_MIME_TYPE;
 }
 
 export function sanitizeFilename(filename: string): string {

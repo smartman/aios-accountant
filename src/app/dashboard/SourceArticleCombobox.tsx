@@ -126,9 +126,9 @@ export function SourceArticleCombobox({
           className="absolute left-0 top-full z-10 mt-2 flex w-full max-w-[560px] flex-col gap-2 rounded-[14px] border border-slate-300 bg-white/95 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.14)] dark:border-slate-700 dark:bg-slate-900"
           role="listbox"
         >
-          {filteredOptions.map((option) => (
+          {filteredOptions.map((option, index) => (
             <button
-              key={option.code}
+              key={`${option.code}-${index}`}
               className="w-full rounded-xl border border-transparent bg-transparent p-[0.8rem_0.9rem] text-left text-sm transition-colors hover:border-indigo-500/20 hover:bg-indigo-500/8"
               type="button"
               onMouseDown={(event) => event.preventDefault()}

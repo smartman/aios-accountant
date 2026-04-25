@@ -7,6 +7,7 @@ type OpenRouterRequestBody = {
     content: unknown;
   }>;
   plugins?: unknown[];
+  response_format?: unknown;
 };
 
 function buildBaseExtraction() {
@@ -142,11 +143,15 @@ async function expectVendorPromptAndRawPdfUpload() {
     "same visual group, column, or side of the page",
   );
   expect(systemPrompt).toContain("flattened reading order");
+  expect(systemPrompt).toContain("photographed receipts or invoices");
   expect(systemPrompt).toContain("branding as the vendor by default");
   expect(systemPrompt).toContain(
     "Do not add a warning when the vendor is confidently resolved",
   );
   expect(userContent.some((item) => item.type === "file")).toBe(true);
+  expect(JSON.stringify(userContent)).toContain("cash-register slips");
+  expect(JSON.stringify(userContent)).toContain("needsManualReview");
+  expect(JSON.stringify(body.response_format)).toContain("manualReviewReason");
   expect(userContent.some((item) => item.type === "image_url")).toBe(false);
   expect(body.plugins).toBeUndefined();
   expect(extraction.vendor.name).toBe("Kilo Code");

@@ -145,6 +145,25 @@ it("allows a total mismatch that is explained by header rounding", () => {
   ).toEqual([]);
 });
 
+it("allows VAT-inclusive cent rounding when net plus row VAT is one cent short", () => {
+  const draft = buildDraft();
+  draft.invoice.amountExcludingVat = 0.52;
+  draft.invoice.vatAmount = 0.13;
+  draft.invoice.totalAmount = 0.65;
+  draft.invoice.roundingAmount = 0.01;
+  draft.rows[0].price = 0.52;
+  draft.rows[0].sum = 0.52;
+  draft.rows[0].vatRate = 24;
+  draft.rows[0].taxCode = "VAT24";
+
+  expect(
+    buildDraftAmountMismatchWarnings({
+      draft,
+      taxCodes: [{ code: "VAT24", rate: 24 }],
+    }),
+  ).toEqual([]);
+});
+
 it("accepts a derived header rounding amount when no explicit value is present", () => {
   const draft = buildDraft();
   draft.invoice.amountExcludingVat = 62.92;

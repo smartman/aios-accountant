@@ -28,6 +28,18 @@ it("updates review and description fields", () => {
   expect(updates.at(-1)?.rows[0].description).toBe("Updated description");
 });
 
+it("shows manual review guidance for unclear extracted rows", () => {
+  const preview = buildPreview({
+    needsManualReview: true,
+    manualReviewReason: "Amount is partially obscured.",
+  });
+
+  const markup = renderToStaticMarkup(renderTree(preview));
+
+  expect(markup).toContain("Needs manual fix");
+  expect(markup).toContain("Amount is partially obscured.");
+});
+
 it("updates row units", () => {
   const preview = buildPreview({
     selectedArticleCode: null,
@@ -69,6 +81,11 @@ it("updates row numeric values", () => {
   const markup = renderToStaticMarkup(tree);
 
   expect(markup).toContain('value="145,08"');
+  expect(markup).toContain("Row total with VAT");
+  expect(
+    hostProps(findControlByLabel(tree, "Row total with VAT", "output"))
+      .children,
+  ).toBe("179,90");
 
   const quantityInput = findControlByLabel(tree, "Quantity", "input");
   hostProps(quantityInput).onChange?.({
@@ -102,6 +119,34 @@ it("updates row numeric values", () => {
     target: { value: "" },
   });
   expect(updates.at(-1)?.rows[0].sum).toBeNull();
+});
+
+it("falls back to the extracted row VAT rate for the VAT-inclusive total", () => {
+  const tree = renderTree(
+    buildPreview({
+      price: 100,
+      sum: 100,
+      taxCode: "UNKNOWN",
+      vatRate: 22,
+    }),
+  );
+  const noVatTree = renderTree(
+    buildPreview({
+      price: 100,
+      sum: 100,
+      taxCode: null,
+      vatRate: null,
+    }),
+  );
+
+  expect(
+    hostProps(findControlByLabel(tree, "Row total with VAT", "output"))
+      .children,
+  ).toBe("122,00");
+  expect(
+    hostProps(findControlByLabel(noVatTree, "Row total with VAT", "output"))
+      .children,
+  ).toBe("100,00");
 });
 
 it("updates accounting fields", () => {
