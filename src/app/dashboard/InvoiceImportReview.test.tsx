@@ -63,6 +63,7 @@ async function loadReviewHarness() {
       draft?: InvoiceImportDraft;
       onConfirm?: () => void;
       preview?: InvoiceImportPreviewResult;
+      submitError?: string | null;
     }) {
       hookIndex = 0;
       const preview = params?.preview ?? buildValidPreview();
@@ -81,6 +82,7 @@ async function loadReviewHarness() {
         draft,
         setDraft: () => undefined,
         confirming: false,
+        submitError: params?.submitError,
         onConfirm: params?.onConfirm ?? (() => undefined),
       });
     },
@@ -146,6 +148,20 @@ it("shows a derived warning when invoice header amounts do not match the rows", 
   expect(markup).toContain(
     "Invoice header amounts do not match the invoice rows: Net amount 120,00 vs rows 145,08; VAT amount 26,40 vs rows 34,82; Total amount 146,40 vs rows 179,90.",
   );
+});
+
+it("shows API response errors next to the confirm button", async () => {
+  const { render } = await loadReviewHarness();
+  const tree = render({
+    submitError:
+      "Merit 400: Total from items is not matching the invoice total amount.",
+  });
+  const markup = renderToStaticMarkup(tree);
+
+  expect(markup).toContain(
+    "Merit 400: Total from items is not matching the invoice total amount.",
+  );
+  expect(markup).toContain("Confirm and create invoice");
 });
 
 it("opens a duplicate confirmation dialog before proceeding", async () => {

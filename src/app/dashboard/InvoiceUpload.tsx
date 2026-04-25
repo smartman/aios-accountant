@@ -87,6 +87,7 @@ export default function InvoiceUpload({
             draft={activeItem.draft}
             setDraft={controller.setActiveDraft}
             confirming={activeItem.status === "confirming"}
+            submitError={activeItem.error}
             onConfirm={controller.handleConfirm}
             companyId={companyId}
           />
