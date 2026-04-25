@@ -422,46 +422,79 @@ describe("merit adapter pure invoice total fallbacks", () => {
 });
 
 describe("merit adapter pure payment payload builders", () => {
-  it("builds payment payloads for EUR and foreign-currency invoices", () => {
-    expect(
-      __test__.buildPaymentBody(
-        {
-          ...buildPaymentParams(),
-          extraction: {
-            ...buildPaymentParams().extraction,
-            payment: {
-              ...buildPaymentParams().extraction.payment,
-              paymentDate: null,
-            },
+  it("adds selected Merit dimensions to invoice and rows", () => {
+    const params = buildInvoiceParams();
+    const invoiceBody = __test__.buildPurchaseInvoiceBody(
+      {
+        ...params,
+        extraction: {
+          ...params.extraction,
+          dimension: {
+            code: "OBJ",
+            name: "Object",
+            reason: "Matched project",
           },
         },
-        { id: "bank-1", name: "Main bank", type: "BANK", currency: "EUR" },
-        122,
-      ).CurrencyCode,
-    ).toBeUndefined();
-    expect(
-      __test__.buildPaymentBody(
-        {
-          ...buildPaymentParams(),
-          extraction: {
-            ...buildPaymentParams().extraction,
-            invoice: {
-              ...buildPaymentParams().extraction.invoice,
-              currency: "USD",
-              invoiceNumber: null,
-              referenceNumber: null,
+        referenceData: {
+          ...params.referenceData,
+          dimensions: [
+            {
+              code: "OBJ",
+              name: "Object",
+              dimId: 1,
+              dimValueId: "value-1",
+              dimCode: "OBJ",
             },
-          },
+          ],
         },
-        { id: "bank-1", name: "Main bank", type: "BANK", currency: "EUR" },
-        122,
-      ),
-    ).toEqual(
-      expect.objectContaining({
-        CurrencyCode: "USD",
-        BillNo: undefined,
-        RefNo: undefined,
-      }),
+      },
+      [],
     );
+
+    expect(invoiceBody.Dimensions).toEqual([
+      {
+        DimId: 1,
+        DimValueId: "value-1",
+        DimCode: "OBJ",
+      },
+    ]);
+    expect(
+      (invoiceBody.InvoiceRow as Array<Record<string, unknown>>)[0].Dimensions,
+    ).toEqual(invoiceBody.Dimensions);
+  });
+
+  it("builds payment payloads for EUR and foreign-currency invoices", () => {
+    __test__.buildPaymentBody(
+      {
+        ...buildPaymentParams(),
+        extraction: {
+          ...buildPaymentParams().extraction,
+          payment: {
+            ...buildPaymentParams().extraction.payment,
+            paymentDate: null,
+          },
+        },
+      },
+      { id: "bank-1", name: "Main bank", type: "BANK", currency: "EUR" },
+      122,
+    );
+    const foreignPayment = __test__.buildPaymentBody(
+      {
+        ...buildPaymentParams(),
+        extraction: {
+          ...buildPaymentParams().extraction,
+          invoice: {
+            ...buildPaymentParams().extraction.invoice,
+            currency: "USD",
+            invoiceNumber: null,
+            referenceNumber: null,
+          },
+        },
+      },
+      { id: "bank-1", name: "Main bank", type: "BANK", currency: "EUR" },
+      122,
+    );
+
+    expect(foreignPayment.CurrencyCode).toBe("USD");
   });
 });

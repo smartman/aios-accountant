@@ -14,12 +14,8 @@ const reviewSectionClass =
   "flex flex-col gap-4 rounded-[16px] border border-slate-300/25 bg-white/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.32),_0_10px_24px_rgba(15,23,42,0.06)] sm:gap-5 sm:rounded-[18px] sm:p-[1.35rem] dark:border-slate-700/30 dark:bg-slate-900/20";
 const reviewSectionHeaderClass =
   "flex flex-wrap items-start justify-between gap-4";
-const reviewSectionCopyClass =
-  "mt-[0.35rem] max-w-[42ch] text-sm leading-5 sm:leading-6 text-slate-500 dark:text-slate-400";
-const reviewInlineNoteClass =
-  "rounded-[14px] border border-slate-300/25 bg-white/20 p-[0.9rem_1rem] text-sm text-slate-500 dark:border-slate-600/40 dark:bg-slate-900/30 dark:text-slate-200";
-const reviewInlineNoteMatchedClass =
-  "rounded-[14px] border border-emerald-300/60 bg-emerald-50 p-[0.9rem_1rem] text-sm text-slate-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100";
+const reviewVendorStatusClass =
+  "text-sm font-medium text-slate-700 dark:text-slate-200";
 const reviewFieldLabelClass = stackedFieldLabelClass;
 const fieldGridClass = "grid w-full grid-cols-1 gap-4 sm:grid-cols-2";
 const paymentFieldsClass =
@@ -41,25 +37,11 @@ export function VendorSection({
   return (
     <section className={reviewSectionClass}>
       <div className={reviewSectionHeaderClass}>
-        <div>
-          {sectionTitle("Vendor")}
-          <p className={reviewSectionCopyClass}>
-            Confirm the supplier identity. Matching vendors are reused
-            automatically and a new vendor is created only when no match exists.
-          </p>
-        </div>
+        <div>{sectionTitle("Vendor")}</div>
       </div>
-      <div
-        className={
-          existingVendorLabel
-            ? reviewInlineNoteMatchedClass
-            : reviewInlineNoteClass
-        }
-      >
-        {existingVendorLabel
-          ? `Preview match: ${existingVendorLabel}. Confirm will reuse this vendor if the details still match.`
-          : "No exact vendor match was found in preview. Confirm will create a new vendor only if a matching vendor still cannot be found."}
-      </div>
+      <p className={reviewVendorStatusClass}>
+        {existingVendorLabel ? "Vendor exists" : "New vendor will be created"}
+      </p>
       <div className={fieldGridClass}>
         <label className="flex min-w-0 flex-col gap-2 text-sm">
           <span className={reviewFieldLabelClass}>Name</span>
@@ -293,6 +275,7 @@ export function InvoiceSection({
     </section>
   );
 }
+
 export function PaymentSection({
   preview,
   draft,

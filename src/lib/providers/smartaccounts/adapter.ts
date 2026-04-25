@@ -20,6 +20,7 @@ import {
   getArticles,
   getBankAccounts,
   getCashAccounts,
+  getObjects,
   getVendorInvoiceHistory,
   getVatPcs,
   listCatalogArticles,
@@ -38,13 +39,14 @@ import {
 } from "./adapter-helpers";
 
 async function loadSmartAccountsContext(credentials: SmartAccountsCredentials) {
-  const [accounts, vatPcs, bankAccounts, cashAccounts, articles] =
+  const [accounts, vatPcs, bankAccounts, cashAccounts, articles, objects] =
     await Promise.all([
       getAccounts(credentials),
       getVatPcs(credentials),
       getBankAccounts(credentials),
       getCashAccounts(credentials),
       getArticles(credentials),
+      getObjects(credentials),
     ]);
 
   return {
@@ -75,6 +77,13 @@ async function loadSmartAccountsContext(credentials: SmartAccountsCredentials) {
           accountCode: account.account,
         })),
       ],
+      dimensions: objects
+        .filter((object) => object.active !== false)
+        .map((object) => ({
+          code: object.code ?? object.id,
+          name: object.code ? `${object.code} - ${object.name}` : object.name,
+          providerId: object.id,
+        })),
     },
     raw: {
       accounts,
@@ -82,6 +91,7 @@ async function loadSmartAccountsContext(credentials: SmartAccountsCredentials) {
       bankAccounts,
       cashAccounts,
       articles,
+      objects,
     },
   };
 }

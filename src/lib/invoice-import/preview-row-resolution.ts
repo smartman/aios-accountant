@@ -224,6 +224,7 @@ async function matchPreviewRowsWithAi(params: {
           rows: params.rows,
           catalog: params.catalog,
           history: params.history,
+          companyContext: params.savedConnection.companyContext,
         }),
     });
 

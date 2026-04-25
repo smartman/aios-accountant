@@ -5,6 +5,7 @@ import type {
   InvoiceImportPreviewResult,
 } from "@/lib/invoice-import-types";
 import InvoiceImportFilePreview from "./InvoiceImportFilePreview";
+import InvoiceImportDimensionSection from "./InvoiceImportDimensionSection";
 import {
   InvoiceSection,
   PaymentSection,
@@ -39,6 +40,11 @@ export default function InvoiceImportReviewLayout({
           <InvoiceSection draft={draft} setDraft={setDraft} />
         </div>
 
+        <InvoiceImportDimensionSection
+          preview={preview}
+          draft={draft}
+          setDraft={setDraft}
+        />
         <PaymentSection preview={preview} draft={draft} setDraft={setDraft} />
         <RowsSection preview={preview} draft={draft} setDraft={setDraft} />
       </div>

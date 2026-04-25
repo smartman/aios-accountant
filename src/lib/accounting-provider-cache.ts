@@ -35,10 +35,13 @@ export function scopeMeritCredentials(
 export function clearStoredConnectionCache(
   savedConnection: StoredAccountingConnection,
 ): void {
+  const cacheScope =
+    savedConnection.companyId ?? savedConnection.workosUserId ?? "global";
+
   if (savedConnection.provider === "smartaccounts") {
     const credentials = scopeSmartAccountsCredentials(
       savedConnection.credentials.credentials as SmartAccountsCredentials,
-      savedConnection.workosUserId,
+      cacheScope,
     );
     clearSmartAccountsCachedValuesByPrefix(
       smartAccountsNamespacedCacheKey(credentials, ""),
@@ -48,7 +51,7 @@ export function clearStoredConnectionCache(
 
   const credentials = scopeMeritCredentials(
     savedConnection.credentials.credentials as MeritCredentials,
-    savedConnection.workosUserId,
+    cacheScope,
   );
   clearMeritCachedValuesByPrefix(meritNamespacedCacheKey(credentials, ""));
 }

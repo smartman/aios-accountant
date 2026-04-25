@@ -1,7 +1,7 @@
 import { getProviderLabel } from "@/lib/accounting-provider-types";
 import type { DashboardTab } from "./workspace-state";
 
-export type WorkspaceMenuActionId = "import" | "provider";
+export type WorkspaceMenuActionId = DashboardTab;
 
 export interface WorkspaceMenuAction {
   current: boolean;
@@ -11,18 +11,19 @@ export interface WorkspaceMenuAction {
 }
 
 export function getWorkspaceSectionLabel(activeTab: DashboardTab): string {
-  return activeTab === "provider" ? "Accounting provider" : "Import invoices";
+  return activeTab === "settings" ? "Company settings" : "Import invoices";
 }
 
 export function getWorkspaceStatusLabel(
   hasConnection: boolean,
   activeProvider: "smartaccounts" | "merit" | null,
+  companyName: string,
 ): string {
   if (!hasConnection || activeProvider === null) {
-    return "Set up a provider to start importing invoices.";
+    return `${companyName}: verify credentials before importing invoices.`;
   }
 
-  return `${getProviderLabel(activeProvider)} is connected.`;
+  return `${companyName}: ${getProviderLabel(activeProvider)} is connected.`;
 }
 
 export function createWorkspaceMenuActions(params: {
@@ -38,10 +39,10 @@ export function createWorkspaceMenuActions(params: {
       label: "Import invoices",
     },
     {
-      current: params.activeTab === "provider",
+      current: params.activeTab === "settings",
       disabled: false,
-      id: "provider",
-      label: params.hasConnection ? "Accounting provider" : "Set up provider",
+      id: "settings",
+      label: "Company settings",
     },
   ];
 }

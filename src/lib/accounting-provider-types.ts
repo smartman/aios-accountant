@@ -62,10 +62,20 @@ export interface ProviderPaymentAccount {
   accountCode?: string;
 }
 
+export interface ProviderDimension {
+  code: string;
+  name: string;
+  providerId?: string;
+  dimId?: number;
+  dimValueId?: string;
+  dimCode?: string;
+}
+
 export interface ProviderReferenceData {
   accounts: ProviderReferenceAccount[];
   taxCodes: ProviderReferenceTaxCode[];
   paymentAccounts: ProviderPaymentAccount[];
+  dimensions?: ProviderDimension[];
 }
 
 export interface ProviderResolvedRow {
@@ -78,6 +88,7 @@ export interface ProviderResolvedRow {
   taxCode?: string;
   accountCode: string;
   accountSelectionReason: string;
+  dimensionCode?: string;
 }
 
 export interface ProviderExistingInvoiceResult {
@@ -134,6 +145,14 @@ export interface SmartAccountsProviderContext {
   bankAccounts: SmartAccountsBankAccount[];
   cashAccounts: SmartAccountsCashAccount[];
   articles: SmartAccountsArticle[];
+  objects?: SmartAccountsObject[];
+}
+
+export interface SmartAccountsObject {
+  id: string;
+  code?: string;
+  name: string;
+  active?: boolean;
 }
 
 export interface MeritAccount {
@@ -202,6 +221,17 @@ export interface MeritItem {
   taxId?: string;
 }
 
+export interface MeritDimension {
+  dimId: number;
+  dimName?: string;
+  id: string;
+  code: string;
+  name: string;
+  endDate?: string;
+  nonActive?: boolean;
+  debitPositive?: boolean;
+}
+
 export interface MeritProviderContext {
   accounts: MeritAccount[];
   taxes: MeritTax[];
@@ -210,6 +240,7 @@ export interface MeritProviderContext {
   units?: MeritUnit[];
   items?: MeritItem[];
   vendors: MeritVendor[];
+  dimensions?: MeritDimension[];
 }
 
 export type ProviderRuntimeContext =

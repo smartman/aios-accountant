@@ -85,6 +85,23 @@ function normalizeDraftRowAmounts(
   };
 }
 
+function normalizeDimension<
+  TDimension extends
+    | {
+        code?: string | null;
+        name?: string | null;
+        reason?: string | null;
+      }
+    | null
+    | undefined,
+>(dimension: TDimension) {
+  return {
+    code: dimension?.code?.trim() || null,
+    name: dimension?.name?.trim() || null,
+    reason: dimension?.reason?.trim() || null,
+  };
+}
+
 const ROUNDING_NOTE_LINE =
   /^\s*(?:rounding(?: amount)?|ümardus)\s*[:\-]\s*([+-]?\d+(?:[.,]\d+)?)\s*$/iu;
 
@@ -142,6 +159,7 @@ export function normalizeInvoiceExtraction(
       ...extraction.payment,
       paymentAmount: normalizeNumber(extraction.payment.paymentAmount) ?? null,
     },
+    dimension: normalizeDimension(extraction.dimension),
     rows: extraction.rows.map((row) => ({
       ...row,
       price: normalizeNumber(row.price) ?? null,
@@ -165,6 +183,7 @@ export function normalizeInvoiceImportDraft(
       ...draft.payment,
       paymentAmount: normalizeNumber(draft.payment.paymentAmount) ?? null,
     },
+    dimension: normalizeDimension(draft.dimension),
     rows: draft.rows.map(normalizeDraftRowAmounts),
   };
 }

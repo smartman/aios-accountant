@@ -22,6 +22,7 @@ import {
   getArticles,
   getBankAccounts,
   getCashAccounts,
+  getObjects,
   getVatPcs,
 } from "./loaders";
 
@@ -226,52 +227,64 @@ describe("smartaccounts-core normalization helpers", () => {
   });
 });
 
+function mockResourceFetch() {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+
+    if (url.includes("/settings/accounts:get")) {
+      return jsonResponse({
+        accounts: [
+          { code: "4000", descriptionEn: "Services" },
+          { name: "skip" },
+        ],
+      });
+    }
+    if (url.includes("/settings/vatpcs:get")) {
+      return jsonResponse({
+        vatPcs: [{ vatPc: "VAT22", vatPercent: "22" }, { percent: 22 }],
+      });
+    }
+    if (url.includes("/settings/bankaccounts:get")) {
+      return jsonResponse({
+        bankAccounts: [
+          { name: "Main bank", account: "1020" },
+          { account: "skip" },
+        ],
+      });
+    }
+    if (url.includes("/settings/cashaccounts:get")) {
+      return jsonResponse({
+        cashAccounts: [
+          { name: "Cash desk", account: "1000" },
+          { account: "skip" },
+        ],
+      });
+    }
+    if (url.includes("/purchasesales/articles:get")) {
+      return jsonResponse({
+        articles: [
+          { code: "ROW01", description: "Consulting" },
+          { description: "skip" },
+        ],
+      });
+    }
+    if (url.includes("/settings/objects:get")) {
+      return jsonResponse({
+        objects: [
+          { id: "object-1", code: "OBJ", name: "Object", active: true },
+          { code: "skip" },
+        ],
+      });
+    }
+
+    return jsonResponse({});
+  });
+}
+
 describe("smartaccounts-core resource loading", () => {
   it("normalizes accounts, VAT codes, bank accounts, cash accounts, and articles", async () => {
     const credentials = buildCredentials("resources");
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
-
-      if (url.includes("/settings/accounts:get")) {
-        return jsonResponse({
-          accounts: [
-            { code: "4000", descriptionEn: "Services" },
-            { name: "skip" },
-          ],
-        });
-      }
-      if (url.includes("/settings/vatpcs:get")) {
-        return jsonResponse({
-          vatPcs: [{ vatPc: "VAT22", vatPercent: "22" }, { percent: 22 }],
-        });
-      }
-      if (url.includes("/settings/bankaccounts:get")) {
-        return jsonResponse({
-          bankAccounts: [
-            { name: "Main bank", account: "1020" },
-            { account: "skip" },
-          ],
-        });
-      }
-      if (url.includes("/settings/cashaccounts:get")) {
-        return jsonResponse({
-          cashAccounts: [
-            { name: "Cash desk", account: "1000" },
-            { account: "skip" },
-          ],
-        });
-      }
-      if (url.includes("/purchasesales/articles:get")) {
-        return jsonResponse({
-          articles: [
-            { code: "ROW01", description: "Consulting" },
-            { description: "skip" },
-          ],
-        });
-      }
-
-      return jsonResponse({});
-    });
+    mockResourceFetch();
 
     await expect(getAccounts(credentials)).resolves.toEqual([
       {
@@ -326,6 +339,14 @@ describe("smartaccounts-core resource loading", () => {
         activeSales: undefined,
         accountPurchase: undefined,
         vatPc: undefined,
+      },
+    ]);
+    await expect(getObjects(credentials)).resolves.toEqual([
+      {
+        id: "object-1",
+        code: "OBJ",
+        name: "Object",
+        active: true,
       },
     ]);
 

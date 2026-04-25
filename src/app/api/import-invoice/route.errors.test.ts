@@ -28,6 +28,28 @@ vi.mock("@/lib/workos", () => ({
 vi.mock("@/lib/user-accounting-connections", () => ({
   getStoredAccountingConnection: hoisted.getStoredAccountingConnection,
 }));
+vi.mock("@/lib/companies/repository", () => ({
+  requireCompanyForUser: vi.fn(async ({ companyId }) => ({
+    id: companyId,
+    name: "Test company",
+    countryCode: "EE",
+    emtakCode: "69202",
+    emtakLabel: "Bookkeeping",
+    accountingProvider: "smartaccounts",
+    configuration: {
+      fixedAssetThreshold: 2000,
+      inventory: { defaultUnit: "tk", newArticlePolicy: "confirm" },
+      vendorExceptions: {},
+      projects: [],
+    },
+    connectionSummary: null,
+    members: [],
+    invitations: [],
+  })),
+}));
+vi.mock("@/lib/companies/ai-context", () => ({
+  buildCompanyAiContext: vi.fn(() => "Company context"),
+}));
 vi.mock("@/lib/merit", () => ({
   meritProviderAdapter: hoisted.meritProviderAdapter,
 }));
@@ -37,7 +59,7 @@ vi.mock("@/lib/smartaccounts", () => ({
 
 function buildSavedConnection() {
   return {
-    workosUserId: "user-1",
+    companyId: "company-1",
     provider: "smartaccounts" as const,
     credentials: {
       provider: "smartaccounts" as const,
@@ -58,6 +80,7 @@ function buildSavedConnection() {
 
 function buildRequest(file?: File): Request {
   const formData = new FormData();
+  formData.set("companyId", "company-1");
   if (file) {
     formData.set("invoice", file);
   }

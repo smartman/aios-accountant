@@ -22,6 +22,7 @@ interface ReviewProps {
   setDraft: (draft: InvoiceImportDraft) => void;
   confirming: boolean;
   onConfirm: () => void;
+  companyId?: string;
 }
 
 const summaryChipClass =
@@ -70,7 +71,13 @@ function WarningPanel({ warnings }: { warnings: string[] }) {
   );
 }
 
-function MissingArticleWarningPanel({ draft }: { draft: InvoiceImportDraft }) {
+function MissingArticleWarningPanel({
+  companyId,
+  draft,
+}: {
+  companyId?: string;
+  draft: InvoiceImportDraft;
+}) {
   const hasUnresolvedMissingArticle = draft.rows.some(
     (row) => row.suggestionStatus === "missing" && !row.selectedArticleCode,
   );
@@ -84,6 +91,7 @@ function MissingArticleWarningPanel({ draft }: { draft: InvoiceImportDraft }) {
       action={clearAccountingConnectionCacheFromForm}
       className="mb-6 rounded-xl border border-amber-400 bg-amber-100/60 px-5 py-4 dark:border-amber-800 dark:bg-amber-950/40"
     >
+      <input type="hidden" name="companyId" value={companyId ?? ""} />
       <p className="m-0 text-sm font-medium text-amber-900 dark:text-amber-100">
         Article not detected, choose manually or create new article and refresh
         the article cache.
@@ -208,6 +216,7 @@ export default function InvoiceImportReview({
   setDraft,
   confirming,
   onConfirm,
+  companyId,
 }: ReviewProps) {
   const errors = validateDraft(draft);
   const warnings = [
@@ -239,7 +248,7 @@ export default function InvoiceImportReview({
       <div className="animate-fade-in rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(241,245,249,0.92))] p-3 shadow-[0_24px_60px_rgba(15,23,42,0.12)] sm:rounded-[30px] sm:p-8 dark:border-slate-700 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.94))]">
         <ReviewHeader draft={draft} />
         <WarningPanel warnings={warnings} />
-        <MissingArticleWarningPanel draft={draft} />
+        <MissingArticleWarningPanel companyId={companyId} draft={draft} />
         <InvoiceImportReviewLayout
           file={file}
           filePreviewUrl={filePreviewUrl}

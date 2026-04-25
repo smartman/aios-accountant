@@ -115,6 +115,11 @@ export interface InvoiceExtraction {
     reason: string | null;
     paymentAccountName?: string | null;
   };
+  dimension?: {
+    code: string | null;
+    name: string | null;
+    reason: string | null;
+  };
   rows: InvoiceExtractionRow[];
   warnings: string[];
 }
@@ -215,6 +220,11 @@ export interface InvoiceImportDraft {
     reason: string | null;
     paymentAccountName: string | null;
   };
+  dimension?: {
+    code: string | null;
+    name: string | null;
+    reason: string | null;
+  };
   actions: {
     createVendor: boolean;
     recordPayment: boolean;
@@ -253,6 +263,7 @@ export interface InvoiceImportPreviewResult {
       rate?: number | null;
     }>;
     paymentAccounts: Array<{ name: string; type: "BANK" | "CASH" }>;
+    dimensions?: Array<{ code: string; name: string }>;
   };
 }
 

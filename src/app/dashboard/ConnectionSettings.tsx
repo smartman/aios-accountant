@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import type { SavedConnectionSummary } from "@/lib/accounting-provider-types";
 import {
+  type ClearCacheState,
   initialClearCacheState,
   initialSaveConnectionState,
 } from "./action-state";
@@ -10,18 +11,6 @@ import {
   clearAccountingConnectionCache,
   saveAccountingConnection,
 } from "./actions";
-
-function formatVerifiedAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 function formatSavedValue(value: string | undefined, fallback: string): string {
   if (typeof value === "string" && value.trim()) {
@@ -37,33 +26,29 @@ function ConnectionSummaryCard({
   currentConnection: SavedConnectionSummary;
 }) {
   return (
-    <div className="min-w-[250px] rounded-[14px] border border-slate-300 bg-white/5 p-4 md:p-5">
-      <p className="m-0 font-bold">{currentConnection.label}</p>
-      <div className="mt-[0.7rem] grid gap-2 text-[0.9rem]">
-        <div>
-          <span className="text-slate-500">Accounting app: </span>
-          <span>{currentConnection.label}</span>
-        </div>
-        <div>
-          <span className="text-slate-500">Public ID: </span>
-          <span>
-            {formatSavedValue(
-              currentConnection.publicId,
-              currentConnection.detail,
-            )}
-          </span>
-        </div>
-        <div>
-          <span className="text-slate-500">Secret: </span>
-          <span>
-            {formatSavedValue(currentConnection.secretMasked, "Hidden")}
-          </span>
-        </div>
-        <div className="text-xs text-slate-500">
-          Verified {formatVerifiedAt(currentConnection.verifiedAt)}
-        </div>
+    <dl className="grid gap-4 text-sm md:grid-cols-3">
+      <div className="flex min-w-0 gap-2">
+        <dt className="text-slate-500 dark:text-slate-400">Status</dt>
+        <dd className="min-w-0 truncate font-semibold text-emerald-700 dark:text-emerald-300">
+          Connected to {currentConnection.label}
+        </dd>
       </div>
-    </div>
+      <div className="flex min-w-0 gap-2">
+        <dt className="text-slate-500 dark:text-slate-400">Public ID</dt>
+        <dd className="min-w-0 truncate">
+          {formatSavedValue(
+            currentConnection.publicId,
+            currentConnection.detail,
+          )}
+        </dd>
+      </div>
+      <div className="flex min-w-0 gap-2">
+        <dt className="text-slate-500 dark:text-slate-400">Secret</dt>
+        <dd className="min-w-0 truncate">
+          {formatSavedValue(currentConnection.secretMasked, "Hidden")}
+        </dd>
+      </div>
+    </dl>
   );
 }
 const fieldLabelClass =
@@ -151,7 +136,7 @@ function ConnectionStatusMessage({
 }) {
   return (
     <div
-      className={`mt-4 rounded-lg border px-4 py-[0.875rem] ${
+      className={`rounded-lg border px-4 py-3 ${
         status === "success"
           ? "border-emerald-300 bg-emerald-500/10 text-emerald-700 dark:border-emerald-700/80 dark:text-emerald-200"
           : "border-rose-300 bg-rose-500/10 text-rose-700 dark:border-rose-700/80 dark:text-rose-200"
@@ -171,7 +156,7 @@ function CacheActionMessage({
 }) {
   return (
     <div
-      className={`mt-3 rounded-lg border px-4 py-3 ${
+      className={`rounded-lg border px-3 py-2 text-sm ${
         status === "success"
           ? "border-emerald-300 bg-emerald-500/10 text-emerald-700 dark:border-emerald-700/80 dark:text-emerald-200"
           : "border-rose-300 bg-rose-500/10 text-rose-700 dark:border-rose-700/80 dark:text-rose-200"
@@ -182,10 +167,105 @@ function CacheActionMessage({
   );
 }
 
-export default function ConnectionSettings({
+function ConnectionSettingsHeader({
   currentConnection,
+  isExpanded,
+  onToggle,
 }: {
   currentConnection: SavedConnectionSummary | null;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  if (!currentConnection) {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold">Accounting connection</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Save credentials for this company after a live validation check.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-4 text-left"
+      aria-expanded={isExpanded}
+      onClick={onToggle}
+    >
+      <div>
+        <h2 className="text-xl font-semibold">Accounting connection</h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Connected to {currentConnection.label}.
+        </p>
+      </div>
+      <span aria-hidden="true" className="text-xl leading-none text-slate-500">
+        {isExpanded ? "-" : "+"}
+      </span>
+    </button>
+  );
+}
+
+function ConnectionDetails({
+  cacheState,
+  clearCachesAction,
+  clearingCaches,
+  companyId,
+  currentConnection,
+}: {
+  cacheState: ClearCacheState;
+  clearCachesAction: (payload: FormData) => void | Promise<void>;
+  clearingCaches: boolean;
+  companyId: string;
+  currentConnection: SavedConnectionSummary | null;
+}) {
+  if (!currentConnection && cacheState.status === "idle") {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 grid gap-4">
+      {currentConnection ? (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Save credentials for this company after a live validation check.
+          </p>
+          <form action={clearCachesAction}>
+            <input type="hidden" name="companyId" value={companyId} />
+            <button
+              type="submit"
+              className="inline-flex min-h-[38px] items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              disabled={clearingCaches}
+            >
+              {clearingCaches ? "Clearing cache..." : "Clear cached values"}
+            </button>
+          </form>
+        </div>
+      ) : null}
+
+      {currentConnection ? (
+        <ConnectionSummaryCard currentConnection={currentConnection} />
+      ) : null}
+
+      {cacheState.status !== "idle" && cacheState.message ? (
+        <CacheActionMessage
+          message={cacheState.message}
+          status={cacheState.status}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export default function ConnectionSettings({
+  companyId,
+  currentConnection,
+  provider,
+}: {
+  companyId: string;
+  currentConnection: SavedConnectionSummary | null;
+  provider: "smartaccounts" | "merit";
 }) {
   const [state, formAction, pending] = useActionState(
     saveAccountingConnection,
@@ -195,68 +275,63 @@ export default function ConnectionSettings({
     clearAccountingConnectionCache,
     initialClearCacheState,
   );
-  const [provider, setProvider] = useState<"smartaccounts" | "merit">(
-    currentConnection?.provider ?? "smartaccounts",
+  const [isExpanded, setExpanded] = useState(currentConnection === null);
+  const [selectedProvider, setProvider] = useState<"smartaccounts" | "merit">(
+    provider,
   );
 
+  useEffect(() => {
+    setExpanded(currentConnection === null);
+  }, [currentConnection]);
+
+  useEffect(() => {
+    setProvider(provider);
+  }, [provider]);
+
   return (
-    <div className="mb-8 rounded-xl border border-slate-200 bg-slate-100 p-8 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),_0_4px_6px_-2px_rgba(0,0,0,0.05)] dark:border-slate-700 dark:bg-slate-900">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-[44rem]">
-          <h2 className="mb-2 text-2xl font-semibold">Accounting connection</h2>
-          <p className="m-0 text-slate-500 dark:text-slate-400">
-            Choose the accounting system for this signed-in user and save
-            credentials after a live validation check.
-          </p>
-        </div>
+    <section className="rounded-xl border border-slate-200 bg-slate-100 p-5 shadow-[0_8px_18px_-12px_rgba(15,23,42,0.35)] sm:p-6 dark:border-slate-700 dark:bg-slate-900">
+      <ConnectionSettingsHeader
+        currentConnection={currentConnection}
+        isExpanded={isExpanded}
+        onToggle={() => setExpanded((current) => !current)}
+      />
 
-        <div className="flex flex-col gap-4 xl:items-end">
-          {currentConnection ? (
-            <ConnectionSummaryCard currentConnection={currentConnection} />
-          ) : null}
-
-          {currentConnection ? (
-            <form action={clearCachesAction}>
-              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start">
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                  disabled={clearingCaches}
-                >
-                  {clearingCaches ? "Clearing cache…" : "Clear cached values"}
-                </button>
-                {cacheState.status !== "idle" && cacheState.message ? (
-                  <CacheActionMessage
-                    message={cacheState.message}
-                    status={cacheState.status}
-                  />
-                ) : null}
-              </div>
-            </form>
-          ) : null}
-        </div>
-      </div>
-
-      <form action={formAction} className="mt-6">
-        <ProviderFields provider={provider} setProvider={setProvider} />
-
-        {state.status !== "idle" && state.message && (
-          <ConnectionStatusMessage
-            message={state.message}
-            status={state.status}
+      {isExpanded ? (
+        <>
+          <ConnectionDetails
+            cacheState={cacheState}
+            clearCachesAction={clearCachesAction}
+            clearingCaches={clearingCaches}
+            companyId={companyId}
+            currentConnection={currentConnection}
           />
-        )}
+          <form action={formAction} className="mt-4 grid gap-4">
+            <input type="hidden" name="companyId" value={companyId} />
+            <ProviderFields
+              provider={selectedProvider}
+              setProvider={setProvider}
+            />
 
-        <div className="mt-4 flex justify-end">
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] whitespace-nowrap transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={pending}
-          >
-            {pending ? "Validating…" : "Save and validate connection"}
-          </button>
-        </div>
-      </form>
-    </div>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              {state.status === "error" && state.message ? (
+                <ConnectionStatusMessage
+                  message={state.message}
+                  status={state.status}
+                />
+              ) : (
+                <span />
+              )}
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+              >
+                {pending ? "Validating..." : "Save and validate connection"}
+              </button>
+            </div>
+          </form>
+        </>
+      ) : null}
+    </section>
   );
 }

@@ -8,11 +8,13 @@ import { decryptJson, encryptJson } from "./connection-crypto";
 import { getPrismaClient } from "./prisma";
 
 export interface StoredAccountingConnection {
-  workosUserId: string;
+  companyId?: string;
+  workosUserId?: string;
   provider: AccountingProvider;
   credentials: AccountingCredentials;
   summary: SavedConnectionSummary;
   verifiedAt: Date;
+  companyContext?: string;
 }
 
 function sanitizeSavedConnectionSummary(
@@ -58,13 +60,15 @@ function assertCredentialProvider(
 }
 
 export async function getStoredAccountingConnection(
-  workosUserId: string,
+  companyId: string,
 ): Promise<StoredAccountingConnection | null> {
-  const record = await getPrismaClient().userAccountingConnection.findUnique({
-    where: {
-      workosUserId,
+  const record = await getPrismaClient().companyAccountingConnection.findUnique(
+    {
+      where: {
+        companyId,
+      },
     },
-  });
+  );
 
   if (!record) {
     return null;
@@ -77,7 +81,7 @@ export async function getStoredAccountingConnection(
   );
 
   return {
-    workosUserId: record.workosUserId,
+    companyId: record.companyId,
     provider,
     credentials,
     summary: sanitizeSavedConnectionSummary(
@@ -88,19 +92,25 @@ export async function getStoredAccountingConnection(
 }
 
 export async function upsertAccountingConnection(params: {
-  workosUserId: string;
+  companyId?: string;
+  workosUserId?: string;
   credentials: AccountingCredentials;
   summary: SavedConnectionSummary;
   verifiedAt?: Date;
 }): Promise<StoredAccountingConnection> {
+  const companyId = params.companyId ?? params.workosUserId;
+  if (!companyId) {
+    throw new Error("Company id is required for accounting credentials.");
+  }
+
   const verifiedAt = params.verifiedAt ?? new Date();
   const summary = sanitizeSavedConnectionSummary(params.summary);
-  const record = await getPrismaClient().userAccountingConnection.upsert({
+  const record = await getPrismaClient().companyAccountingConnection.upsert({
     where: {
-      workosUserId: params.workosUserId,
+      companyId,
     },
     create: {
-      workosUserId: params.workosUserId,
+      companyId,
       provider: params.credentials.provider,
       encryptedCredentials: encryptJson(params.credentials),
       credentialSummary: summary as unknown as Prisma.InputJsonValue,
@@ -115,10 +125,18 @@ export async function upsertAccountingConnection(params: {
   });
 
   return {
-    workosUserId: record.workosUserId,
+    companyId: record.companyId,
     provider: assertAccountingProvider(record.provider),
     credentials: params.credentials,
     summary,
     verifiedAt: record.verifiedAt,
   };
+}
+
+export async function deleteAccountingConnection(companyId: string) {
+  await getPrismaClient().companyAccountingConnection.deleteMany({
+    where: {
+      companyId,
+    },
+  });
 }

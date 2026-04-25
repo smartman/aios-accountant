@@ -1,4 +1,5 @@
 import { SmartAccountsCredentials } from "../../accounting-provider-types";
+import type { SmartAccountsObject } from "../../accounting-provider-types";
 import {
   SmartAccountsAccount,
   SmartAccountsArticle,
@@ -122,6 +123,23 @@ function normalizeArticle(
   };
 }
 
+function normalizeObject(
+  record: Record<string, unknown>,
+): SmartAccountsObject | null {
+  const id = toOptionalString(record.id);
+  const name = toOptionalString(record.name);
+  if (!id || !name) {
+    return null;
+  }
+
+  return {
+    id,
+    code: toOptionalString(record.code),
+    name,
+    active: toOptionalBoolean(record.active),
+  };
+}
+
 export async function getAccounts(
   credentials: SmartAccountsCredentials,
 ): Promise<SmartAccountsAccount[]> {
@@ -228,6 +246,27 @@ export async function getArticles(
         .map(asRecord)
         .filter(isNonNull)
         .map(normalizeArticle)
+        .filter(isNonNull);
+    },
+  );
+}
+
+export async function getObjects(
+  credentials: SmartAccountsCredentials,
+): Promise<SmartAccountsObject[]> {
+  return cachedValue(
+    namespacedCacheKey(credentials, "objects"),
+    CACHE_TTLS.objects,
+    async () => {
+      const response = await smartAccountsRequest<unknown>(
+        "/settings/objects",
+        "get",
+        credentials,
+      );
+      return extractArray(response, ["objects"])
+        .map(asRecord)
+        .filter(isNonNull)
+        .map(normalizeObject)
         .filter(isNonNull);
     },
   );

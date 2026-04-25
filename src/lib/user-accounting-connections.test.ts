@@ -6,7 +6,8 @@ import {
 import { encryptJson } from "./connection-crypto";
 
 const prismaMock = {
-  userAccountingConnection: {
+  companyAccountingConnection: {
+    deleteMany: vi.fn(),
     findUnique: vi.fn(),
     upsert: vi.fn(),
   },
@@ -17,7 +18,7 @@ vi.mock("./prisma", () => ({
 }));
 
 type StoredRecord = {
-  workosUserId: string;
+  companyId: string;
   provider: string;
   encryptedCredentials: string;
   credentialSummary: SavedConnectionSummary & Record<string, unknown>;
@@ -63,18 +64,16 @@ function buildSummary(
 
 beforeEach(() => {
   storedRecord = null;
-  prismaMock.userAccountingConnection.findUnique.mockImplementation(
+  prismaMock.companyAccountingConnection.findUnique.mockImplementation(
     async ({ where }) => {
-      return storedRecord?.workosUserId === where.workosUserId
-        ? storedRecord
-        : null;
+      return storedRecord?.companyId === where.companyId ? storedRecord : null;
     },
   );
-  prismaMock.userAccountingConnection.upsert.mockImplementation(
+  prismaMock.companyAccountingConnection.upsert.mockImplementation(
     async ({ where, create, update }) => {
       const nextRecord = storedRecord ? { ...storedRecord, ...update } : create;
       storedRecord = {
-        workosUserId: where.workosUserId ?? nextRecord.workosUserId,
+        companyId: where.companyId ?? nextRecord.companyId,
         provider: nextRecord.provider,
         encryptedCredentials: nextRecord.encryptedCredentials,
         credentialSummary: nextRecord.credentialSummary,
@@ -83,6 +82,9 @@ beforeEach(() => {
       return storedRecord;
     },
   );
+  prismaMock.companyAccountingConnection.deleteMany.mockResolvedValue({
+    count: 1,
+  });
 });
 
 describe("user-accounting-connections", () => {
@@ -105,7 +107,7 @@ describe("user-accounting-connections", () => {
     } as SavedConnectionSummary & Record<string, unknown>;
 
     const saved = await upsertAccountingConnection({
-      workosUserId: "user-1",
+      companyId: "user-1",
       credentials: buildCredentials("smartaccounts"),
       summary: summaryWithSecret,
       verifiedAt: new Date("2026-04-14T09:00:00.000Z"),
@@ -119,7 +121,7 @@ describe("user-accounting-connections", () => {
     );
     expect(storedRecord?.encryptedCredentials).toMatch(/^v1:/);
     expect(hydrated).toEqual({
-      workosUserId: "user-1",
+      companyId: "user-1",
       provider: "smartaccounts",
       credentials: buildCredentials("smartaccounts"),
       summary: buildSummary("smartaccounts"),
@@ -132,7 +134,7 @@ describe("user-accounting-connections", () => {
       await import("./user-accounting-connections");
 
     const saved = await upsertAccountingConnection({
-      workosUserId: "user-optional",
+      companyId: "user-optional",
       credentials: buildCredentials("merit"),
       summary: {
         provider: "merit",
@@ -153,12 +155,36 @@ describe("user-accounting-connections", () => {
     expect(saved.verifiedAt).toBeInstanceOf(Date);
   });
 
+  it("requires a company id for new credentials and can delete a connection", async () => {
+    const { deleteAccountingConnection, upsertAccountingConnection } =
+      await import("./user-accounting-connections");
+
+    await expect(
+      upsertAccountingConnection({
+        credentials: buildCredentials("smartaccounts"),
+        summary: buildSummary("smartaccounts"),
+      }),
+    ).rejects.toThrow("Company id is required");
+
+    await deleteAccountingConnection("company-delete");
+
+    expect(
+      prismaMock.companyAccountingConnection.deleteMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        companyId: "company-delete",
+      },
+    });
+  });
+});
+
+describe("user-accounting-connections stored data validation", () => {
   it("rejects unsupported stored providers", async () => {
     const { getStoredAccountingConnection } =
       await import("./user-accounting-connections");
 
     storedRecord = {
-      workosUserId: "user-2",
+      companyId: "user-2",
       provider: "unsupported-provider",
       encryptedCredentials: encryptJson(buildCredentials("smartaccounts")),
       credentialSummary: buildSummary(
@@ -177,7 +203,7 @@ describe("user-accounting-connections", () => {
       await import("./user-accounting-connections");
 
     storedRecord = {
-      workosUserId: "user-3",
+      companyId: "user-3",
       provider: "smartaccounts",
       encryptedCredentials: encryptJson(buildCredentials("merit")),
       credentialSummary: buildSummary(

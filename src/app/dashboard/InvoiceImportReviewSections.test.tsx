@@ -31,7 +31,8 @@ it("renders vendor match messaging and updates vendor fields", () => {
     <VendorSection draft={preview.draft} setDraft={setDraft} />,
   );
 
-  expect(matchedMarkup).toContain("Preview match: Vendor OÜ.");
+  expect(matchedMarkup).toContain("Vendor exists");
+  expect(matchedMarkup).not.toContain("Confirm the supplier identity");
 
   const unmatchedDraft = {
     ...preview.draft,
@@ -45,7 +46,7 @@ it("renders vendor match messaging and updates vendor fields", () => {
     renderToStaticMarkup(
       <VendorSection draft={unmatchedDraft} setDraft={setDraft} />,
     ),
-  ).toContain("No exact vendor match was found in preview.");
+  ).toContain("New vendor will be created");
 
   const tree = <VendorSection draft={preview.draft} setDraft={setDraft} />;
 

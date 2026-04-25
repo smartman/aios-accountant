@@ -15,6 +15,7 @@ export const CACHE_TTLS = {
   cashAccounts: 10 * 60 * 1000,
   articles: 5 * 60 * 1000,
   vendors: 5 * 60 * 1000,
+  objects: 10 * 60 * 1000,
 } as const;
 
 const memoryCache = new Map<string, { expiresAt: number; value: unknown }>();

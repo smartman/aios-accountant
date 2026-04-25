@@ -18,9 +18,9 @@ import {
   clearCachedValuesByPrefix,
   getAccounts,
   getBanks,
-  getPaymentTypes,
   getTaxes,
   getUnits,
+  getPaymentTypes,
   meritDate,
   meritDateTime,
   meritRequest,
@@ -28,6 +28,7 @@ import {
   toOptionalString,
   validateMeritV2Access,
 } from "./core";
+import { getDimensions } from "./dimensions";
 import {
   buildMeritVendorPayload,
   buildPaymentBody,
@@ -58,13 +59,15 @@ import {
 } from "./units";
 
 async function loadMeritContext(credentials: MeritCredentials) {
-  const [accounts, taxes, banks, paymentTypes, units] = await Promise.all([
-    getAccounts(credentials),
-    getTaxes(credentials),
-    getBanks(credentials),
-    getPaymentTypes(credentials),
-    getUnits(credentials),
-  ]);
+  const [accounts, taxes, banks, paymentTypes, units, dimensions] =
+    await Promise.all([
+      getAccounts(credentials),
+      getTaxes(credentials),
+      getBanks(credentials),
+      getPaymentTypes(credentials),
+      getUnits(credentials),
+      getDimensions(credentials),
+    ]);
 
   return {
     provider: "merit" as const,
@@ -87,6 +90,17 @@ async function loadMeritContext(credentials: MeritCredentials) {
         currency: bank.currencyCode,
         accountCode: bank.accountCode,
       })),
+      dimensions: dimensions
+        .filter((dimension) => dimension.nonActive !== true)
+        .map((dimension) => ({
+          code: dimension.code,
+          name: [dimension.dimName, `${dimension.code} - ${dimension.name}`]
+            .filter(Boolean)
+            .join(": "),
+          dimId: dimension.dimId,
+          dimValueId: dimension.id,
+          dimCode: dimension.code,
+        })),
     },
     raw: {
       accounts,
@@ -96,6 +110,7 @@ async function loadMeritContext(credentials: MeritCredentials) {
       units,
       items: [],
       vendors: [],
+      dimensions,
     },
   };
 }
@@ -160,6 +175,24 @@ function buildMeritRowNetTotal(
   return total > 0 ? roundCurrencyAmount(total) : undefined;
 }
 
+function buildMeritDimensions(params: CreatePurchaseInvoiceParams) {
+  const dimension = (params.referenceData.dimensions ?? []).find(
+    (candidate) => candidate.code === params.extraction.dimension?.code,
+  );
+
+  if (!dimension?.dimId || !dimension.dimValueId || !dimension.dimCode) {
+    return undefined;
+  }
+
+  return [
+    {
+      DimId: dimension.dimId,
+      DimValueId: dimension.dimValueId,
+      DimCode: dimension.dimCode,
+    },
+  ];
+}
+
 function buildPurchaseInvoiceBody(
   params: CreatePurchaseInvoiceParams,
   units: MeritUnit[],
@@ -172,6 +205,7 @@ function buildPurchaseInvoiceBody(
     : isFiniteAmount(params.extraction.invoice.totalAmount)
       ? roundCurrencyAmount(params.extraction.invoice.totalAmount)
       : undefined;
+  const dimensions = buildMeritDimensions(params);
 
   return {
     Vendor: buildVendorObject(params.vendorId),
@@ -187,6 +221,7 @@ function buildPurchaseInvoiceBody(
     BillNo: params.extraction.invoice.invoiceNumber ?? undefined,
     RefNo: params.extraction.invoice.referenceNumber ?? undefined,
     CurrencyCode: params.extraction.invoice.currency ?? "EUR",
+    Dimensions: dimensions,
     InvoiceRow: params.rows.map((row) => ({
       Item: {
         Code: row.code,
@@ -199,6 +234,7 @@ function buildPurchaseInvoiceBody(
       TaxId: row.taxCode ?? undefined,
       GLAccountCode: row.accountCode,
       Description: row.description,
+      Dimensions: dimensions,
     })),
     RoundingAmount: roundingAmount,
     TotalAmount: buildMeritRowNetTotal(params.rows) ?? fallbackTotalAmount,

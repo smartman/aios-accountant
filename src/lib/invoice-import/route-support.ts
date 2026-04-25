@@ -6,11 +6,13 @@ const BAD_REQUEST_ERRORS = new Set([
   "Only PDF and image invoices are supported right now.",
   "Missing reviewed import draft.",
   "Reviewed import draft is invalid.",
+  "Choose a company before importing.",
 ]);
 
 const CONFLICT_ERRORS = new Set([
   "Connect Merit or SmartAccounts before importing.",
 ]);
+const FORBIDDEN_ERRORS = new Set(["Company access was not found."]);
 
 export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
@@ -41,6 +43,14 @@ export function validateInvoiceFile(file: FormDataEntryValue | null): File {
   return file;
 }
 
+export function parseImportCompanyId(value: FormDataEntryValue | null): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Choose a company before importing.");
+  }
+
+  return value.trim();
+}
+
 export function parseInvoiceImportDraft(
   value: FormDataEntryValue | null,
 ): InvoiceImportDraft {
@@ -64,6 +74,10 @@ export function getInvoiceImportResponseStatus(error: unknown): number {
 
   if (CONFLICT_ERRORS.has(message)) {
     return 409;
+  }
+
+  if (FORBIDDEN_ERRORS.has(message)) {
+    return 403;
   }
 
   return 500;

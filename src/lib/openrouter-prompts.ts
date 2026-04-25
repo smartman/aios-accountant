@@ -1,6 +1,7 @@
 import type { InvoiceExtraction } from "./invoice-import-types";
 import type {
   AccountingProvider,
+  ProviderDimension,
   ProviderReferenceAccount,
   ProviderReferenceTaxCode,
 } from "./accounting-provider-types";
@@ -19,6 +20,13 @@ function simplifyTaxCodes(taxCodes: ProviderReferenceTaxCode[]) {
     percent: taxCode.rate ?? null,
     description: taxCode.description ?? null,
     purchaseAccountCode: taxCode.purchaseAccountCode ?? null,
+  }));
+}
+
+function simplifyDimensions(dimensions: ProviderDimension[]) {
+  return dimensions.map((dimension) => ({
+    code: dimension.code,
+    name: dimension.name,
   }));
 }
 
@@ -48,9 +56,12 @@ export function buildUserPrompt(
   provider: AccountingProvider,
   accounts: ProviderReferenceAccount[],
   taxCodes: ProviderReferenceTaxCode[],
+  dimensions: ProviderDimension[] = [],
+  companyContext?: string | null,
 ): string {
-  return [
+  const prompt = [
     `Return only structured accounting data for importing a purchase invoice into ${getProviderLabel(provider)}.`,
+    companyContext?.trim() ? companyContext.trim() : null,
     "Vendor extraction is the top priority: vendor.* must describe the supplier or issuer, never the buyer.",
     "For Estonian invoices, Arve saaja is the invoice recipient and Makse saaja is the payee or payment recipient. Do not copy Arve saaja details into vendor fields.",
     "For multi-column or visually grouped PDFs, keep labels matched with the nearest company details in the same block or column.",
@@ -71,12 +82,16 @@ export function buildUserPrompt(
     "When a row shows quantity, a rounded unit price, and a separate row total, copy the exact row total into sum and do not recompute it from price times quantity.",
     "If the invoice total includes an explicit rounding amount, return it in invoice.roundingAmount, keep amountExcludingVat and vatAmount as stated, and set totalAmount to the final payable amount after rounding.",
     "If a supplier-specific product or article code is shown on a row, return it as sourceArticleCode. This is source evidence only, not the accounting item code.",
+    "Set dimension.code only when a provided project/dimension rule clearly matches the invoice. Otherwise return null dimension fields.",
     "Return monetary amounts exactly as shown in the document. Do not round or normalize them.",
     "Do not put rounding information into invoice.notes when it belongs in invoice.roundingAmount.",
     "If something is unclear, keep fields null and add a warning.",
     `Available purchase accounts: ${JSON.stringify(simplifyAccounts(accounts))}`,
     `Available tax codes: ${JSON.stringify(simplifyTaxCodes(taxCodes))}`,
-  ].join("\n");
+    `Available dimensions/objects: ${JSON.stringify(simplifyDimensions(dimensions))}`,
+  ].filter(Boolean);
+
+  return prompt.join("\n");
 }
 
 export function buildRowRepairPrompt(
@@ -84,9 +99,12 @@ export function buildRowRepairPrompt(
   extraction: InvoiceExtraction,
   accounts: ProviderReferenceAccount[],
   taxCodes: ProviderReferenceTaxCode[],
+  dimensions: ProviderDimension[] = [],
+  companyContext?: string | null,
 ): string {
   return [
     `Re-read the attached ${getProviderLabel(provider)} purchase invoice and return only the purchase rows.`,
+    companyContext?.trim() ? companyContext.trim() : null,
     "The previous extraction likely summarized several visible invoice rows into one row.",
     "Never combine separate source rows into one output row.",
     "Preserve the row order from the document table.",
@@ -105,5 +123,8 @@ export function buildRowRepairPrompt(
     })}`,
     `Available purchase accounts: ${JSON.stringify(simplifyAccounts(accounts))}`,
     `Available tax codes: ${JSON.stringify(simplifyTaxCodes(taxCodes))}`,
-  ].join("\n");
+    `Available dimensions/objects: ${JSON.stringify(simplifyDimensions(dimensions))}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
