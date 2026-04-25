@@ -7,35 +7,81 @@ type PdfLoadingTask = ReturnType<PdfJsModule["getDocument"]>;
 type PdfDocument = Awaited<PdfLoadingTask["promise"]>;
 type PdfPage = Awaited<ReturnType<PdfDocument["getPage"]>>;
 type PdfRenderTask = ReturnType<PdfPage["render"]>;
+type PdfRenderContext = {
+  canvas: HTMLCanvasElement;
+  outputScale: number;
+  page: PdfPage;
+};
 
 function buildPdfPreviewUrl(fileUrl: string): string {
   return `${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&zoom=page-fit&view=FitH`;
 }
 
+function configurePdfWorker(pdfjs: PdfJsModule) {
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.mjs",
+    import.meta.url,
+  ).toString();
+}
+
+function createPdfPageCanvas(fileName: string, pageNumber: number) {
+  const canvas = document.createElement("canvas");
+  canvas.setAttribute(
+    "aria-label",
+    `Preview of ${fileName}, page ${pageNumber}`,
+  );
+  canvas.className = "block w-full rounded-[14px] bg-white";
+
+  return canvas;
+}
+
+function renderPdfPageToCanvas({
+  canvas,
+  outputScale,
+  page,
+}: PdfRenderContext): PdfRenderTask {
+  const viewport = page.getViewport({ scale: 1.6 });
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("Canvas is not available.");
+
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  return page.render({
+    canvas,
+    canvasContext: context,
+    transform:
+      outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+    viewport,
+  });
+}
+
 function PdfPreviewCanvas({ file, fileUrl }: { file: File; fileUrl: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRendering, setIsRendering] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    let renderTask: PdfRenderTask | null = null;
+    const renderTasks: PdfRenderTask[] = [];
     let loadingTask: PdfLoadingTask | null = null;
     let pdfDocument: PdfDocument | null = null;
 
-    async function renderPdfPage() {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    async function renderPdfDocument() {
+      const pagesElement = pagesRef.current;
+      if (!pagesElement) return;
 
       setError(null);
       setIsRendering(true);
 
       try {
+        pagesElement.replaceChildren();
         const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
+        configurePdfWorker(pdfjs);
 
         const data = new Uint8Array(await file.arrayBuffer());
         loadingTask = pdfjs.getDocument({ data });
@@ -43,31 +89,22 @@ function PdfPreviewCanvas({ file, fileUrl }: { file: File; fileUrl: string }) {
         pdfDocument = pdf;
         if (cancelled) return;
 
-        const page = await pdf.getPage(1);
-        if (cancelled) return;
-
-        const viewport = page.getViewport({ scale: 1.6 });
         const outputScale = window.devicePixelRatio || 1;
-        const context = canvas.getContext("2d", { alpha: false });
-        if (!context) throw new Error("Canvas is not available.");
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          if (cancelled) return;
 
-        canvas.width = Math.floor(viewport.width * outputScale);
-        canvas.height = Math.floor(viewport.height * outputScale);
-        canvas.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-
-        context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        renderTask = page.render({
-          canvas,
-          canvasContext: context,
-          transform:
-            outputScale === 1
-              ? undefined
-              : [outputScale, 0, 0, outputScale, 0, 0],
-          viewport,
-        });
-        await renderTask.promise;
+          const canvas = createPdfPageCanvas(file.name, pageNumber);
+          pagesElement.append(canvas);
+          const renderTask = renderPdfPageToCanvas({
+            canvas,
+            outputScale,
+            page,
+          });
+          renderTasks.push(renderTask);
+          await renderTask.promise;
+          if (cancelled) return;
+        }
         if (!cancelled) setIsRendering(false);
       } catch {
         if (!cancelled) {
@@ -77,11 +114,11 @@ function PdfPreviewCanvas({ file, fileUrl }: { file: File; fileUrl: string }) {
       }
     }
 
-    void renderPdfPage();
+    void renderPdfDocument();
 
     return () => {
       cancelled = true;
-      renderTask?.cancel();
+      renderTasks.forEach((renderTask) => renderTask.cancel());
       void loadingTask?.destroy();
       void pdfDocument?.destroy();
     };
@@ -94,11 +131,8 @@ function PdfPreviewCanvas({ file, fileUrl }: { file: File; fileUrl: string }) {
           {error ?? "Rendering PDF preview."}
         </div>
       ) : null}
-      <canvas
-        ref={canvasRef}
-        aria-label={`Preview of ${file.name}`}
-        className="block w-full bg-white"
-      />
+      <div ref={pagesRef} className="flex flex-col gap-4 bg-white" />
+      <span className="sr-only">{`Preview of ${file.name}`}</span>
       <a className="sr-only" href={buildPdfPreviewUrl(fileUrl)}>
         Open PDF preview
       </a>

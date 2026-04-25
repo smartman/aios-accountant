@@ -6,6 +6,7 @@ import type {
 } from "./invoice-upload-batch";
 
 interface HookHarness {
+  cleanupEffects: () => void;
   renderController: () => Promise<{
     controller: ReturnType<
       (typeof import("./invoice-upload-controller"))["useInvoiceUploadController"]
@@ -15,12 +16,18 @@ interface HookHarness {
   states: unknown[];
 }
 
+type DeferredResponse = {
+  reject: (error: unknown) => void;
+  resolve: (response: Response) => void;
+};
+
 async function loadControllerHarness(
   initialState: InvoiceUploadBatchState,
 ): Promise<HookHarness> {
   vi.resetModules();
 
   const states: unknown[] = [initialState];
+  const effectCleanups: Array<() => void> = [];
   const refs: Array<{ current: unknown }> = [];
   let hookIndex = 0;
   let refIndex = 0;
@@ -29,7 +36,12 @@ async function loadControllerHarness(
     const actual = await vi.importActual<typeof import("react")>("react");
     return {
       ...actual,
-      useEffect: vi.fn(),
+      useEffect: vi.fn((effect: () => void | (() => void)) => {
+        const cleanup = effect();
+        if (typeof cleanup === "function") {
+          effectCleanups.push(cleanup);
+        }
+      }),
       useRef: vi.fn((initialValue: unknown) => {
         const currentIndex = refIndex++;
         refs[currentIndex] ??= { current: initialValue };
@@ -58,6 +70,9 @@ async function loadControllerHarness(
   });
 
   return {
+    cleanupEffects() {
+      effectCleanups.forEach((cleanup) => cleanup());
+    },
     states,
     async renderController() {
       hookIndex = 0;
@@ -73,6 +88,24 @@ async function loadControllerHarness(
       };
     },
   };
+}
+
+async function flushAsyncWork() {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+async function waitForCondition(assertion: () => void) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (attempt === 19) throw error;
+      await flushAsyncWork();
+    }
+  }
 }
 
 function buildReadyItem(): InvoiceBatchItem {
@@ -212,6 +245,43 @@ it("does not confirm when no ready invoice is active", async () => {
   await controller.handleConfirm();
 
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("cancels queued preview requests when the controller unmounts", async () => {
+  const deferredResponses: DeferredResponse[] = [];
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+    (_input, init) =>
+      new Promise<Response>((resolve, reject) => {
+        const signal = (init as RequestInit | undefined)?.signal;
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
+        deferredResponses.push({ reject, resolve });
+      }),
+  );
+  const { cleanupEffects, renderController } = await loadControllerHarness({
+    items: [],
+    activeItemId: null,
+    lightboxItemId: null,
+  });
+  const { controller } = await renderController();
+  const files = Array.from(
+    { length: 5 },
+    (_, index) =>
+      new File([`invoice-${index}`], `invoice-${index}.pdf`, {
+        type: "application/pdf",
+      }),
+  );
+
+  controller.handleFileChange(files);
+  await waitForCondition(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  cleanupEffects();
+  await flushAsyncWork();
+
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+  expect(deferredResponses).toHaveLength(3);
 });
 
 it("returns early when revoking an empty preview URL", async () => {

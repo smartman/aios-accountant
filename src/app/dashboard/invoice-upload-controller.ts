@@ -13,6 +13,7 @@ import {
   getFilesFromInput,
   getItemErrorMessage,
   type InvoiceBatchItem,
+  type InvoicePreviewPromise,
   type InvoiceUploadBatchState,
   resolveActiveItemId,
   updateInvoiceBatchItem,
@@ -22,9 +23,12 @@ type SetBatch = (
   updater: (state: InvoiceUploadBatchState) => InvoiceUploadBatchState,
 ) => void;
 
+type Ref<T> = { current: T };
+
 async function previewInvoice(
   file: File,
   companyId: string,
+  signal: AbortSignal,
 ): Promise<InvoiceImportPreviewResult> {
   const formData = new FormData();
   formData.append("invoice", file);
@@ -33,6 +37,7 @@ async function previewInvoice(
   const response = await fetch("/api/import-invoice", {
     method: "POST",
     body: formData,
+    signal,
   });
   const data = await response.json();
 
@@ -103,8 +108,10 @@ function updateBatchItem(
 function startPreview(params: {
   item: InvoiceBatchItem;
   companyId: string;
+  isCanceled: () => boolean;
+  signal: AbortSignal;
   setBatch: SetBatch;
-}) {
+}): InvoicePreviewPromise<InvoiceImportPreviewResult> {
   updateBatchItem(params.setBatch, params.item.id, (item) => ({
     ...item,
     status: "queued",
@@ -114,14 +121,21 @@ function startPreview(params: {
     result: null,
   }));
 
-  enqueueInvoicePreview(() => {
+  const previewPromise = enqueueInvoicePreview(() => {
+    if (params.isCanceled()) {
+      throw new Error("Invoice preview canceled.");
+    }
+
     updateBatchItem(params.setBatch, params.item.id, (item) => ({
       ...item,
       status: "processing",
     }));
-    return previewInvoice(params.item.file, params.companyId);
-  })
+    return previewInvoice(params.item.file, params.companyId, params.signal);
+  });
+
+  previewPromise
     .then((preview) => {
+      if (params.isCanceled()) return;
       updateBatchItem(params.setBatch, params.item.id, (item) => ({
         ...item,
         status: "ready",
@@ -131,12 +145,97 @@ function startPreview(params: {
       }));
     })
     .catch((error) => {
+      if (params.isCanceled()) return;
       updateBatchItem(params.setBatch, params.item.id, (item) => ({
         ...item,
         status: "failed",
         error: getItemErrorMessage(error),
       }));
     });
+
+  return previewPromise;
+}
+
+function startManagedPreview(params: {
+  companyId: string;
+  item: InvoiceBatchItem;
+  mountedRef: Ref<boolean>;
+  previewCancelersRef: Ref<Map<string, () => void>>;
+  setBatch: SetBatch;
+}) {
+  const abortController = new AbortController();
+  const isCanceled = () =>
+    !params.mountedRef.current || abortController.signal.aborted;
+  const previewPromise = startPreview({
+    item: params.item,
+    companyId: params.companyId,
+    isCanceled,
+    signal: abortController.signal,
+    setBatch: params.setBatch,
+  });
+
+  params.previewCancelersRef.current.set(params.item.id, () => {
+    abortController.abort();
+    previewPromise.cancel();
+  });
+  previewPromise.then(
+    () => params.previewCancelersRef.current.delete(params.item.id),
+    () => params.previewCancelersRef.current.delete(params.item.id),
+  );
+}
+
+async function confirmActiveInvoice(params: {
+  batch: InvoiceUploadBatchState;
+  companyId: string;
+  setBatch: SetBatch;
+}) {
+  const activeItem = findActiveBatchItem(
+    params.batch.items,
+    params.batch.activeItemId,
+  );
+  if (!activeItem?.draft || activeItem.status !== "ready") return;
+
+  updateBatchItem(params.setBatch, activeItem.id, (item) => ({
+    ...item,
+    status: "confirming",
+  }));
+
+  try {
+    const imported = await confirmInvoice(
+      activeItem.file,
+      activeItem.draft,
+      params.companyId,
+    );
+    revokeFilePreviewUrl(activeItem.filePreviewUrl);
+    params.setBatch((previousState) => {
+      const items = updateInvoiceBatchItem(
+        previousState.items,
+        activeItem.id,
+        (item) => ({
+          ...item,
+          status: "confirmed",
+          result: imported,
+          filePreviewUrl: null,
+          error: null,
+        }),
+      );
+
+      return {
+        ...previousState,
+        items,
+        activeItemId:
+          findNextReadyItemId(items, activeItem.id) ??
+          resolveActiveItemId(items, null),
+        lightboxItemId: null,
+      };
+    });
+  } catch (error) {
+    updateBatchItem(params.setBatch, activeItem.id, (item) => ({
+      ...item,
+      status: "ready",
+      error: getItemErrorMessage(error),
+    }));
+  }
 }
 
 export function useInvoiceUploadController({
@@ -148,10 +247,20 @@ export function useInvoiceUploadController({
 }) {
   const [batch, setBatch] = useState(createInitialInvoiceUploadBatchState);
   const itemsRef = useRef<InvoiceBatchItem[]>([]);
-  itemsRef.current = batch.items;
+  const mountedRef = useRef(true);
+  const previewCancelersRef = useRef<Map<string, () => void>>(new Map());
+
+  useEffect(() => {
+    itemsRef.current = batch.items;
+  }, [batch.items]);
 
   useEffect(
     () => () => {
+      mountedRef.current = false;
+      for (const cancelPreview of previewCancelersRef.current.values()) {
+        cancelPreview();
+      }
+      previewCancelersRef.current.clear();
       for (const item of itemsRef.current) {
         revokeFilePreviewUrl(item.filePreviewUrl);
       }
@@ -173,54 +282,19 @@ export function useInvoiceUploadController({
         activeItemId: resolveActiveItemId(items, previousState.activeItemId),
       };
     });
-    nextItems.forEach((item) => startPreview({ item, companyId, setBatch }));
+    nextItems.forEach((item) =>
+      startManagedPreview({
+        item,
+        companyId,
+        mountedRef,
+        previewCancelersRef,
+        setBatch,
+      }),
+    );
   }
 
   async function handleConfirm() {
-    const activeItem = findActiveBatchItem(batch.items, batch.activeItemId);
-    if (!activeItem?.draft || activeItem.status !== "ready") return;
-
-    updateBatchItem(setBatch, activeItem.id, (item) => ({
-      ...item,
-      status: "confirming",
-    }));
-
-    try {
-      const imported = await confirmInvoice(
-        activeItem.file,
-        activeItem.draft,
-        companyId,
-      );
-      revokeFilePreviewUrl(activeItem.filePreviewUrl);
-      setBatch((previousState) => {
-        const items = updateInvoiceBatchItem(
-          previousState.items,
-          activeItem.id,
-          (item) => ({
-            ...item,
-            status: "confirmed",
-            result: imported,
-            filePreviewUrl: null,
-            error: null,
-          }),
-        );
-
-        return {
-          ...previousState,
-          items,
-          activeItemId:
-            findNextReadyItemId(items, activeItem.id) ??
-            resolveActiveItemId(items, null),
-          lightboxItemId: null,
-        };
-      });
-    } catch (error) {
-      updateBatchItem(setBatch, activeItem.id, (item) => ({
-        ...item,
-        status: "ready",
-        error: getItemErrorMessage(error),
-      }));
-    }
+    await confirmActiveInvoice({ batch, companyId, setBatch });
   }
 
   const activeItem = findActiveBatchItem(batch.items, batch.activeItemId);
@@ -236,7 +310,15 @@ export function useInvoiceUploadController({
     handleFileChange,
     retryItem: (itemId: string) => {
       const item = batch.items.find((candidate) => candidate.id === itemId);
-      if (item) startPreview({ item, companyId, setBatch });
+      if (item) {
+        startManagedPreview({
+          item,
+          companyId,
+          mountedRef,
+          previewCancelersRef,
+          setBatch,
+        });
+      }
     },
     selectItem: (itemId: string) =>
       setBatch((previousState) => ({
