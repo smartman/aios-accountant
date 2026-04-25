@@ -87,6 +87,25 @@ it("updates, finds, and chooses active invoice items", () => {
   ).toBe("ready");
 });
 
+it("finds the next ready invoice from the original queue position", () => {
+  const firstReady = buildItem("ready");
+  const confirmedCurrent = {
+    ...buildItem("confirmed"),
+    id: "confirmed-current",
+  };
+  const nextReady = { ...buildItem("ready"), id: "next-ready" };
+
+  expect(
+    findNextReadyItemId(
+      [firstReady, confirmedCurrent, nextReady],
+      "confirmed-current",
+    ),
+  ).toBe(nextReady.id);
+  expect(
+    findNextReadyItemId([firstReady, confirmedCurrent], "confirmed-current"),
+  ).toBe(firstReady.id);
+});
+
 it("formats generic import errors", () => {
   expect(getItemErrorMessage(new Error("Bad scan."))).toBe("Bad scan.");
   expect(getItemErrorMessage("boom")).toBe("Network error - please try again.");
@@ -126,4 +145,43 @@ it("limits preview work to three active tasks", async () => {
     "invoice-3",
     "invoice-4",
   ]);
+});
+
+it("cancels queued preview work before it starts", async () => {
+  const deferredTasks: DeferredTask[] = [];
+  const firstTasks = Array.from({ length: 3 }, () =>
+    enqueueInvoicePreview(
+      () =>
+        new Promise<string>((resolve) => {
+          deferredTasks.push({ resolve });
+        }),
+    ),
+  );
+  const canceledTask = enqueueInvoicePreview(async () => "should-not-run");
+
+  canceledTask.cancel();
+
+  await expect(canceledTask).rejects.toThrow("Invoice preview canceled.");
+  deferredTasks.forEach((deferred) => deferred.resolve("done"));
+  await expect(Promise.all(firstTasks)).resolves.toEqual([
+    "done",
+    "done",
+    "done",
+  ]);
+});
+
+it("ignores repeated cancellation and active preview cancellation", async () => {
+  let resolveActiveTask: (value: string) => void = () => undefined;
+  const activeTask = enqueueInvoicePreview(
+    () =>
+      new Promise<string>((resolve) => {
+        resolveActiveTask = resolve;
+      }),
+  );
+
+  activeTask.cancel();
+  activeTask.cancel();
+  resolveActiveTask("active-done");
+
+  await expect(activeTask).resolves.toBe("active-done");
 });

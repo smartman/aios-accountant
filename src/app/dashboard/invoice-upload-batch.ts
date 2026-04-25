@@ -32,6 +32,7 @@ export interface InvoiceUploadBatchState {
 }
 
 type QueuedPreviewTask = {
+  canceled: boolean;
   run: () => Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -96,9 +97,14 @@ export function findNextReadyItemId(
   items: InvoiceBatchItem[],
   afterItemId: string,
 ): string | null {
-  const readyItems = items.filter((item) => item.status === "ready");
-  const currentIndex = readyItems.findIndex((item) => item.id === afterItemId);
-  const nextReadyItem = readyItems[currentIndex + 1] ?? readyItems[0];
+  const currentIndex = items.findIndex((item) => item.id === afterItemId);
+  const itemsAfterCurrent =
+    currentIndex >= 0 ? items.slice(currentIndex + 1) : [];
+  const itemsBeforeCurrent =
+    currentIndex >= 0 ? items.slice(0, currentIndex) : [];
+  const nextReadyItem = [...itemsAfterCurrent, ...itemsBeforeCurrent].find(
+    (item) => item.status === "ready",
+  );
 
   return nextReadyItem?.id ?? null;
 }
@@ -166,15 +172,37 @@ function drainPreviewTasks() {
   }
 }
 
-export function enqueueInvoicePreview<T>(run: () => Promise<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    pendingPreviewTasks.push({
+export type InvoicePreviewPromise<T> = Promise<T> & { cancel: () => void };
+
+export function enqueueInvoicePreview<T>(
+  run: () => Promise<T>,
+): InvoicePreviewPromise<T> {
+  let queuedTask: QueuedPreviewTask | null = null;
+  const promise = new Promise<T>((resolve, reject) => {
+    queuedTask = {
+      canceled: false,
       run,
       resolve: (value) => resolve(value as T),
       reject,
-    });
+    };
+    pendingPreviewTasks.push(queuedTask);
     drainPreviewTasks();
-  });
+  }) as InvoicePreviewPromise<T>;
+
+  promise.cancel = () => {
+    if (!queuedTask || queuedTask.canceled) {
+      return;
+    }
+
+    queuedTask.canceled = true;
+    const pendingIndex = pendingPreviewTasks.indexOf(queuedTask);
+    if (pendingIndex >= 0) {
+      pendingPreviewTasks.splice(pendingIndex, 1);
+      queuedTask.reject(new Error("Invoice preview canceled."));
+    }
+  };
+
+  return promise;
 }
 
 export function __resetInvoicePreviewLimiterForTests() {
