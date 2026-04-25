@@ -21,6 +21,7 @@ interface ReviewProps {
   draft: InvoiceImportDraft;
   setDraft: (draft: InvoiceImportDraft) => void;
   confirming: boolean;
+  submitError?: string | null;
   onConfirm: () => void;
   companyId?: string;
 }
@@ -127,13 +128,23 @@ function ErrorPanel({ errors }: { errors: string[] }) {
 function ConfirmButton({
   confirming,
   disabled,
+  submitError,
   onConfirm,
 }: Pick<ReviewProps, "confirming"> & {
   disabled: boolean;
+  submitError?: string | null;
   onConfirm: () => void;
 }) {
   return (
-    <div className="mt-8 flex justify-end">
+    <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+      {submitError ? (
+        <p
+          className="m-0 min-w-0 max-w-2xl text-sm font-medium text-red-600 dark:text-red-400"
+          role="alert"
+        >
+          {submitError}
+        </p>
+      ) : null}
       <button
         className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_6px_-1px_rgba(99,102,241,0.2),_0_2px_4px_-1px_rgba(99,102,241,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-700 hover:shadow-[0_10px_15px_-3px_rgba(99,102,241,0.3),_0_4px_6px_-2px_rgba(99,102,241,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
         type="button"
@@ -215,6 +226,7 @@ export default function InvoiceImportReview({
   draft,
   setDraft,
   confirming,
+  submitError,
   onConfirm,
   companyId,
 }: ReviewProps) {
@@ -263,6 +275,7 @@ export default function InvoiceImportReview({
         <ConfirmButton
           confirming={confirming}
           disabled={confirming || errors.length > 0}
+          submitError={submitError}
           onConfirm={handleConfirmRequest}
         />
       </div>

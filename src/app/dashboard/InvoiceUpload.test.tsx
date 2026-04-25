@@ -232,7 +232,9 @@ it("shows import and confirm errors from failed requests", async () => {
   await flushAsyncWork();
 
   tree = render({ canImport: true, activeProvider: "merit" });
-  expect(renderToStaticMarkup(tree)).toContain("Confirm failed.");
+  const markup = renderToStaticMarkup(tree);
+  expect(markup).toContain("Confirm failed.");
+  expect(markup.split("Confirm failed.")).toHaveLength(3);
 });
 
 it("falls back to the generic network error message for non-Error throws", async () => {

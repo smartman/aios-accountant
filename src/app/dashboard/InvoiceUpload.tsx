@@ -262,6 +262,7 @@ export default function InvoiceUpload({
           draft={draft}
           setDraft={setDraft}
           confirming={confirming}
+          submitError={error}
           onConfirm={handleConfirm}
           companyId={companyId}
         />
