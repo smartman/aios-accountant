@@ -24,6 +24,11 @@ import {
   cleanupTemporaryInvoiceBlobReference,
   readInvoiceUploadContent,
 } from "@/lib/invoice-import/temporary-blob";
+import {
+  addLogThreadContext,
+  createLogRequestId,
+  withLogThreadContext,
+} from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -69,11 +74,12 @@ async function previewForSavedConnection(params: {
   });
 }
 
-export async function POST(request: Request) {
+async function handlePreviewRequest(request: Request) {
   const { user } = await getUser();
   if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  addLogThreadContext({ userId: user.id, workflow: "preview" });
 
   let formData: FormData | null = null;
   let invoiceUpload: Awaited<
@@ -90,6 +96,7 @@ export async function POST(request: Request) {
         email: user.email,
       },
     });
+    addLogThreadContext({ companyId: company.id });
     const savedConnection = await getStoredAccountingConnection(company.id);
     if (!savedConnection) {
       await cleanupTemporaryInvoiceBlobReference(formData);
@@ -98,6 +105,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    addLogThreadContext({ provider: savedConnection.provider });
     invoiceUpload = await readInvoiceUploadContent(formData);
     try {
       const result = await previewForSavedConnection({
@@ -126,4 +134,14 @@ export async function POST(request: Request) {
       { status: getInvoiceImportResponseStatus(error) },
     );
   }
+}
+
+export async function POST(request: Request) {
+  return withLogThreadContext(
+    {
+      requestId: createLogRequestId(),
+      route: "POST /api/import-invoice",
+    },
+    () => handlePreviewRequest(request),
+  );
 }

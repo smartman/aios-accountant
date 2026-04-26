@@ -15,7 +15,7 @@ import {
 } from "./article-matching";
 import {
   applyAiArticleMatches,
-  matchArticlesWithOpenRouter,
+  matchArticlesWithOpenAI,
 } from "./article-matching-ai";
 import { createRowId } from "./preview-helpers";
 import {
@@ -221,7 +221,7 @@ async function matchPreviewRowsWithAi(params: {
         rowCount: params.rows.length,
       },
       run: () =>
-        matchArticlesWithOpenRouter({
+        matchArticlesWithOpenAI({
           provider: params.savedConnection.provider,
           rows: params.rows,
           catalog: params.catalog,

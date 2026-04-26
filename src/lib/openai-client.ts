@@ -1,70 +1,72 @@
-type OpenRouterMessageContent =
+import { logger } from "@/lib/logger";
+import { logOpenAIUsage, type OpenAIUsage } from "./openai-usage-logger";
+
+type OpenAIMessageContent =
   | {
-      type: "text";
+      type: "input_text";
       text: string;
     }
   | {
-      type: "file";
-      file: {
-        filename: string;
-        file_data: string;
-      };
+      type: "input_file";
+      filename: string;
+      file_data: string;
     }
   | {
-      type: "image_url";
-      image_url: {
-        url: string;
-      };
+      type: "input_image";
+      image_url: string;
+      detail: "original";
     };
 
-type OpenRouterJsonSchema = {
+type OpenAIJsonSchema = {
   name: string;
   strict: true;
   schema: Record<string, unknown>;
 };
 
-const MAX_PARALLEL_OPENROUTER_CALLS = 3;
+type OpenAIReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
-type QueuedOpenRouterCall = {
+const MAX_PARALLEL_OPENAI_CALLS = 3;
+
+type QueuedOpenAICall = {
   run: () => Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
 };
 
-let activeOpenRouterCalls = 0;
-const pendingOpenRouterCalls: QueuedOpenRouterCall[] = [];
+let activeOpenAICalls = 0;
+const pendingOpenAICalls: QueuedOpenAICall[] = [];
 
-function runOpenRouterCall(call: QueuedOpenRouterCall) {
-  activeOpenRouterCalls += 1;
+function runOpenAICall(call: QueuedOpenAICall) {
+  activeOpenAICalls += 1;
   call
     .run()
     .then(call.resolve, call.reject)
     .finally(() => {
-      activeOpenRouterCalls -= 1;
-      drainOpenRouterCalls();
+      activeOpenAICalls -= 1;
+      drainOpenAICalls();
     });
 }
 
-function drainOpenRouterCalls() {
+function drainOpenAICalls() {
   while (
-    activeOpenRouterCalls < MAX_PARALLEL_OPENROUTER_CALLS &&
-    pendingOpenRouterCalls.length > 0
+    activeOpenAICalls < MAX_PARALLEL_OPENAI_CALLS &&
+    pendingOpenAICalls.length > 0
   ) {
-    const call = pendingOpenRouterCalls.shift();
+    const call = pendingOpenAICalls.shift();
     if (call) {
-      runOpenRouterCall(call);
+      runOpenAICall(call);
     }
   }
 }
 
-function withOpenRouterConcurrency<T>(run: () => Promise<T>): Promise<T> {
+function withOpenAIConcurrency<T>(run: () => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    pendingOpenRouterCalls.push({
+    pendingOpenAICalls.push({
       run,
       resolve: (value) => resolve(value as T),
       reject,
     });
-    drainOpenRouterCalls();
+    drainOpenAICalls();
   });
 }
 
@@ -191,7 +193,7 @@ const INVOICE_EXTRACTION_SCHEMA = {
   },
 } as const;
 
-export function jsonSchemaForInvoiceExtraction(): OpenRouterJsonSchema {
+export function jsonSchemaForInvoiceExtraction(): OpenAIJsonSchema {
   return {
     name: "invoice_import_payload",
     strict: true,
@@ -199,7 +201,7 @@ export function jsonSchemaForInvoiceExtraction(): OpenRouterJsonSchema {
   };
 }
 
-export function jsonSchemaForInvoiceRows(): OpenRouterJsonSchema {
+export function jsonSchemaForInvoiceRows(): OpenAIJsonSchema {
   return {
     name: "invoice_import_rows_payload",
     strict: true,
@@ -230,97 +232,159 @@ function extractMessageText(content: unknown): string {
   return "";
 }
 
-export function buildOpenRouterContent(params: {
+function extractResponseText(payload: {
+  output_text?: unknown;
+  output?: Array<{
+    type?: unknown;
+    content?: unknown;
+  }>;
+  choices?: Array<{
+    message?: {
+      content?: unknown;
+    };
+  }>;
+}): string {
+  if (typeof payload.output_text === "string") {
+    return payload.output_text;
+  }
+
+  const outputText =
+    payload.output
+      ?.filter((item) => item.type === "message")
+      .map((item) => extractMessageText(item.content))
+      .join("") ?? "";
+
+  if (outputText) {
+    return outputText;
+  }
+
+  return extractMessageText(payload.choices?.[0]?.message?.content);
+}
+
+export function buildOpenAIContent(params: {
   mimeType: string;
   filename: string;
   fileDataUrl: string;
   promptText: string;
-}): OpenRouterMessageContent[] {
-  const content: OpenRouterMessageContent[] = [
+}): OpenAIMessageContent[] {
+  const content: OpenAIMessageContent[] = [
     {
-      type: "text",
+      type: "input_text",
       text: params.promptText,
     },
   ];
 
   if (params.mimeType.startsWith("image/")) {
     content.push({
-      type: "image_url",
-      image_url: {
-        url: params.fileDataUrl,
-      },
+      type: "input_image",
+      image_url: params.fileDataUrl,
+      detail: "original",
     });
     return content;
   }
 
   content.push({
-    type: "file",
-    file: {
-      filename: params.filename,
-      file_data: params.fileDataUrl,
-    },
+    type: "input_file",
+    filename: params.filename,
+    file_data: params.fileDataUrl,
   });
 
   return content;
 }
 
-export async function requestOpenRouterStructuredOutput<T>(params: {
+export async function requestOpenAIStructuredOutput<T>(params: {
   apiKey: string;
   model: string;
   systemPrompt: string;
-  userContent: OpenRouterMessageContent[];
-  jsonSchema: OpenRouterJsonSchema;
+  userContent: OpenAIMessageContent[];
+  jsonSchema: OpenAIJsonSchema;
+  promptCacheKey: string;
+  reasoningEffort?: OpenAIReasoningEffort;
   invalidJsonMessage: string;
 }): Promise<T> {
-  const response = await withOpenRouterConcurrency(() =>
-    fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const startedAt = performance.now();
+  const response = await withOpenAIConcurrency(() =>
+    fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${params.apiKey}`,
         "Content-Type": "application/json",
-        "X-Title":
-          process.env.OPENROUTER_APP_TITLE ?? "Accounting Invoice Importer",
       },
       body: JSON.stringify({
         model: params.model,
-        messages: [
-          {
-            role: "system",
-            content: params.systemPrompt,
-          },
+        instructions: params.systemPrompt,
+        input: [
           {
             role: "user",
             content: params.userContent,
           },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: params.jsonSchema,
+        reasoning: params.reasoningEffort
+          ? {
+              effort: params.reasoningEffort,
+            }
+          : undefined,
+        text: {
+          format: {
+            type: "json_schema",
+            ...params.jsonSchema,
+          },
         },
-        temperature: 0.1,
+        prompt_cache_key: params.promptCacheKey,
+        prompt_cache_retention: "24h",
+        store: false,
       }),
     }),
   );
 
   if (!response.ok) {
+    const durationMs = Math.round(performance.now() - startedAt);
     const text = await response.text();
+    logger.error({
+      category: "openai",
+      event: "openai.responses.error",
+      status: "error",
+      durationMs,
+      metadata: {
+        model: params.model,
+        promptCacheKey: params.promptCacheKey,
+        reasoningEffort: params.reasoningEffort,
+        schemaName: params.jsonSchema.name,
+        httpStatus: response.status,
+      },
+      error: new Error(text || response.statusText),
+    });
     throw new Error(
-      `OpenRouter ${response.status}: ${text || response.statusText}`,
+      `OpenAI ${response.status}: ${text || response.statusText}`,
     );
   }
 
   const payload = (await response.json()) as {
+    output_text?: unknown;
+    output?: Array<{
+      type?: unknown;
+      content?: unknown;
+    }>;
     choices?: Array<{
       message?: {
         content?: unknown;
       };
     }>;
+    id?: unknown;
+    usage?: OpenAIUsage;
   };
-  const rawContent = payload.choices?.[0]?.message?.content;
-  const text = extractMessageText(rawContent);
+  logOpenAIUsage({
+    durationMs: Math.round(performance.now() - startedAt),
+    model: params.model,
+    promptCacheKey: params.promptCacheKey,
+    reasoningEffort: params.reasoningEffort,
+    schemaName: params.jsonSchema.name,
+    payload,
+  });
+  const text = extractResponseText(payload);
 
   if (!text) {
-    throw new Error("OpenRouter returned an empty response.");
+    throw new Error("OpenAI returned an empty response.");
   }
 
   try {
@@ -330,7 +394,7 @@ export async function requestOpenRouterStructuredOutput<T>(params: {
   }
 }
 
-export function __resetOpenRouterConcurrencyForTests() {
-  activeOpenRouterCalls = 0;
-  pendingOpenRouterCalls.splice(0, pendingOpenRouterCalls.length);
+export function __resetOpenAIConcurrencyForTests() {
+  activeOpenAICalls = 0;
+  pendingOpenAICalls.splice(0, pendingOpenAICalls.length);
 }

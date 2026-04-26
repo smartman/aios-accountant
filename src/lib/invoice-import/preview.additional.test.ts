@@ -1,9 +1,9 @@
 import { expect, it, vi } from "vitest";
-import { extractInvoiceWithOpenRouter } from "../openrouter";
+import { extractInvoiceWithOpenAI } from "../openai";
 import { previewInvoiceImport } from "./preview";
 
-vi.mock("../openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("../openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 
 function buildExtraction(overrides?: Record<string, unknown>) {
@@ -85,7 +85,7 @@ function buildConnection(provider: "smartaccounts" | "merit" = "merit") {
 }
 
 it("falls back to the first payment account and derives tax/article labels", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction() as never,
   );
 
@@ -131,7 +131,7 @@ it("falls back to the first payment account and derives tax/article labels", asy
 });
 
 it("prefers a same-type payment account when only the currency mismatches", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({
       payment: {
         isPaid: true,
@@ -175,7 +175,7 @@ it("prefers a same-type payment account when only the currency mismatches", asyn
 });
 
 it("preserves high-precision row prices in the reviewed draft", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({
       rows: [
         {
@@ -224,7 +224,7 @@ it("fills empty vendor and invoice fields from preview defaults", async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
   try {
-    vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+    vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
       buildExtraction({
         vendor: {
           name: null,

@@ -1,13 +1,18 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { __test__, matchArticlesWithOpenRouter } from "./article-matching-ai";
+import { __test__, matchArticlesWithOpenAI } from "./article-matching-ai";
 import { InvoiceImportDraftRow } from "../invoice-import-types";
 
-type OpenRouterRequestBody = {
+type OpenAIRequestBody = {
   model?: string;
-  messages: Array<{
+  instructions?: unknown;
+  input: Array<{
     role: string;
     content: unknown;
   }>;
+  prompt_cache_key?: string;
+  prompt_cache_retention?: string;
+  reasoning?: unknown;
+  store?: boolean;
 };
 
 function buildRow(
@@ -34,7 +39,7 @@ function buildRow(
   };
 }
 
-function mockOpenRouterResponse(payload: unknown): ReturnType<typeof vi.spyOn> {
+function mockOpenAIResponse(payload: unknown): ReturnType<typeof vi.spyOn> {
   return vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(JSON.stringify(payload), {
       status: 200,
@@ -54,7 +59,7 @@ it("returns null in the test environment so preview tests stay offline", async (
   vi.stubEnv("NODE_ENV", "test");
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
@@ -63,13 +68,12 @@ it("returns null in the test environment so preview tests stay offline", async (
   ).resolves.toBeNull();
 });
 
-it("sends rows, catalog, and history summaries to OpenRouter", async () => {
+it("sends rows, catalog, and history summaries to OpenAI", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
-  vi.stubEnv("OPENROUTER_APP_TITLE", "AI Accountant");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
-  const fetchMock = mockOpenRouterResponse({
+  const fetchMock = mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -95,7 +99,7 @@ it("sends rows, catalog, and history summaries to OpenRouter", async () => {
     ],
   });
 
-  const matches = await matchArticlesWithOpenRouter({
+  const matches = await matchArticlesWithOpenAI({
     provider: "smartaccounts",
     rows: [buildRow()],
     catalog: [
@@ -124,25 +128,26 @@ it("sends rows, catalog, and history summaries to OpenRouter", async () => {
   const [, requestInit] = fetchMock.mock.calls[0] ?? [];
   const body = JSON.parse(
     String(requestInit?.body ?? "{}"),
-  ) as OpenRouterRequestBody;
-  const systemPrompt = body.messages.find(
-    (message) => message.role === "system",
-  )?.content;
-  const userPrompt = body.messages.find(
-    (message) => message.role === "user",
-  )?.content;
-  const headers = requestInit?.headers as Record<string, string> | undefined;
+  ) as OpenAIRequestBody;
+  const systemPrompt = body.instructions;
+  const userContent = body.input.find((message) => message.role === "user")
+    ?.content as Array<{ text?: string }>;
+  const userPrompt = userContent[0]?.text ?? "";
 
+  expect(fetchMock.mock.calls[0]?.[0]).toBe(
+    "https://api.openai.com/v1/responses",
+  );
   expect(typeof systemPrompt).toBe("string");
   expect(systemPrompt).toContain("best existing accounting article");
   expect(systemPrompt).toContain("Uldelekter oine jaanuar 2025");
   expect(body.model).toBe("test-article-model");
-  expect(headers?.["X-Title"]).toBe("AI Accountant");
-  expect(String(userPrompt)).toContain(
-    '"description":"Elekter oine jaanuar 2025"',
-  );
-  expect(String(userPrompt)).toContain('"code":"el"');
-  expect(String(userPrompt)).toContain('"matches":1');
+  expect(body.reasoning).toBeUndefined();
+  expect(body.prompt_cache_key).toBe("invoice-article-matching");
+  expect(body.prompt_cache_retention).toBe("24h");
+  expect(body.store).toBe(false);
+  expect(userPrompt).toContain('"description":"Elekter oine jaanuar 2025"');
+  expect(userPrompt).toContain('"code":"el"');
+  expect(userPrompt).toContain('"matches":1');
   expect(matches).toEqual([
     {
       rowId: "row-1",
@@ -154,11 +159,11 @@ it("sends rows, catalog, and history summaries to OpenRouter", async () => {
   ]);
 });
 
-it("returns null when OpenRouter credentials are missing outside tests", async () => {
+it("returns null when OpenAI credentials are missing outside tests", async () => {
   vi.stubEnv("NODE_ENV", "development");
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
@@ -167,10 +172,10 @@ it("returns null when OpenRouter credentials are missing outside tests", async (
   ).resolves.toBeNull();
 });
 
-it("throws when OpenRouter returns an error response", async () => {
+it("throws when OpenAI returns an error response", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response("gateway issue", {
@@ -180,19 +185,19 @@ it("throws when OpenRouter returns an error response", async () => {
   );
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
       history: [],
     }),
-  ).rejects.toThrow("OpenRouter 502");
+  ).rejects.toThrow("OpenAI 502");
 });
 
 it("falls back to the response status text when the error body is empty", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response("", {
@@ -202,21 +207,21 @@ it("falls back to the response status text when the error body is empty", async 
   );
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
       history: [],
     }),
-  ).rejects.toThrow("OpenRouter 503: Service Unavailable");
+  ).rejects.toThrow("OpenAI 503: Service Unavailable");
 });
 
-it("throws when OpenRouter returns empty content", async () => {
+it("throws when OpenAI returns empty content", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
-  mockOpenRouterResponse({
+  mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -227,21 +232,21 @@ it("throws when OpenRouter returns empty content", async () => {
   });
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
       history: [],
     }),
-  ).rejects.toThrow("OpenRouter returned an empty response.");
+  ).rejects.toThrow("OpenAI returned an empty response.");
 });
 
-it("treats non-text OpenRouter content objects as empty responses", async () => {
+it("treats non-text OpenAI content objects as empty responses", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
-  mockOpenRouterResponse({
+  mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -252,21 +257,21 @@ it("treats non-text OpenRouter content objects as empty responses", async () => 
   });
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
       history: [],
     }),
-  ).rejects.toThrow("OpenRouter returned an empty response.");
+  ).rejects.toThrow("OpenAI returned an empty response.");
 });
 
-it("throws when OpenRouter returns invalid JSON", async () => {
+it("throws when OpenAI returns invalid JSON", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
-  mockOpenRouterResponse({
+  mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -277,23 +282,23 @@ it("throws when OpenRouter returns invalid JSON", async () => {
   });
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
       history: [],
     }),
   ).rejects.toThrow(
-    "OpenRouter did not return valid JSON for the article matcher.",
+    "OpenAI did not return valid JSON for the article matcher.",
   );
 });
 
 it("returns an empty match list when the payload omits rows", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_ARTICLE_MATCH_MODEL", "test-article-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_ARTICLE_MATCH_MODEL", "test-article-model");
 
-  mockOpenRouterResponse({
+  mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -304,7 +309,7 @@ it("returns an empty match list when the payload omits rows", async () => {
   });
 
   await expect(
-    matchArticlesWithOpenRouter({
+    matchArticlesWithOpenAI({
       provider: "smartaccounts",
       rows: [buildRow()],
       catalog: [{ code: "el", description: "Elekter" }],
@@ -313,11 +318,11 @@ it("returns an empty match list when the payload omits rows", async () => {
   ).resolves.toEqual([]);
 });
 
-it("defaults the article matcher model to openai/gpt-5.4-mini", async () => {
+it("defaults the article matcher model to gpt-5.5", async () => {
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
 
-  const fetchMock = mockOpenRouterResponse({
+  const fetchMock = mockOpenAIResponse({
     choices: [
       {
         message: {
@@ -327,7 +332,7 @@ it("defaults the article matcher model to openai/gpt-5.4-mini", async () => {
     ],
   });
 
-  await matchArticlesWithOpenRouter({
+  await matchArticlesWithOpenAI({
     provider: "smartaccounts",
     rows: [buildRow()],
     catalog: [{ code: "el", description: "Elekter" }],
@@ -337,9 +342,9 @@ it("defaults the article matcher model to openai/gpt-5.4-mini", async () => {
   const [, requestInit] = fetchMock.mock.calls[0] ?? [];
   const body = JSON.parse(
     String(requestInit?.body ?? "{}"),
-  ) as OpenRouterRequestBody;
+  ) as OpenAIRequestBody;
 
-  expect(body.model).toBe("openai/gpt-5.4-mini");
+  expect(body.model).toBe("gpt-5.5");
 });
 
 it("summarizes vendor history by article code", () => {
@@ -371,6 +376,64 @@ it("summarizes vendor history by article code", () => {
 
   expect(prompt).toContain('"matches":2');
   expect(prompt).toContain('"recentInvoiceDate":"2026-04-10"');
+});
+
+it("includes company context and provider labels in the user prompt", () => {
+  const prompt = __test__.buildUserPrompt({
+    provider: "merit",
+    rows: [buildRow()],
+    catalog: [
+      { code: "el", description: "Elekter" },
+      { code: "old", description: "Inactive", activePurchase: false },
+    ],
+    history: [],
+    companyContext: "  Prefer configured project rules.  ",
+  });
+
+  expect(prompt).toContain("purchase invoice rows into Merit");
+  expect(prompt).toContain("Prefer configured project rules.");
+  expect(prompt).toContain('"code":"el"');
+  expect(prompt).not.toContain('"code":"old"');
+});
+
+it("summarizes sparse vendor history without duplicate samples", () => {
+  const summary = __test__.summarizeVendorHistory([
+    {
+      invoiceId: "hist-1",
+      vendorId: "vendor-1",
+      vendorName: "Utility OU",
+      description: "",
+      articleCode: "net",
+    },
+    {
+      invoiceId: "hist-2",
+      vendorId: "vendor-1",
+      vendorName: "Utility OU",
+      issueDate: "2026-01-10",
+      description: "Internet jaanuar 2026",
+      articleCode: "net",
+      articleDescription: "Internet",
+      purchaseAccountCode: "4000",
+      taxCode: "VAT22",
+    },
+    {
+      invoiceId: "hist-3",
+      vendorId: "vendor-1",
+      vendorName: "Utility OU",
+      issueDate: "2026-01-01",
+      description: "Internet jaanuar 2026",
+      articleCode: "net",
+      articleDescription: "Internet",
+    },
+  ]);
+
+  expect(summary[0]).toMatchObject({
+    articleCode: "net",
+    articleDescription: null,
+    matches: 3,
+    recentInvoiceDate: "2026-01-10",
+    sampleDescriptions: ["Internet jaanuar 2026"],
+  });
 });
 
 it("sorts history summary by match count and then by recency", () => {

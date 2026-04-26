@@ -11,16 +11,16 @@ import type {
   ProviderReferenceTaxCode,
 } from "./accounting-provider-types";
 import {
-  buildOpenRouterContent,
+  buildOpenAIContent,
   jsonSchemaForInvoiceExtraction,
   jsonSchemaForInvoiceRows,
-  requestOpenRouterStructuredOutput,
-} from "./openrouter-client";
+  requestOpenAIStructuredOutput,
+} from "./openai-client";
 import {
   buildRowRepairPrompt,
   buildSystemPrompt,
   buildUserPrompt,
-} from "./openrouter-prompts";
+} from "./openai-prompts";
 
 function assertEnv(name: string): string {
   const value = process.env[name];
@@ -29,6 +29,11 @@ function assertEnv(name: string): string {
   }
   return value;
 }
+
+function getOpenAIModel(): string {
+  return process.env.OPENAI_MODEL?.trim() || "gpt-5.5";
+}
+
 function normalizeVendor(data: InvoiceExtraction): InvoiceExtraction["vendor"] {
   return {
     name: data.vendor.name ?? null,
@@ -123,7 +128,7 @@ function normalizeExtraction(data: InvoiceExtraction): InvoiceExtraction {
   });
 }
 
-export async function extractInvoiceWithOpenRouter(params: {
+export async function extractInvoiceWithOpenAI(params: {
   provider: AccountingProvider;
   filename: string;
   mimeType: string;
@@ -133,14 +138,14 @@ export async function extractInvoiceWithOpenRouter(params: {
   dimensions?: ProviderDimension[];
   companyContext?: string | null;
 }): Promise<InvoiceExtraction> {
-  const apiKey = assertEnv("OPENROUTER_API_KEY");
-  const model = assertEnv("OPENROUTER_MODEL");
+  const apiKey = assertEnv("OPENAI_API_KEY");
+  const model = getOpenAIModel();
   const systemPrompt = buildSystemPrompt();
-  const parsed = await requestOpenRouterStructuredOutput<InvoiceExtraction>({
+  const parsed = await requestOpenAIStructuredOutput<InvoiceExtraction>({
     apiKey,
     model,
     systemPrompt,
-    userContent: buildOpenRouterContent({
+    userContent: buildOpenAIContent({
       mimeType: params.mimeType,
       filename: params.filename,
       fileDataUrl: params.fileDataUrl,
@@ -153,8 +158,10 @@ export async function extractInvoiceWithOpenRouter(params: {
       ),
     }),
     jsonSchema: jsonSchemaForInvoiceExtraction(),
+    promptCacheKey: "invoice-extraction",
+    reasoningEffort: "low",
     invalidJsonMessage:
-      "OpenRouter did not return valid JSON for the invoice extraction.",
+      "OpenAI did not return valid JSON for the invoice extraction.",
   });
   const extraction = normalizeExtraction(parsed);
 
@@ -163,13 +170,13 @@ export async function extractInvoiceWithOpenRouter(params: {
   }
 
   try {
-    const repairedRowsPayload = await requestOpenRouterStructuredOutput<{
+    const repairedRowsPayload = await requestOpenAIStructuredOutput<{
       rows?: InvoiceExtraction["rows"];
     }>({
       apiKey,
       model,
       systemPrompt,
-      userContent: buildOpenRouterContent({
+      userContent: buildOpenAIContent({
         mimeType: params.mimeType,
         filename: params.filename,
         fileDataUrl: params.fileDataUrl,
@@ -183,8 +190,10 @@ export async function extractInvoiceWithOpenRouter(params: {
         ),
       }),
       jsonSchema: jsonSchemaForInvoiceRows(),
+      promptCacheKey: "invoice-row-repair",
+      reasoningEffort: "low",
       invalidJsonMessage:
-        "OpenRouter did not return valid JSON for the invoice row repair.",
+        "OpenAI did not return valid JSON for the invoice row repair.",
     });
     const repairedRows = repairedRowsPayload.rows ?? [];
 

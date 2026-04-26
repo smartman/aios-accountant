@@ -3,6 +3,7 @@ import {
   logInvoiceImportEvent,
   measureInvoiceImportPhase,
 } from "./observability";
+import { withLogThreadContext } from "@/lib/logger";
 
 describe("invoice import observability", () => {
   it("logs structured success events", async () => {
@@ -19,12 +20,18 @@ describe("invoice import observability", () => {
     ).resolves.toBe("ok");
 
     expect(infoSpy).toHaveBeenCalledOnce();
-    expect(JSON.parse(infoSpy.mock.calls[0][0] as string)).toMatchObject({
+    const payload = JSON.parse(infoSpy.mock.calls[0][0] as string);
+    expect(payload.timestamp).toMatch(/Z$/);
+    expect(payload).toMatchObject({
       category: "invoice-import",
-      workflow: "preview",
-      provider: "smartaccounts",
-      phase: "loadContext",
+      level: "info",
+      event: "invoice-import.preview.loadContext",
       status: "success",
+      thread: {
+        workflow: "preview",
+        provider: "smartaccounts",
+        phase: "loadContext",
+      },
       metadata: {
         accountCount: 3,
       },
@@ -48,11 +55,17 @@ describe("invoice import observability", () => {
     expect(errorSpy).toHaveBeenCalledOnce();
     expect(JSON.parse(errorSpy.mock.calls[0][0] as string)).toMatchObject({
       category: "invoice-import",
-      workflow: "confirm",
-      provider: "merit",
-      phase: "createPurchaseInvoice",
+      level: "error",
+      event: "invoice-import.confirm.createPurchaseInvoice",
       status: "error",
-      errorMessage: "Provider offline",
+      thread: {
+        workflow: "confirm",
+        provider: "merit",
+        phase: "createPurchaseInvoice",
+      },
+      error: {
+        message: "Provider offline",
+      },
     });
   });
 
@@ -75,6 +88,32 @@ describe("invoice import observability", () => {
       metadata: {
         usedFallbackInvoiceNumber: true,
         warningCount: 1,
+      },
+    });
+  });
+
+  it("includes request thread context", () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    withLogThreadContext(
+      { requestId: "request-1", userId: "user-1", companyId: "company-1" },
+      () => {
+        logInvoiceImportEvent({
+          workflow: "preview",
+          provider: "smartaccounts",
+          phase: "extractInvoice.summary",
+          status: "success",
+        });
+      },
+    );
+
+    expect(JSON.parse(infoSpy.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      thread: {
+        requestId: "request-1",
+        userId: "user-1",
+        companyId: "company-1",
+        workflow: "preview",
+        provider: "smartaccounts",
       },
     });
   });

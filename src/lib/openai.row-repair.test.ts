@@ -1,15 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { extractInvoiceWithOpenRouter } from "./openrouter";
+import { extractInvoiceWithOpenAI } from "./openai";
 
-type OpenRouterRequestBody = {
-  messages: Array<{
+type OpenAIRequestBody = {
+  input: Array<{
     role: string;
     content: unknown;
   }>;
-  response_format?: {
-    json_schema?: {
+  text?: {
+    format?: {
       name?: string;
     };
+  };
+  prompt_cache_key?: string;
+  reasoning?: {
+    effort?: string;
   };
 };
 
@@ -136,17 +140,19 @@ function buildSeparatedRows() {
 
 function buildResponse(content: unknown) {
   return {
-    choices: [
+    output: [
       {
-        message: {
-          content,
-        },
+        type: "message",
+        content:
+          typeof content === "string"
+            ? [{ type: "output_text", text: content }]
+            : content,
       },
     ],
   };
 }
 
-function mockOpenRouterResponses(...payloads: unknown[]) {
+function mockOpenAIResponses(...payloads: unknown[]) {
   const fetchMock = vi.spyOn(globalThis, "fetch");
 
   for (const payload of payloads) {
@@ -164,8 +170,8 @@ function mockOpenRouterResponses(...payloads: unknown[]) {
 }
 
 function setupEnv() {
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_MODEL", "test-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_MODEL", "test-model");
 }
 
 function buildImportParams() {
@@ -176,18 +182,18 @@ function buildImportParams() {
     fileDataUrl: "data:application/pdf;base64,ZmFrZQ==",
     accounts: [{ code: "4030", type: "EXPENSE", label: "4030 - Elekter" }],
     taxCodes: [{ code: "VAT22", rate: 22 }],
-  } as Parameters<typeof extractInvoiceWithOpenRouter>[0];
+  } as Parameters<typeof extractInvoiceWithOpenAI>[0];
 }
 
 async function expectRepairPassToSeparateRows() {
   setupEnv();
 
-  const fetchMock = mockOpenRouterResponses(
+  const fetchMock = mockOpenAIResponses(
     buildResponse(JSON.stringify(buildMergedExtraction())),
     buildResponse(JSON.stringify({ rows: buildSeparatedRows() })),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(extraction.rows).toHaveLength(5);
@@ -198,14 +204,14 @@ async function expectRepairPassToSeparateRows() {
   const [, secondRequestInit] = fetchMock.mock.calls[1] ?? [];
   const secondBody = JSON.parse(
     String(secondRequestInit?.body ?? "{}"),
-  ) as OpenRouterRequestBody;
-  const secondUserContent = (secondBody.messages.find(
+  ) as OpenAIRequestBody;
+  const secondUserContent = (secondBody.input.find(
     (message) => message.role === "user",
   )?.content ?? []) as Array<{ text?: string }>;
 
-  expect(secondBody.response_format?.json_schema?.name).toBe(
-    "invoice_import_rows_payload",
-  );
+  expect(secondBody.text?.format?.name).toBe("invoice_import_rows_payload");
+  expect(secondBody.reasoning).toEqual({ effort: "low" });
+  expect(secondBody.prompt_cache_key).toBe("invoice-row-repair");
   expect(secondUserContent[0]?.text).toContain(
     "previous extraction likely summarized several visible invoice rows",
   );
@@ -214,12 +220,12 @@ async function expectRepairPassToSeparateRows() {
 async function expectRepairPassToKeepOriginalWhenRowsMissing() {
   setupEnv();
 
-  mockOpenRouterResponses(
+  mockOpenAIResponses(
     buildResponse(JSON.stringify(buildMergedExtraction())),
     buildResponse(JSON.stringify({})),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(extraction.rows).toEqual(buildMergedExtraction().rows);
 }
@@ -227,7 +233,7 @@ async function expectRepairPassToKeepOriginalWhenRowsMissing() {
 async function expectNoRepairForNormalSingleRowInvoice() {
   setupEnv();
 
-  const fetchMock = mockOpenRouterResponses(
+  const fetchMock = mockOpenAIResponses(
     buildResponse(
       JSON.stringify({
         ...buildMergedExtraction(),
@@ -248,7 +254,7 @@ async function expectNoRepairForNormalSingleRowInvoice() {
     ),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(extraction.rows[0]?.description).toBe("Monthly accounting service");
@@ -277,13 +283,13 @@ async function expectFailedRepairToFallback() {
       }),
     );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(extraction.rows).toEqual(buildMergedExtraction().rows);
 }
 
-describe("extractInvoiceWithOpenRouter row repair", () => {
+describe("extractInvoiceWithOpenAI row repair", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();

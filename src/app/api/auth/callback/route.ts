@@ -1,5 +1,11 @@
 import { sealData, unsealData } from "iron-session";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  addLogThreadContext,
+  createLogRequestId,
+  logger,
+  withLogThreadContext,
+} from "@/lib/logger";
 import { clientId, workos } from "@/lib/workos";
 
 const AUTH_CALLBACK_FALLBACK_PATH = "/dashboard";
@@ -63,7 +69,7 @@ function createErrorResponse(request: NextRequest) {
   return response;
 }
 
-export async function GET(request: NextRequest) {
+async function handleAuthCallback(request: NextRequest) {
   try {
     const code = request.nextUrl.searchParams.get("code");
     const state = request.nextUrl.searchParams.get("state");
@@ -83,6 +89,7 @@ export async function GET(request: NextRequest) {
     if (!authResponse.accessToken || !authResponse.refreshToken) {
       throw new Error("Auth response is missing tokens.");
     }
+    addLogThreadContext({ userId: authResponse.user.id });
 
     const sessionCookieValue = await createSessionCookieValue({
       accessToken: authResponse.accessToken,
@@ -110,7 +117,22 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("[Auth callback error]", error);
+    logger.error({
+      category: "auth",
+      event: "auth.callback.error",
+      status: "error",
+      error,
+    });
     return createErrorResponse(request);
   }
+}
+
+export async function GET(request: NextRequest) {
+  return withLogThreadContext(
+    {
+      requestId: createLogRequestId(),
+      route: "GET /api/auth/callback",
+    },
+    () => handleAuthCallback(request),
+  );
 }

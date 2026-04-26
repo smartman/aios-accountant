@@ -34,8 +34,8 @@ const hoisted = vi.hoisted(() => ({
   smartAccountsFindVendor: vi.fn(),
 }));
 
-vi.mock("@/lib/openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("@/lib/openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 vi.mock("@/lib/workos", () => ({
   getUser: vi.fn(),
@@ -239,8 +239,8 @@ beforeEach(async () => {
   hoisted.smartAccountsFindVendor.mockResolvedValue(null);
   hoisted.meritFindVendor.mockResolvedValue(null);
 
-  const { extractInvoiceWithOpenRouter } = await import("@/lib/openrouter");
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(buildExtraction());
+  const { extractInvoiceWithOpenAI } = await import("@/lib/openai");
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(buildExtraction());
 });
 
 describe("POST imports", () => {
@@ -249,18 +249,18 @@ describe("POST imports", () => {
       { POST },
       { getUser },
       { getStoredAccountingConnection },
-      { extractInvoiceWithOpenRouter },
+      { extractInvoiceWithOpenAI },
     ] = await Promise.all([
       import("./route"),
       import("@/lib/workos"),
       import("@/lib/user-accounting-connections"),
-      import("@/lib/openrouter"),
+      import("@/lib/openai"),
     ]);
     vi.mocked(getUser).mockResolvedValue({ user: { id: "user-1" } as never });
     vi.mocked(getStoredAccountingConnection).mockResolvedValue(
       buildSavedConnection("smartaccounts"),
     );
-    vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+    vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
       buildExtraction({
         payment: {
           isPaid: false,
@@ -301,12 +301,12 @@ describe("POST photographed invoice imports", () => {
       { POST },
       { getUser },
       { getStoredAccountingConnection },
-      { extractInvoiceWithOpenRouter },
+      { extractInvoiceWithOpenAI },
     ] = await Promise.all([
       import("./route"),
       import("@/lib/workos"),
       import("@/lib/user-accounting-connections"),
-      import("@/lib/openrouter"),
+      import("@/lib/openai"),
     ]);
     vi.mocked(getUser).mockResolvedValue({ user: { id: "user-1" } as never });
     vi.mocked(getStoredAccountingConnection).mockResolvedValue(
@@ -322,7 +322,7 @@ describe("POST photographed invoice imports", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(extractInvoiceWithOpenRouter).toHaveBeenCalledWith(
+    expect(extractInvoiceWithOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({
         filename: "restaurant_receipt.JPG",
         mimeType: "image/jpeg",

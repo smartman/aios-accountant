@@ -93,6 +93,28 @@ it("keeps heuristic candidates for manual review when AI says missing", () => {
   expect(rows[0]?.articleCandidates).toHaveLength(1);
 });
 
+it("keeps an empty candidate list when AI says a row is missing", () => {
+  const rows = applyAiArticleMatches({
+    rows: [buildRow({ articleCandidates: [], suggestionStatus: "missing" })],
+    catalog: [{ code: "el", description: "Elekter" }],
+    matches: [
+      {
+        rowId: "row-1",
+        status: "missing",
+        selectedArticleCode: null,
+        alternativeArticleCodes: [],
+        reason: "No existing article fits closely enough.",
+      },
+    ],
+  });
+
+  expect(rows[0]).toMatchObject({
+    selectedArticleCode: null,
+    suggestionStatus: "missing",
+    articleCandidates: [],
+  });
+});
+
 it("uses a default missing reason when the AI leaves it blank", () => {
   const rows = applyAiArticleMatches({
     rows: [buildRow()],

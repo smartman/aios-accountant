@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InvoiceExtraction } from "../invoice-import-types";
 
-const { mockApplyAiArticleMatches, mockMatchArticlesWithOpenRouter } =
-  vi.hoisted(() => ({
+const { mockApplyAiArticleMatches, mockMatchArticlesWithOpenAI } = vi.hoisted(
+  () => ({
     mockApplyAiArticleMatches: vi.fn(),
-    mockMatchArticlesWithOpenRouter: vi.fn(),
-  }));
+    mockMatchArticlesWithOpenAI: vi.fn(),
+  }),
+);
 
 vi.mock("./article-matching-ai", () => ({
   applyAiArticleMatches: mockApplyAiArticleMatches,
-  matchArticlesWithOpenRouter: mockMatchArticlesWithOpenRouter,
+  matchArticlesWithOpenAI: mockMatchArticlesWithOpenAI,
 }));
 
 import { resolvePreviewRows } from "./preview-row-resolution";
@@ -143,7 +144,7 @@ describe("resolvePreviewRows", () => {
     mockApplyAiArticleMatches.mockImplementation(
       ({ rows }: { rows: unknown[] }) => rows,
     );
-    mockMatchArticlesWithOpenRouter.mockResolvedValue(null);
+    mockMatchArticlesWithOpenAI.mockResolvedValue(null);
   });
 
   it("creates a fallback row when the extraction has no rows and keeps history unloaded without a vendor match", async () => {
@@ -158,11 +159,11 @@ describe("resolvePreviewRows", () => {
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0]?.description).toBe("Fallback electricity note");
     expect(params.activities.getVendorArticleHistory).not.toHaveBeenCalled();
-    expect(mockMatchArticlesWithOpenRouter).toHaveBeenCalledTimes(1);
+    expect(mockMatchArticlesWithOpenAI).toHaveBeenCalledTimes(1);
   });
 
   it("applies AI article matches after vendor history is loaded", async () => {
-    mockMatchArticlesWithOpenRouter.mockResolvedValueOnce([
+    mockMatchArticlesWithOpenAI.mockResolvedValueOnce([
       {
         rowId: "row-1",
         status: "clear",
@@ -202,7 +203,7 @@ describe("resolvePreviewRows", () => {
 
     expect(result.historyLoaded).toBe(true);
     expect(params.activities.getVendorArticleHistory).toHaveBeenCalledTimes(1);
-    expect(mockMatchArticlesWithOpenRouter).toHaveBeenCalledTimes(1);
+    expect(mockMatchArticlesWithOpenAI).toHaveBeenCalledTimes(1);
     expect(mockApplyAiArticleMatches).toHaveBeenCalledTimes(1);
     expect(result.rows[0]).toMatchObject({
       selectedArticleCode: "el",
@@ -212,7 +213,7 @@ describe("resolvePreviewRows", () => {
   });
 
   it("falls back to heuristic rows when the AI matcher throws", async () => {
-    mockMatchArticlesWithOpenRouter.mockRejectedValueOnce(new Error("boom"));
+    mockMatchArticlesWithOpenAI.mockRejectedValueOnce(new Error("boom"));
     const params = buildParams();
 
     const result = await resolvePreviewRows(params);
