@@ -16,7 +16,7 @@ For SmartAccounts import testing, `.env.local` currently contains these local te
 - `DEV_AUTH_EMAIL`
 - `DEV_AUTH_PASSWORD`
 
-The file also contains the app-level keys needed for local imports, including `OPENROUTER_*` and `WORKOS_*` variables.
+The file also contains the app-level keys needed for local imports, including `OPENAI_*` and `WORKOS_*` variables.
 
 Do not add or rely on ad-hoc import scripts for local testing in this repo.
 

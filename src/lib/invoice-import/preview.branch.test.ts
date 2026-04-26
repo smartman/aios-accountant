@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(async () => ({
+vi.mock("../openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(async () => ({
     vendor: {
       name: "Vendor OÜ",
       regCode: null,

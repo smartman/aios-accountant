@@ -14,8 +14,9 @@ import {
   preferValue,
   resolveAppliedAiSelection,
 } from "./article-matching-ai-helpers";
+import { requestOpenAIStructuredOutput } from "../openai-client";
 
-interface OpenRouterArticleMatch {
+interface OpenAIArticleMatch {
   rowId: string;
   status: "clear" | "ambiguous" | "missing";
   selectedArticleCode: string | null;
@@ -23,8 +24,8 @@ interface OpenRouterArticleMatch {
   reason: string;
 }
 
-interface OpenRouterArticleMatchResponse {
-  rows: OpenRouterArticleMatch[];
+interface OpenAIArticleMatchResponse {
+  rows: OpenAIArticleMatch[];
 }
 
 const ARTICLE_MATCH_RESPONSE_SCHEMA = {
@@ -62,26 +63,24 @@ const ARTICLE_MATCH_RESPONSE_SCHEMA = {
   },
 } as const;
 
-function openRouterArticleMatchSchema() {
+function openAIArticleMatchSchema() {
   return {
     name: "invoice_article_match_payload",
-    strict: true,
+    strict: true as const,
     schema: ARTICLE_MATCH_RESPONSE_SCHEMA,
   };
 }
 
-function getOpenRouterConfig(): {
+function getOpenAIConfig(): {
   apiKey: string;
   model: string;
-  title: string;
 } | null {
   if (process.env.NODE_ENV === "test") {
     return null;
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model =
-    process.env.OPENROUTER_ARTICLE_MATCH_MODEL?.trim() || "openai/gpt-5.4-mini";
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_ARTICLE_MATCH_MODEL?.trim() || "gpt-5.5";
 
   if (!apiKey) {
     return null;
@@ -90,33 +89,7 @@ function getOpenRouterConfig(): {
   return {
     apiKey,
     model,
-    title: process.env.OPENROUTER_APP_TITLE ?? "Accounting Invoice Importer",
   };
-}
-
-function extractMessageText(content: unknown): string {
-  if (typeof content === "string") {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === "string") {
-          return item;
-        }
-
-        if (item && typeof item === "object" && "text" in item) {
-          const text = (item as { text?: unknown }).text;
-          return typeof text === "string" ? text : "";
-        }
-
-        return "";
-      })
-      .join("");
-  }
-
-  return "";
 }
 
 function buildSystemPrompt(): string {
@@ -261,7 +234,7 @@ function buildAiCandidate(params: {
 }
 
 function normalizeAiMatch(params: {
-  match: OpenRouterArticleMatch;
+  match: OpenAIArticleMatch;
   catalogByCode: Map<string, ProviderCatalogArticle>;
 }): {
   status: "clear" | "ambiguous" | "missing";
@@ -300,7 +273,7 @@ function normalizeAiMatch(params: {
 
 function mergeAiCandidates(params: {
   row: InvoiceImportDraftRow;
-  match: OpenRouterArticleMatch;
+  match: OpenAIArticleMatch;
   catalogByCode: Map<string, ProviderCatalogArticle>;
 }): InvoiceImportReviewArticleCandidate[] | null {
   const normalizedMatch = normalizeAiMatch({
@@ -344,7 +317,7 @@ function mergeAiCandidates(params: {
 function resolveAiCandidatesForRow(params: {
   row: InvoiceImportDraftRow;
   catalogByCode: Map<string, ProviderCatalogArticle>;
-  match?: OpenRouterArticleMatch;
+  match?: OpenAIArticleMatch;
 }) {
   if (!params.match) {
     return null;
@@ -360,7 +333,7 @@ function resolveAiCandidatesForRow(params: {
 function applyAiMatchToRow(params: {
   row: InvoiceImportDraftRow;
   catalogByCode: Map<string, ProviderCatalogArticle>;
-  match?: OpenRouterArticleMatch;
+  match?: OpenAIArticleMatch;
 }): InvoiceImportDraftRow {
   const mergedCandidates = resolveAiCandidatesForRow(params);
 
@@ -390,7 +363,7 @@ function applyAiMatchToRow(params: {
 export function applyAiArticleMatches(params: {
   rows: InvoiceImportDraftRow[];
   catalog: ProviderCatalogArticle[];
-  matches: OpenRouterArticleMatch[];
+  matches: OpenAIArticleMatch[];
 }): InvoiceImportDraftRow[] {
   const catalogByCode = new Map(
     params.catalog.map((article) => [article.code, article] as const),
@@ -408,78 +381,30 @@ export function applyAiArticleMatches(params: {
   );
 }
 
-export async function matchArticlesWithOpenRouter(params: {
+export async function matchArticlesWithOpenAI(params: {
   provider: AccountingProvider;
   rows: InvoiceImportDraftRow[];
   catalog: ProviderCatalogArticle[];
   history: ProviderHistoricalInvoiceRow[];
   companyContext?: string | null;
-}): Promise<OpenRouterArticleMatch[] | null> {
-  const config = getOpenRouterConfig();
+}): Promise<OpenAIArticleMatch[] | null> {
+  const config = getOpenAIConfig();
 
   if (!config || params.rows.length === 0 || params.catalog.length === 0) {
     return null;
   }
 
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        "Content-Type": "application/json",
-        "X-Title": config.title,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          {
-            role: "system",
-            content: buildSystemPrompt(),
-          },
-          {
-            role: "user",
-            content: buildUserPrompt(params),
-          },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: openRouterArticleMatchSchema(),
-        },
-        temperature: 0.1,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `OpenRouter ${response.status}: ${text || response.statusText}`,
-    );
-  }
-
-  const payload = (await response.json()) as {
-    choices?: Array<{
-      message?: {
-        content?: unknown;
-      };
-    }>;
-  };
-  const rawContent = payload.choices?.[0]?.message?.content;
-  const text = extractMessageText(rawContent);
-
-  if (!text) {
-    throw new Error("OpenRouter returned an empty response.");
-  }
-
-  let parsed: OpenRouterArticleMatchResponse;
-  try {
-    parsed = JSON.parse(text) as OpenRouterArticleMatchResponse;
-  } catch {
-    throw new Error(
-      "OpenRouter did not return valid JSON for the article matcher.",
-    );
-  }
+  const parsed =
+    await requestOpenAIStructuredOutput<OpenAIArticleMatchResponse>({
+      apiKey: config.apiKey,
+      model: config.model,
+      systemPrompt: buildSystemPrompt(),
+      userContent: [{ type: "input_text", text: buildUserPrompt(params) }],
+      jsonSchema: openAIArticleMatchSchema(),
+      promptCacheKey: "invoice-article-matching",
+      invalidJsonMessage:
+        "OpenAI did not return valid JSON for the article matcher.",
+    });
 
   return parsed.rows ?? [];
 }

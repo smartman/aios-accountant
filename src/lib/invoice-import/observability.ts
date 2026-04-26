@@ -1,3 +1,5 @@
+import { logger, type LogMetadata } from "@/lib/logger";
+
 type InvoiceImportWorkflow = "preview" | "confirm";
 type InvoiceImportProvider = "smartaccounts" | "merit";
 type InvoiceImportLogMetadata = Record<
@@ -32,21 +34,24 @@ export function logInvoiceImportEvent(params: {
   metadata?: InvoiceImportLogMetadata;
   error?: unknown;
 }): void {
-  const payload = {
-    category: "invoice-import",
-    timestamp: new Date().toISOString(),
-    workflow: params.workflow,
-    provider: params.provider,
-    phase: params.phase,
-    status: params.status,
-    durationMs: params.durationMs,
-    metadata: compactMetadata(params.metadata),
-    errorMessage:
-      params.status === "error" ? toErrorMessage(params.error) : undefined,
-  };
+  const metadata = compactMetadata(params.metadata);
 
-  const logger = params.status === "error" ? console.error : console.info;
-  logger(JSON.stringify(payload));
+  logger[params.status === "error" ? "error" : "info"]({
+    category: "invoice-import",
+    event: `invoice-import.${params.workflow}.${params.phase}`,
+    status: params.status,
+    thread: {
+      workflow: params.workflow,
+      provider: params.provider,
+      phase: params.phase,
+    },
+    durationMs: params.durationMs,
+    metadata: metadata as LogMetadata | undefined,
+    error:
+      params.status === "error"
+        ? new Error(toErrorMessage(params.error))
+        : null,
+  });
 }
 
 export async function measureInvoiceImportPhase<T>(params: {

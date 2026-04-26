@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { extractInvoiceWithOpenRouter } from "../openrouter";
+import { extractInvoiceWithOpenAI } from "../openai";
 import {
   assertReferenceAccounts,
   attachFileIfNeeded,
@@ -8,8 +8,8 @@ import {
   recordPaymentIfNeeded,
 } from "./workflow-utils";
 
-vi.mock("../openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("../openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 
 function buildSavedConnection() {
@@ -79,7 +79,7 @@ it("validates reference accounts and generates fallback invoice numbers", async 
     assertReferenceAccounts(buildSavedConnection(), 1),
   ).not.toThrow();
 
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(buildExtraction());
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(buildExtraction());
   const extraction = await extractInvoiceData(
     {
       savedConnection: buildSavedConnection(),

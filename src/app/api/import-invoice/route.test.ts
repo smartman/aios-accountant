@@ -34,8 +34,8 @@ const hoisted = vi.hoisted(() => ({
   smartAccountsFindVendor: vi.fn(),
 }));
 
-vi.mock("@/lib/openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("@/lib/openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 vi.mock("@/lib/workos", () => ({
   getUser: vi.fn(),
@@ -251,8 +251,8 @@ beforeEach(async () => {
   hoisted.smartAccountsFindVendor.mockResolvedValue(null);
   hoisted.meritFindVendor.mockResolvedValue(null);
 
-  const { extractInvoiceWithOpenRouter } = await import("@/lib/openrouter");
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(buildExtraction());
+  const { extractInvoiceWithOpenAI } = await import("@/lib/openai");
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(buildExtraction());
 });
 
 afterEach(() => {

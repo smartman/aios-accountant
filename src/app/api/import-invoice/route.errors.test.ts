@@ -19,8 +19,8 @@ const hoisted = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("@/lib/openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 vi.mock("@/lib/workos", () => ({
   getUser: hoisted.getUser,

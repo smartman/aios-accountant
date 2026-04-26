@@ -64,11 +64,13 @@ WORKOS_CLIENT_ID=client_example_id
 WORKOS_COOKIE_PASSWORD=change-me-use-openssl-rand-base64-32
 
 # AI extraction
-OPENROUTER_API_KEY=sk-or-v1-example
-OPENROUTER_MODEL=openai/gpt-4.1-mini
-OPENROUTER_ARTICLE_MATCH_MODEL=openai/gpt-5.4-mini
-OPENROUTER_APP_TITLE=AI Accountant
+OPENAI_API_KEY=sk-proj-example
+OPENAI_MODEL=gpt-5.5
+OPENAI_ARTICLE_MATCH_MODEL=gpt-5.5
 ```
+
+Invoice extraction and article matching call OpenAI directly through the Responses API. Requests use structured JSON schema outputs and set `prompt_cache_key` with 24-hour prompt cache retention for repeated invoice workflows.
+Structured logs include each OpenAI call's token usage, cached-token percentage, estimated per-call USD cost, latency, model, schema, and prompt-cache key.
 
 > **Tip:** Generate secrets for `CREDENTIAL_ENCRYPTION_KEY` and `WORKOS_COOKIE_PASSWORD` with:
 >
@@ -112,7 +114,7 @@ Users sign in with WorkOS, then configure either their own SmartAccounts credent
 When the importer suggests an existing accounting article for an invoice row, it applies these rules in order:
 
 1. Only active purchase articles are considered.
-2. The primary matcher is AI. For each invoice row, the app sends the row description, source article code, resolved account/VAT/unit, the active article catalog, and a vendor-history summary to OpenRouter.
+2. The primary matcher is AI. For each invoice row, the app sends the row description, source article code, resolved account/VAT/unit, the active article catalog, and a vendor-history summary to OpenAI.
 3. The AI must return one of three outcomes for each row:
    - `clear`: one existing article is clearly the best match
    - `ambiguous`: more than one existing article is still plausible
@@ -120,7 +122,7 @@ When the importer suggests an existing accounting article for an invoice row, it
 4. The AI is instructed to use row-description meaning first, with vendor history and accounting metadata as supporting evidence.
 5. The row stays on manual review unless the AI returns a `clear` match.
 6. A deterministic matcher still ranks candidate articles underneath the AI decision so the UI can show review options and so the app has a fallback if the AI matcher is unavailable.
-7. Set `OPENROUTER_ARTICLE_MATCH_MODEL` to override the article-matcher model. If it is unset, the matcher defaults to `openai/gpt-5.4-mini`.
+7. Set `OPENAI_ARTICLE_MATCH_MODEL` to override the article-matcher model. If it is unset, the matcher defaults to `gpt-5.5`.
 
 Example: `Kontori internet märts 2025` should match an article such as `net - Internet`, because `märts 2025` is billing-period detail and `Kontori` is just extra context around the core service name.
 

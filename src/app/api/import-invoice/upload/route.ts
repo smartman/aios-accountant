@@ -6,6 +6,11 @@ import {
 } from "@/lib/invoice-import/upload-limits";
 import { requireCompanyForUser } from "@/lib/companies/repository";
 import { getUser } from "@/lib/workos";
+import {
+  addLogThreadContext,
+  createLogRequestId,
+  withLogThreadContext,
+} from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -58,11 +63,12 @@ function validateTemporaryInvoiceUpload(pathname: string, size: number) {
   }
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function handleUploadRequest(request: Request): Promise<NextResponse> {
   const { user } = await getUser();
   if (!user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  addLogThreadContext({ userId: user.id, routeAction: "invoice-upload" });
 
   try {
     const body = (await request.json()) as HandleUploadBody;
@@ -71,6 +77,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const payload = parseClientPayload(clientPayload);
+        addLogThreadContext({ companyId: payload.companyId });
         validateTemporaryInvoiceUpload(pathname, payload.size);
         await requireCompanyForUser({
           companyId: payload.companyId,
@@ -100,4 +107,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 400 },
     );
   }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  return withLogThreadContext(
+    {
+      requestId: createLogRequestId(),
+      route: "POST /api/import-invoice/upload",
+    },
+    () => handleUploadRequest(request),
+  );
 }

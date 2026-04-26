@@ -1,9 +1,9 @@
 import { expect, it, vi } from "vitest";
 import { previewInvoiceImport } from "./preview";
-import { extractInvoiceWithOpenRouter } from "../openrouter";
+import { extractInvoiceWithOpenAI } from "../openai";
 
-vi.mock("../openrouter", () => ({
-  extractInvoiceWithOpenRouter: vi.fn(),
+vi.mock("../openai", () => ({
+  extractInvoiceWithOpenAI: vi.fn(),
 }));
 
 function buildExtraction(overrides?: Record<string, unknown>) {
@@ -61,7 +61,7 @@ function buildExtraction(overrides?: Record<string, unknown>) {
 }
 
 it("builds a reviewed draft with candidate suggestions and duplicate info", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction() as never,
   );
   const activities = {
@@ -162,7 +162,7 @@ it("builds a reviewed draft with candidate suggestions and duplicate info", asyn
 });
 
 it("falls back to a summarized row and leaves article selection empty when there is no match", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({ rows: [] }) as never,
   );
   const preview = await previewInvoiceImport({
@@ -213,7 +213,7 @@ it("falls back to a summarized row and leaves article selection empty when there
 });
 
 it("skips vendor history loading when the catalog description match is already clear", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({
       rows: [
         {
@@ -296,7 +296,7 @@ it("skips vendor history loading when the catalog description match is already c
 });
 
 it("loads vendor history when the catalog-only description match is low confidence", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({
       rows: [
         {
@@ -381,7 +381,7 @@ it("loads vendor history when the catalog-only description match is low confiden
 });
 
 it("preserves exact preview amounts and hides non-actionable vendor warnings", async () => {
-  vi.mocked(extractInvoiceWithOpenRouter).mockResolvedValue(
+  vi.mocked(extractInvoiceWithOpenAI).mockResolvedValue(
     buildExtraction({
       invoice: {
         ...buildExtraction().invoice,

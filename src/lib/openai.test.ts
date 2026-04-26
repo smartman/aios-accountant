@@ -1,13 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { extractInvoiceWithOpenRouter } from "./openrouter";
+import { extractInvoiceWithOpenAI } from "./openai";
 
-type OpenRouterRequestBody = {
-  messages: Array<{
+type OpenAIRequestBody = {
+  model?: string;
+  instructions?: unknown;
+  input: Array<{
     role: string;
     content: unknown;
   }>;
-  plugins?: unknown[];
-  response_format?: unknown;
+  text?: {
+    format?: unknown;
+  };
+  prompt_cache_key?: string;
+  prompt_cache_retention?: string;
+  reasoning?: {
+    effort?: string;
+  };
+  store?: boolean;
 };
 
 function buildBaseExtraction() {
@@ -66,17 +75,19 @@ function buildResponse(
   content: unknown = JSON.stringify(buildBaseExtraction()),
 ) {
   return {
-    choices: [
+    output: [
       {
-        message: {
-          content,
-        },
+        type: "message",
+        content:
+          typeof content === "string"
+            ? [{ type: "output_text", text: content }]
+            : content,
       },
     ],
   };
 }
 
-function mockOpenRouterResponse(
+function mockOpenAIResponse(
   payload: unknown,
   init?: ResponseInit,
 ): ReturnType<typeof vi.spyOn> {
@@ -92,8 +103,8 @@ function mockOpenRouterResponse(
 }
 
 function setupEnv() {
-  vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-  vi.stubEnv("OPENROUTER_MODEL", "test-model");
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("OPENAI_MODEL", "test-model");
 }
 
 function buildImportParams(overrides?: {
@@ -112,15 +123,15 @@ function buildImportParams(overrides?: {
       overrides?.fileDataUrl ?? "data:application/pdf;base64,ZmFrZQ==",
     accounts: overrides?.accounts ?? [],
     taxCodes: overrides?.taxCodes ?? [],
-  } as Parameters<typeof extractInvoiceWithOpenRouter>[0];
+  } as Parameters<typeof extractInvoiceWithOpenAI>[0];
 }
 
 async function expectVendorPromptAndRawPdfUpload() {
   setupEnv();
 
-  const fetchMock = mockOpenRouterResponse(buildResponse());
+  const fetchMock = mockOpenAIResponse(buildResponse());
 
-  const extraction = await extractInvoiceWithOpenRouter(
+  const extraction = await extractInvoiceWithOpenAI(
     buildImportParams({
       accounts: [{ code: "4000", type: "EXPENSE", label: "4000 - Services" }],
     }),
@@ -129,13 +140,19 @@ async function expectVendorPromptAndRawPdfUpload() {
   const [, requestInit] = fetchMock.mock.calls[0] ?? [];
   const body = JSON.parse(
     String(requestInit?.body ?? "{}"),
-  ) as OpenRouterRequestBody;
-  const systemPrompt = body.messages.find(
-    (message) => message.role === "system",
-  )?.content;
-  const userContent = body.messages.find((message) => message.role === "user")
+  ) as OpenAIRequestBody;
+  const systemPrompt = body.instructions;
+  const userContent = body.input.find((message) => message.role === "user")
     ?.content as Array<{ type: string }>;
 
+  expect(fetchMock.mock.calls[0]?.[0]).toBe(
+    "https://api.openai.com/v1/responses",
+  );
+  expect(body.model).toBe("test-model");
+  expect(body.reasoning).toEqual({ effort: "low" });
+  expect(body.prompt_cache_key).toBe("invoice-extraction");
+  expect(body.prompt_cache_retention).toBe("24h");
+  expect(body.store).toBe(false);
   expect(typeof systemPrompt).toBe("string");
   expect(systemPrompt).toContain("Arve saaja");
   expect(systemPrompt).toContain("Makse saaja");
@@ -148,12 +165,11 @@ async function expectVendorPromptAndRawPdfUpload() {
   expect(systemPrompt).toContain(
     "Do not add a warning when the vendor is confidently resolved",
   );
-  expect(userContent.some((item) => item.type === "file")).toBe(true);
+  expect(userContent.some((item) => item.type === "input_file")).toBe(true);
   expect(JSON.stringify(userContent)).toContain("cash-register slips");
   expect(JSON.stringify(userContent)).toContain("needsManualReview");
-  expect(JSON.stringify(body.response_format)).toContain("manualReviewReason");
-  expect(userContent.some((item) => item.type === "image_url")).toBe(false);
-  expect(body.plugins).toBeUndefined();
+  expect(JSON.stringify(body.text?.format)).toContain("manualReviewReason");
+  expect(userContent.some((item) => item.type === "input_image")).toBe(false);
   expect(extraction.vendor.name).toBe("Kilo Code");
   expect(extraction.vendor.countryCode).toBe("EE");
   expect(extraction.invoice.currency).toBe("EUR");
@@ -162,7 +178,7 @@ async function expectVendorPromptAndRawPdfUpload() {
 async function expectImageUploadNormalization() {
   setupEnv();
 
-  const fetchMock = mockOpenRouterResponse(
+  const fetchMock = mockOpenAIResponse(
     buildResponse([
       { text: 7 },
       "",
@@ -204,7 +220,7 @@ async function expectImageUploadNormalization() {
     ]),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(
+  const extraction = await extractInvoiceWithOpenAI(
     buildImportParams({
       provider: "merit",
       filename: "invoice.png",
@@ -218,12 +234,12 @@ async function expectImageUploadNormalization() {
   const [, requestInit] = fetchMock.mock.calls[0] ?? [];
   const body = JSON.parse(
     String(requestInit?.body ?? "{}"),
-  ) as OpenRouterRequestBody;
-  const userContent = body.messages.find((message) => message.role === "user")
+  ) as OpenAIRequestBody;
+  const userContent = body.input.find((message) => message.role === "user")
     ?.content as Array<{ type: string }>;
 
-  expect(userContent.some((item) => item.type === "image_url")).toBe(true);
-  expect(userContent.some((item) => item.type === "file")).toBe(false);
+  expect(userContent.some((item) => item.type === "input_image")).toBe(true);
+  expect(userContent.some((item) => item.type === "input_file")).toBe(false);
   expect(extraction.vendor.name).toBeNull();
   expect(extraction.invoice.currency).toBe("EUR");
   expect(extraction.invoice.entryDate).toBe("2026-02-03");
@@ -234,7 +250,7 @@ async function expectImageUploadNormalization() {
 async function expectExactAmountExtractionAndWarningFiltering() {
   setupEnv();
 
-  mockOpenRouterResponse(
+  mockOpenAIResponse(
     buildResponse(
       JSON.stringify({
         ...buildBaseExtraction(),
@@ -265,7 +281,7 @@ async function expectExactAmountExtractionAndWarningFiltering() {
     ),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(extraction.invoice.amountExcludingVat).toBe(181.294);
   expect(extraction.invoice.vatAmount).toBe(39.884);
@@ -285,7 +301,7 @@ async function expectExactAmountExtractionAndWarningFiltering() {
 async function expectArrayFallbackNormalization() {
   setupEnv();
 
-  mockOpenRouterResponse(
+  mockOpenAIResponse(
     buildResponse(
       JSON.stringify({
         ...buildBaseExtraction(),
@@ -295,7 +311,7 @@ async function expectArrayFallbackNormalization() {
     ),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(extraction.rows).toEqual([]);
   expect(extraction.warnings).toEqual([]);
@@ -304,7 +320,7 @@ async function expectArrayFallbackNormalization() {
 async function expectInvoiceNullFallbackNormalization() {
   setupEnv();
 
-  mockOpenRouterResponse(
+  mockOpenAIResponse(
     buildResponse(
       JSON.stringify({
         ...buildBaseExtraction(),
@@ -325,7 +341,7 @@ async function expectInvoiceNullFallbackNormalization() {
     ),
   );
 
-  const extraction = await extractInvoiceWithOpenRouter(buildImportParams());
+  const extraction = await extractInvoiceWithOpenAI(buildImportParams());
 
   expect(extraction.invoice).toMatchObject({
     documentType: null,
@@ -343,22 +359,22 @@ async function expectInvoiceNullFallbackNormalization() {
 }
 
 async function expectMissingEnvFailure() {
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow("Missing required environment variable");
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "Missing required environment variable",
+  );
 }
 
 async function expectApiFailureMessage() {
   setupEnv();
 
-  mockOpenRouterResponse(
+  mockOpenAIResponse(
     { error: "gateway issue" },
     { status: 502, statusText: "Bad Gateway" },
   );
 
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow("OpenRouter 502");
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "OpenAI 502",
+  );
 }
 
 async function expectStatusTextFallback() {
@@ -371,54 +387,51 @@ async function expectStatusTextFallback() {
     }),
   );
 
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow("OpenRouter 503: Service Unavailable");
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "OpenAI 503: Service Unavailable",
+  );
 }
 
 async function expectEmptyContentFailure() {
   setupEnv();
 
-  mockOpenRouterResponse(
+  mockOpenAIResponse(
     buildResponse([{ type: "output_text", value: "missing text field" }]),
   );
 
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow("OpenRouter returned an empty response.");
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "OpenAI returned an empty response.",
+  );
 }
 
 async function expectNonTextObjectFailure() {
   setupEnv();
 
-  mockOpenRouterResponse({
-    choices: [
+  mockOpenAIResponse({
+    output: [
       {
-        message: {
-          content: { text: "not handled outside arrays" },
-        },
+        type: "message",
+        content: { text: "not handled outside arrays" },
       },
     ],
   });
 
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow("OpenRouter returned an empty response.");
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "OpenAI returned an empty response.",
+  );
 }
 
 async function expectInvalidJsonFailure() {
   setupEnv();
 
-  mockOpenRouterResponse(buildResponse("not json"));
+  mockOpenAIResponse(buildResponse("not json"));
 
-  await expect(
-    extractInvoiceWithOpenRouter(buildImportParams()),
-  ).rejects.toThrow(
-    "OpenRouter did not return valid JSON for the invoice extraction.",
+  await expect(extractInvoiceWithOpenAI(buildImportParams())).rejects.toThrow(
+    "OpenAI did not return valid JSON for the invoice extraction.",
   );
 }
 
-describe("extractInvoiceWithOpenRouter", () => {
+describe("extractInvoiceWithOpenAI", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
@@ -449,17 +462,17 @@ describe("extractInvoiceWithOpenRouter", () => {
     expectMissingEnvFailure,
   );
   it(
-    "throws the OpenRouter status text when the API call fails",
+    "throws the OpenAI status text when the API call fails",
     expectApiFailureMessage,
   );
   it(
     "falls back to the response status text when the error body is empty",
     expectStatusTextFallback,
   );
-  it("throws when OpenRouter returns empty content", expectEmptyContentFailure);
+  it("throws when OpenAI returns empty content", expectEmptyContentFailure);
   it(
-    "throws when OpenRouter returns a non-text content object",
+    "throws when OpenAI returns a non-text content object",
     expectNonTextObjectFailure,
   );
-  it("throws when OpenRouter returns invalid JSON", expectInvalidJsonFailure);
+  it("throws when OpenAI returns invalid JSON", expectInvalidJsonFailure);
 });

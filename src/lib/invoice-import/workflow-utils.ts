@@ -1,4 +1,4 @@
-import { extractInvoiceWithOpenRouter } from "../openrouter";
+import { extractInvoiceWithOpenAI } from "../openai";
 import { ImportedInvoiceResult } from "../invoice-import-types";
 import { generateFallbackInvoiceNumber } from "../provider-import-helpers";
 import {
@@ -56,7 +56,7 @@ export async function extractInvoiceData<TCredentials>(
       taxCodeCount: taxCodes.length,
     },
     run: () =>
-      extractInvoiceWithOpenRouter({
+      extractInvoiceWithOpenAI({
         provider: params.savedConnection.provider,
         filename: params.filename,
         mimeType: params.mimeType,

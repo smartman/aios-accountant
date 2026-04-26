@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRowRepairPrompt, buildUserPrompt } from "./openrouter-prompts";
+import { buildRowRepairPrompt, buildUserPrompt } from "./openai-prompts";
 import type { InvoiceExtraction } from "./invoice-import-types";
 
 const extraction: InvoiceExtraction = {
@@ -46,7 +46,7 @@ const extraction: InvoiceExtraction = {
   warnings: [],
 };
 
-describe("OpenRouter company prompts", () => {
+describe("OpenAI company prompts", () => {
   it("includes company context and provider dimensions in extraction prompts", () => {
     const prompt = buildUserPrompt(
       "merit",

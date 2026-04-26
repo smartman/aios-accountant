@@ -4,7 +4,7 @@ import path from "node:path";
 const TEST_ISOLATED_ENV_PREFIXES = [
   "DEV_AUTH_",
   "NEXT_PUBLIC_WORKOS_",
-  "OPENROUTER_",
+  "OPENAI_",
   "SMARTACCOUNTS_DEV_",
   "WORKOS_",
 ] as const;
