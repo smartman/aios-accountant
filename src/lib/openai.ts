@@ -52,6 +52,15 @@ function normalizeVendor(data: InvoiceExtraction): InvoiceExtraction["vendor"] {
   };
 }
 
+function normalizeCurrency(currency: string | null | undefined): string {
+  const normalized = currency?.trim().toUpperCase();
+  if (!normalized || ["UNKNOWN", "N/A", "NA", "NULL"].includes(normalized)) {
+    return "EUR";
+  }
+
+  return normalized;
+}
+
 function normalizeInvoice(
   data: InvoiceExtraction,
 ): InvoiceExtraction["invoice"] {
@@ -59,9 +68,7 @@ function normalizeInvoice(
     documentType: data.invoice.documentType ?? null,
     invoiceNumber: data.invoice.invoiceNumber ?? null,
     referenceNumber: data.invoice.referenceNumber ?? null,
-    currency: data.invoice.currency
-      ? data.invoice.currency.toUpperCase()
-      : "EUR",
+    currency: normalizeCurrency(data.invoice.currency),
     issueDate: data.invoice.issueDate ?? null,
     dueDate: data.invoice.dueDate ?? null,
     entryDate: data.invoice.entryDate ?? data.invoice.issueDate ?? null,

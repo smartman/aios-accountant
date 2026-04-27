@@ -328,7 +328,7 @@ async function expectInvoiceNullFallbackNormalization() {
           documentType: null,
           invoiceNumber: null,
           referenceNumber: null,
-          currency: null,
+          currency: " n/a ",
           issueDate: null,
           dueDate: null,
           entryDate: null,
@@ -454,7 +454,7 @@ describe("extractInvoiceWithOpenAI", () => {
     expectArrayFallbackNormalization,
   );
   it(
-    "normalizes null invoice fields without inventing values",
+    "normalizes null invoice fields and defaults currency to euro",
     expectInvoiceNullFallbackNormalization,
   );
   it(
