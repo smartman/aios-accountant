@@ -68,6 +68,7 @@ export function buildUserPrompt(
     "For multi-column, visually grouped, or photographed documents, keep labels matched with the nearest company details in the same block or column.",
     "If explicit role labels and header branding disagree, prefer the explicit labeled roles and mention the conflict in warnings.",
     "Use ISO date format YYYY-MM-DD for every date.",
+    "If the invoice currency cannot be determined from the document, set invoice.currency to EUR.",
     "Use one of the provided account codes for each row's accountPurchase.",
     "Only choose purchase posting accounts that fit the invoice content. Do not use bank, cash, receivable, payable, or VAT settlement accounts unless the invoice clearly represents such a purchase.",
     "Prefer the most specific matching account description over generic catch-all accounts when a better fit exists.",
